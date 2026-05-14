@@ -113,6 +113,8 @@
   #mainCanvas {
     display: block;
     cursor: crosshair;
+    width: 100%;
+    height: 100%;
   }
   #tooltip {
     position: absolute;
@@ -249,7 +251,7 @@
     </button>
   </div>
   <div id="canvas-wrap">
-    <canvas id="mainCanvas" width="800" height="600"></canvas>
+    <canvas id="mainCanvas"></canvas>
     <div id="tooltip"></div>
   </div>
 </div>
@@ -271,7 +273,7 @@
 </div>
 
 <script>
-const W = 800, H = 600;
+let W, H;
 const N_PARTICLES = 7000;
 const WARMUP = 1000;
 
@@ -281,7 +283,7 @@ const tooltip = document.getElementById('tooltip');
 const canvasWrap = document.getElementById('canvas-wrap');
 
 // Density buffer
-let density = new Float32Array(W * H);
+let density;
 let maxDensity = 1;
 let frameCount = 0;
 let warmupDone = false;
@@ -345,7 +347,7 @@ const attractors = [
         (Math.random()-0.5)*2 + 20
       ];
     },
-    viewScale: 11, viewOX: W/2, viewOY: H/2+60
+    viewScale: 11, viewOX: 400, viewOY: 360
   },
   {
     name: 'Rössler',
@@ -368,7 +370,7 @@ const attractors = [
         (Math.random()-0.5)*0.5
       ];
     },
-    viewScale: 16, viewOX: W/2, viewOY: H/2+30
+    viewScale: 16, viewOX: 400, viewOY: 330
   },
   {
     name: 'Thomas',
@@ -391,7 +393,7 @@ const attractors = [
         (Math.random()-0.5)*0.4
       ];
     },
-    viewScale: 70, viewOX: W/2, viewOY: H/2
+    viewScale: 70, viewOX: 400, viewOY: 300
   },
   {
     name: 'Halvorsen',
@@ -414,7 +416,7 @@ const attractors = [
         (Math.random()-0.5)*0.2
       ];
     },
-    viewScale: 28, viewOX: W/2, viewOY: H/2+20
+    viewScale: 28, viewOX: 400, viewOY: 320
   },
   {
     name: 'Aizawa',
@@ -437,7 +439,7 @@ const attractors = [
         (Math.random()-0.5)*0.2 - 0.3
       ];
     },
-    viewScale: 140, viewOX: W/2, viewOY: H/2
+    viewScale: 140, viewOX: 400, viewOY: 300
   }
 ];
 
@@ -448,6 +450,22 @@ let running = true;
 let animId = null;
 
 function getAttractor() { return attractors[currentIdx]; }
+
+function resize() {
+  W = canvas.offsetWidth;
+  H = canvas.offsetHeight;
+  canvas.width = W;
+  canvas.height = H;
+  density = new Float32Array(W * H);
+  // Update projection centers for each attractor
+  attractors[0].viewOX = W/2; attractors[0].viewOY = H/2 + 60;
+  attractors[1].viewOX = W/2; attractors[1].viewOY = H/2 + 30;
+  attractors[2].viewOX = W/2; attractors[2].viewOY = H/2;
+  attractors[3].viewOX = W/2; attractors[3].viewOY = H/2 + 20;
+  attractors[4].viewOX = W/2; attractors[4].viewOY = H/2;
+  if (particles) initParticles();
+}
+window.addEventListener('resize', resize);
 
 function initParticles() {
   const attr = getAttractor();
@@ -617,6 +635,7 @@ canvas.addEventListener('mousemove', e => {
 canvas.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
 
 // Init
+resize();
 initParticles();
 loop();
 </script>

@@ -97,11 +97,16 @@
     align-items: center;
     justify-content: center;
     min-height: 0;
+    min-width: 0;
   }
   canvas#networkCanvas {
     image-rendering: pixelated;
     border: 2px solid #1e2a4a;
     border-radius: 4px;
+    width: auto;
+    height: 100%;
+    aspect-ratio: 1;
+    max-height: calc(100vh - 180px);
   }
   .overlap-bar-row {
     display: flex;
@@ -260,7 +265,7 @@
       Select a pattern to begin recall
     </div>
     <div class="network-canvas-wrap">
-      <canvas id="networkCanvas" width="320" height="320"></canvas>
+      <canvas id="networkCanvas"></canvas>
     </div>
     <div class="section-label" style="align-self:flex-start; padding-left:10px">Overlap m_μ with each stored pattern</div>
     <div class="overlap-bar-row" id="overlapBars"></div>
@@ -863,13 +868,22 @@ function animate() {
 // ─────────────────────────────────────────────────────────────────────────────
 // INIT
 // ─────────────────────────────────────────────────────────────────────────────
+function resizeCanvas() {
+  const wrap = document.querySelector('.network-canvas-wrap');
+  const size = Math.min(wrap.clientWidth, wrap.clientHeight - 4);
+  netCanvas.width = size;
+  netCanvas.height = size;
+  renderNetwork();
+}
+window.addEventListener('resize', resizeCanvas);
+
 buildThumbnails();
 buildOverlapBars();
 
 // Init with all +1 (blank)
 for (let i = 0; i < N; i++) state[i] = 1;
 computeOverlaps();
-renderNetwork();
+resizeCanvas();
 updateStats();
 
 animate();

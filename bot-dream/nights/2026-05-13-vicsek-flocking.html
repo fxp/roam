@@ -12,28 +12,43 @@
     font-family: 'SF Mono', 'Fira Code', monospace;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    min-height: 100vh;
-    padding: 16px;
+    height: 100vh;
+    overflow: hidden;
+  }
+  #header {
+    flex-shrink: 0;
+    padding: 8px 16px;
+    background: inherit;
+    border-bottom: 1px solid #1a2a3a;
   }
   h1 {
     font-size: 1.3rem;
     font-weight: 400;
     color: #aad4f5;
-    margin-bottom: 4px;
+    margin-bottom: 2px;
     letter-spacing: 0.05em;
   }
   .subtitle {
     font-size: 0.72rem;
     color: #556;
-    margin-bottom: 14px;
     letter-spacing: 0.08em;
   }
   .main-layout {
+    flex: 1;
     display: flex;
-    gap: 18px;
-    align-items: flex-start;
-    flex-wrap: wrap;
+    gap: 16px;
+    padding: 12px;
+    overflow: hidden;
+    align-items: stretch;
+    min-height: 0;
+  }
+  .canvas-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    align-items: center;
     justify-content: center;
   }
   canvas#main {
@@ -41,6 +56,10 @@
     border-radius: 4px;
     background: #03050a;
     display: block;
+    max-width: 100%;
+    max-height: 100%;
+    aspect-ratio: 1;
+    flex-shrink: 1;
   }
   .side-panel {
     display: flex;
@@ -199,12 +218,14 @@
 </style>
 </head>
 <body>
-<h1>Vicsek 模型 — 椋鸟群舞</h1>
-<div class="subtitle">Vicsek et al. 1995 · 粒子方向对齐 · 涌现相变</div>
+<div id="header">
+  <h1>Vicsek 模型 — 椋鸟群舞</h1>
+  <div class="subtitle">Vicsek et al. 1995 · 粒子方向对齐 · 涌现相变</div>
+</div>
 
 <div class="main-layout">
-  <div>
-    <canvas id="main" width="560" height="560"></canvas>
+  <div class="canvas-area">
+    <canvas id="main"></canvas>
     <div class="step-count" id="stepCount">step: 0</div>
   </div>
 
@@ -375,8 +396,19 @@ function simulate() {
 // ─── Canvas rendering ─────────────────────────────────────────────────────────
 const mainCanvas = document.getElementById('main');
 const ctx = mainCanvas.getContext('2d');
-const W = mainCanvas.width;
-const H = mainCanvas.height;
+let W = mainCanvas.width;
+let H = mainCanvas.height;
+
+function resizeMain() {
+  const area = document.querySelector('.canvas-area');
+  const size = Math.min(area.clientWidth, area.clientHeight);
+  mainCanvas.width = size;
+  mainCanvas.height = size;
+  W = mainCanvas.width;
+  H = mainCanvas.height;
+  L = Math.sqrt(N / 1.0);
+}
+window.addEventListener('resize', resizeMain);
 
 const phiCanvas = document.getElementById('phiChart');
 const pctx = phiCanvas.getContext('2d');
@@ -615,6 +647,7 @@ function updatePhaseInfo() {
 }
 
 // ─── Main loop ────────────────────────────────────────────────────────────────
+resizeMain();
 initParticles();
 updateL();
 updatePhaseInfo();
