@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Night 12 · 进化博弈：合作的涌现</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #000; color: #fff; font-family: 'Courier New', monospace; overflow: hidden; height: 100vh; }
+
+#label {
+  position: absolute; top: 12px; left: 14px; z-index: 10;
+  font-size: 11px; color: #888; line-height: 1.6; pointer-events: none;
+}
+
+#controls {
+  position: absolute; top: 12px; right: 14px; z-index: 10;
+  display: flex; flex-direction: column; gap: 10px;
+  background: rgba(0,0,0,0.75); padding: 12px; border: 1px solid #333;
+  min-width: 230px;
+}
+.ctrl-row { display: flex; flex-direction: column; gap: 4px; }
+.ctrl-row label { font-size: 11px; color: #aaa; }
+.ctrl-row input[type=range] { width: 100%; accent-color: #3b82f6; }
+.ctrl-marks { display: flex; justify-content: space-between; font-size: 9px; color: #666; }
+.stat { font-size: 12px; color: #60a5fa; }
+.stat span { color: #fff; }
+.btn-row { display: flex; gap: 6px; flex-wrap: wrap; }
+button {
+  font-family: 'Courier New', monospace; font-size: 11px;
+  background: #111; border: 1px solid #444; color: #ccc;
+  padding: 5px 10px; cursor: pointer; border-radius: 2px;
+}
+button:hover { background: #222; border-color: #666; color: #fff; }
+button.active { background: #1e3a5f; border-color: #3b82f6; color: #60a5fa; }
+.sep { border-top: 1px solid #333; margin-top: 4px; padding-top: 4px; }
+
+#caption {
+  position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
+  font-size: 12px; color: #666; text-align: center; max-width: 720px;
+  line-height: 1.7; pointer-events: none; font-family: sans-serif; z-index: 10;
+}
+
+canvas { display: block; }
+#graph-canvas { position: absolute; bottom: 60px; right: 14px; border: 1px solid #333; background: rgba(0,0,0,0.6); }
+</style>
+</head>
+<body>
+
+<div id="label">
+  Night 12 · 2026-05-09<br>进化博弈 · 合作的涌现
+</div>
+
+<div id="controls">
+  <div class="ctrl-row">
+    <label>背叛诱惑 b = <span id="b-val">1.65</span></label>
+    <input type="range" id="b-slider" min="1.0" max="2.0" step="0.01" value="1.65">
+    <div class="ctrl-marks"><span>1.0 低诱惑</span><span>2.0 高诱惑</span></div>
+  </div>
+  <div class="ctrl-row sep">
+    <label>博弈类型</label>
+    <div class="btn-row">
+      <button id="btn-pd" class="active" onclick="setGame('pd')">囚徒困境</button>
+      <button id="btn-sd" onclick="setGame('sd')">雪堆博弈</button>
+    </div>
+  </div>
+  <div class="stat">合作率 C% = <span id="coop-val">50.0</span>%</div>
+  <div class="stat">世代 = <span id="gen-val">0</span></div>
+  <div class="btn-row sep">
+    <button onclick="resetGrid()">重置</button>
+    <button onclick="stepOnce()">单步</button>
+    <button id="btn-run" onclick="toggleRun()">运行 ▶</button>
+  </div>
+</div>
+
+<canvas id="main"></canvas>
+<canvas id="graph-canvas" width="230" height="110"></canvas>
+
+<div id="caption">「每个个体只有一条规则：模仿周围最成功的邻居。当背叛的诱惑足够小，合作会在格点上形成稳定的岛屿——这就是合作在自然界中存活的原理之一。」</div>
+
+<script>
+const GRID = 120;
+const canvas = document.getElementById('main');
+const ctx = canvas.getContext('2d');
+const gCanvas = document.getElementById('graph-canvas');
+const gCtx = gCanvas.getContext('2d');
+
+let W, H, cellW, cellH;
+let grid = new Uint8Array(GRID * GRID); // 0=Defect, 1=Cooperate
+let nextGrid = new Uint8Array(GRID * GRID);
+let b = 1.65;
+let gameType = 'pd'; // 'pd' or 'sd'
+let generation = 0;
+let running = false;
+let animId = null;
+let coopHistory = [];
+
+function resize() {
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = W; canvas.height = H;
+  cellW = W / GRID; cellH = H / GRID;
+}
+
+function resetGrid() {
+  generation = 0;
+  coopHistory = [];
+  for (let i = 0; i < GRID * GRID; i++) {
+    grid[i] = Math.random() < 0.5 ? 1 : 0;
+  }
+  render();
+}
+
+function payoff(me, neighbor) {
+  if (gameType === 'pd') {
+    // Prisoner's Dilemma: R=1, S=0, T=b, P=0
+    if (me === 1 && neighbor === 1) return 1;   // C vs C: R
+    if (me === 1 && neighbor === 0) return 0;   // C vs D: S
+    if (me === 0 && neighbor === 1) return b;   // D vs C: T
+    return 0;                                    // D vs D: P
+  } else {
+    // Snowdrift: R=1, S=1-b/2, T=1+b/2, P=0
+    const r = 1, s = 1 - b / 2, t = 1 + b / 2, p = 0;
+    if (me === 1 && neighbor === 1) return r;
+    if (me === 1 && neighbor === 0) return s;
+    if (me === 0 && neighbor === 1) return t;
+    return p;
+  }
+}
+
+function step() {
+  // Compute payoffs
+  const payoffs = new Float32Array(GRID * GRID);
+  for (let y = 0; y < GRID; y++) {
+    for (let x = 0; x < GRID; x++) {
+      const me = grid[y * GRID + x];
+      let score = 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          const ny = (y + dy + GRID) % GRID;
+          const nx = (x + dx + GRID) % GRID;
+          score += payoff(me, grid[ny * GRID + nx]);
+        }
+      }
+      payoffs[y * GRID + x] = score;
+    }
+  }
+  // Copy best neighbor strategy
+  for (let y = 0; y < GRID; y++) {
+    for (let x = 0; x < GRID; x++) {
+      let bestScore = payoffs[y * GRID + x];
+      let bestStrat = grid[y * GRID + x];
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          const ny = (y + dy + GRID) % GRID;
+          const nx = (x + dx + GRID) % GRID;
+          if (payoffs[ny * GRID + nx] > bestScore) {
+            bestScore = payoffs[ny * GRID + nx];
+            bestStrat = grid[ny * GRID + nx];
+          }
+        }
+      }
+      nextGrid[y * GRID + x] = bestStrat;
+    }
+  }
+  [grid, nextGrid] = [nextGrid, grid];
+  generation++;
+
+  let coop = 0;
+  for (let i = 0; i < GRID * GRID; i++) coop += grid[i];
+  const coopFrac = coop / (GRID * GRID);
+  coopHistory.push(coopFrac);
+  if (coopHistory.length > 300) coopHistory.shift();
+
+  document.getElementById('coop-val').textContent = (coopFrac * 100).toFixed(1);
+  document.getElementById('gen-val').textContent = generation;
+}
+
+function render() {
+  // Draw grid
+  const imgData = ctx.createImageData(W, H);
+  const data = imgData.data;
+
+  for (let y = 0; y < GRID; y++) {
+    for (let x = 0; x < GRID; x++) {
+      const strat = grid[y * GRID + x];
+      const px = Math.floor(x * cellW);
+      const py = Math.floor(y * cellH);
+      const pw = Math.ceil(cellW);
+      const ph = Math.ceil(cellH);
+      // C=blue, D=red
+      const r = strat === 1 ? 59 : 239;
+      const g = strat === 1 ? 130 : 68;
+      const bv = strat === 1 ? 246 : 68;
+      for (let ry = py; ry < py + ph && ry < H; ry++) {
+        for (let rx = px; rx < px + pw && rx < W; rx++) {
+          const idx = (ry * W + rx) * 4;
+          data[idx] = r; data[idx+1] = g; data[idx+2] = bv; data[idx+3] = 255;
+        }
+      }
+    }
+  }
+  ctx.putImageData(imgData, 0, 0);
+
+  // Draw time series graph
+  const gW = gCanvas.width, gH = gCanvas.height;
+  gCtx.clearRect(0, 0, gW, gH);
+  gCtx.fillStyle = 'rgba(0,0,0,0.0)';
+  gCtx.fillRect(0, 0, gW, gH);
+
+  // Grid lines
+  gCtx.strokeStyle = '#1a2a1a';
+  gCtx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const yy = (i / 4) * gH;
+    gCtx.beginPath(); gCtx.moveTo(0, yy); gCtx.lineTo(gW, yy); gCtx.stroke();
+  }
+
+  // 50% line
+  gCtx.strokeStyle = '#333'; gCtx.lineWidth = 1;
+  gCtx.setLineDash([4, 4]);
+  gCtx.beginPath(); gCtx.moveTo(0, gH * 0.5); gCtx.lineTo(gW, gH * 0.5); gCtx.stroke();
+  gCtx.setLineDash([]);
+
+  // Labels
+  gCtx.fillStyle = '#666'; gCtx.font = '9px Courier New';
+  gCtx.fillText('C%', 4, 12);
+  gCtx.fillText('100', 4, 14);
+  gCtx.fillText('0', 4, gH - 4);
+
+  if (coopHistory.length > 1) {
+    gCtx.beginPath();
+    gCtx.strokeStyle = '#3b82f6'; gCtx.lineWidth = 1.5;
+    for (let i = 0; i < coopHistory.length; i++) {
+      const cx = (i / (coopHistory.length - 1)) * gW;
+      const cy = (1 - coopHistory[i]) * gH;
+      i === 0 ? gCtx.moveTo(cx, cy) : gCtx.lineTo(cx, cy);
+    }
+    gCtx.stroke();
+
+    // Current point
+    const lastC = coopHistory[coopHistory.length - 1];
+    gCtx.fillStyle = '#60a5fa';
+    gCtx.beginPath();
+    gCtx.arc(gW - 3, (1 - lastC) * gH, 3, 0, Math.PI * 2);
+    gCtx.fill();
+  }
+}
+
+function stepOnce() {
+  step();
+  render();
+}
+
+function toggleRun() {
+  running = !running;
+  document.getElementById('btn-run').textContent = running ? '暂停 ⏸' : '运行 ▶';
+  if (running) loop();
+}
+
+function loop() {
+  if (!running) return;
+  step();
+  render();
+  animId = requestAnimationFrame(loop);
+}
+
+function setGame(type) {
+  gameType = type;
+  document.getElementById('btn-pd').classList.toggle('active', type === 'pd');
+  document.getElementById('btn-sd').classList.toggle('active', type === 'sd');
+  resetGrid();
+}
+
+document.getElementById('b-slider').addEventListener('input', function() {
+  b = parseFloat(this.value);
+  document.getElementById('b-val').textContent = b.toFixed(2);
+});
+
+window.addEventListener('resize', () => { resize(); render(); });
+resize();
+resetGrid();
+// auto-start
+toggleRun();
+</script>
+</body>
+</html>

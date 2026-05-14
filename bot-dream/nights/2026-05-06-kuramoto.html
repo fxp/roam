@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Night 9 · 久保振荡器</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #030309; color: #fff; font-family: 'Courier New', monospace; overflow: hidden; height: 100vh; display: flex; }
+
+#label {
+  position: absolute; top: 12px; left: 14px; z-index: 10;
+  font-size: 11px; color: #556; line-height: 1.6; pointer-events: none;
+}
+
+#main-area {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  position: relative;
+}
+
+#side-panel {
+  width: 200px; min-width: 200px; display: flex; flex-direction: column;
+  background: rgba(0,0,0,0.6); border-left: 1px solid #1a1a2e; padding: 14px; gap: 14px;
+}
+
+.ctrl-row { display: flex; flex-direction: column; gap: 4px; }
+.ctrl-row label { font-size: 11px; color: #778; }
+.ctrl-row input[type=range] { width: 100%; accent-color: #a78bfa; }
+.ctrl-marks { display: flex; justify-content: space-between; font-size: 9px; color: #445; }
+
+.stat { font-size: 12px; color: #667; }
+.stat span { color: #c4b5fd; font-size: 13px; }
+.phase-label { font-size: 13px; font-weight: bold; }
+
+.n-btns { display: flex; gap: 6px; }
+.n-btn {
+  flex: 1; background: #0d0d1a; border: 1px solid #333; color: #a78bfa;
+  padding: 5px 0; cursor: pointer; font-size: 11px; font-family: 'Courier New', monospace;
+}
+.n-btn.active { background: #1a1a3e; border-color: #7c3aed; }
+
+#ts-canvas { border: 1px solid #1a1a2e; border-radius: 2px; }
+#ts-label { font-size: 10px; color: #445; text-align: center; }
+
+#caption {
+  position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
+  font-size: 11px; color: #445; text-align: center; max-width: 560px;
+  line-height: 1.7; pointer-events: none; font-family: sans-serif; z-index: 10;
+  width: calc(100% - 220px);
+}
+</style>
+</head>
+<body>
+
+<div id="main-area">
+  <div id="label">Night 09 · 2026-05-06<br>久保振荡器 · 同步</div>
+  <canvas id="main"></canvas>
+  <div id="caption">「200个振荡器，各自频率略有不同——像200人各自哼不同调子的歌。耦合超过临界强度时，它们突然全部同步，变成一个声音。这也是萤火虫群体闪光的工作原理。」</div>
+</div>
+
+<div id="side-panel">
+  <div class="ctrl-row">
+    <label>耦合强度 K = <span id="k-val">1.50</span></label>
+    <input type="range" id="k-slider" min="0" max="5" step="0.05" value="1.5">
+    <div class="ctrl-marks"><span>0</span><span>Kc≈1.6</span><span>5</span></div>
+  </div>
+
+  <div class="ctrl-row">
+    <label>振荡器数量 N</label>
+    <div class="n-btns">
+      <button class="n-btn" data-n="50">50</button>
+      <button class="n-btn active" data-n="100">100</button>
+      <button class="n-btn" data-n="200">200</button>
+    </div>
+  </div>
+
+  <div class="stat">r = <span id="r-val">0.000</span></div>
+  <div class="stat">K = <span id="k-disp">1.50</span></div>
+  <div class="stat phase-label" id="phase-label" style="color:#a78bfa">去同步</div>
+
+  <div id="ts-label">同步度 r(t)</div>
+  <canvas id="ts-canvas" width="172" height="100"></canvas>
+
+  <div style="font-size:10px; color:#334; line-height:1.5; margin-top:4px;">
+    点颜色 = 固有频率<br>蓝=慢 · 红=快<br>箭头 = 序参量 r
+  </div>
+</div>
+
+<script>
+const mainCanvas = document.getElementById('main');
+const ctx = mainCanvas.getContext('2d');
+const tsCanvas = document.getElementById('ts-canvas');
+const tsCtx = tsCanvas.getContext('2d');
+
+let N = 100;
+let K = 1.5;
+const DT = 0.05;
+const GAMMA = 1.0;
+
+let phases, freqs;
+let rHistory = [];
+const MAX_HIST = 172;
+
+function initOscillators() {
+  phases = new Float64Array(N);
+  freqs = new Float64Array(N);
+  rHistory = [];
+
+  // Lorentzian distribution: ω = γ * tan(π*(u-0.5)) where u~Uniform
+  for (let i = 0; i < N; i++) {
+    phases[i] = Math.random() * Math.PI * 2;
+    const u = (i + 0.5) / N; // quasi-random for better distribution
+    freqs[i] = GAMMA * Math.tan(Math.PI * (u - 0.5));
+    // Clamp extreme values
+    freqs[i] = Math.max(-10, Math.min(10, freqs[i]));
+  }
+}
+
+function computeOrderParam() {
+  let sx = 0, sy = 0;
+  for (let i = 0; i < N; i++) {
+    sx += Math.cos(phases[i]);
+    sy += Math.sin(phases[i]);
+  }
+  const r = Math.sqrt(sx * sx + sy * sy) / N;
+  const psi = Math.atan2(sy, sx);
+  return { r, psi };
+}
+
+function updateKuramoto() {
+  const { r, psi } = computeOrderParam();
+  const newPhases = new Float64Array(N);
+  for (let i = 0; i < N; i++) {
+    // Mean-field form: dθᵢ/dt = ωᵢ + K*r*sin(ψ - θᵢ)
+    newPhases[i] = phases[i] + DT * (freqs[i] + K * r * Math.sin(psi - phases[i]));
+  }
+  phases = newPhases;
+  return { r, psi };
+}
+
+function freqColor(freq) {
+  // Map freq [-5,5] → hue [240,0] (blue to red)
+  const t = (freq + 5) / 10;
+  const clamped = Math.max(0, Math.min(1, t));
+  const h = (1 - clamped) * 240;
+  return `hsl(${h}, 90%, 65%)`;
+}
+
+let W, H, CX, CY, RING_R;
+
+function resize() {
+  const panelW = 200;
+  W = window.innerWidth - panelW;
+  H = window.innerHeight;
+  mainCanvas.width = W;
+  mainCanvas.height = H;
+  CX = W / 2;
+  CY = H / 2;
+  RING_R = Math.min(W, H) * 0.35;
+}
+
+function draw() {
+  const { r, psi } = updateKuramoto();
+
+  rHistory.push(r);
+  if (rHistory.length > MAX_HIST) rHistory.shift();
+
+  // Background fade
+  ctx.fillStyle = 'rgba(3,3,9,0.25)';
+  ctx.fillRect(0, 0, W, H);
+
+  // Ring guide
+  ctx.beginPath();
+  ctx.arc(CX, CY, RING_R, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(100,100,180,0.15)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Order parameter arrow
+  const arrowLen = RING_R * 0.7 * r;
+  const arrowX = CX + arrowLen * Math.cos(psi);
+  const arrowY = CY + arrowLen * Math.sin(psi);
+
+  ctx.beginPath();
+  ctx.moveTo(CX, CY);
+  ctx.lineTo(arrowX, arrowY);
+  const brightness = Math.round(100 + r * 155);
+  ctx.strokeStyle = `rgba(${brightness}, ${brightness}, 255, ${0.4 + r * 0.5})`;
+  ctx.lineWidth = 2 + r * 3;
+  ctx.stroke();
+
+  // Arrow head
+  const headLen = 10;
+  const angle = psi;
+  ctx.beginPath();
+  ctx.moveTo(arrowX, arrowY);
+  ctx.lineTo(arrowX - headLen * Math.cos(angle - 0.4), arrowY - headLen * Math.sin(angle - 0.4));
+  ctx.lineTo(arrowX - headLen * Math.cos(angle + 0.4), arrowY - headLen * Math.sin(angle + 0.4));
+  ctx.closePath();
+  ctx.fillStyle = `rgba(${brightness}, ${brightness}, 255, ${0.6 + r * 0.4})`;
+  ctx.fill();
+
+  // Oscillator dots
+  for (let i = 0; i < N; i++) {
+    const px = CX + RING_R * Math.cos(phases[i]);
+    const py = CY + RING_R * Math.sin(phases[i]);
+    const col = freqColor(freqs[i]);
+
+    // Glow
+    const grd = ctx.createRadialGradient(px, py, 0, px, py, 6);
+    grd.addColorStop(0, col);
+    grd.addColorStop(1, 'transparent');
+    ctx.fillStyle = grd;
+    ctx.beginPath();
+    ctx.arc(px, py, 6, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(px, py, 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = '#fff';
+    ctx.fill();
+  }
+
+  // r value
+  const rDisplay = r.toFixed(3);
+  document.getElementById('r-val').textContent = rDisplay;
+  document.getElementById('k-disp').textContent = K.toFixed(2);
+
+  const phaseEl = document.getElementById('phase-label');
+  if (r < 0.3) { phaseEl.textContent = '去同步'; phaseEl.style.color = '#6366f1'; }
+  else if (r < 0.6) { phaseEl.textContent = '临界'; phaseEl.style.color = '#f59e0b'; }
+  else { phaseEl.textContent = '同步'; phaseEl.style.color = '#34d399'; }
+
+  drawTimeSeries();
+  requestAnimationFrame(draw);
+}
+
+function drawTimeSeries() {
+  const tw = tsCanvas.width, th = tsCanvas.height;
+  tsCtx.fillStyle = 'rgba(0,0,5,0.3)';
+  tsCtx.fillRect(0, 0, tw, th);
+
+  // Grid
+  tsCtx.strokeStyle = '#111a2e';
+  tsCtx.lineWidth = 1;
+  for (let v = 0; v <= 1; v += 0.25) {
+    const y = th - v * th;
+    tsCtx.beginPath(); tsCtx.moveTo(0, y); tsCtx.lineTo(tw, y); tsCtx.stroke();
+  }
+
+  // Kc line
+  tsCtx.strokeStyle = '#7c3aed44';
+  tsCtx.setLineDash([3, 3]);
+  tsCtx.beginPath();
+  tsCtx.moveTo(0, th * 0.5); tsCtx.lineTo(tw, th * 0.5);
+  tsCtx.stroke();
+  tsCtx.setLineDash([]);
+
+  if (rHistory.length < 2) return;
+
+  tsCtx.beginPath();
+  for (let i = 0; i < rHistory.length; i++) {
+    const x = (i / MAX_HIST) * tw;
+    const y = th - rHistory[i] * th;
+    if (i === 0) tsCtx.moveTo(x, y);
+    else tsCtx.lineTo(x, y);
+  }
+  tsCtx.strokeStyle = '#a78bfa';
+  tsCtx.lineWidth = 1.5;
+  tsCtx.stroke();
+
+  // Labels
+  tsCtx.fillStyle = '#445';
+  tsCtx.font = '9px Courier New';
+  tsCtx.fillText('1.0', 2, 10);
+  tsCtx.fillText('0.5', 2, th / 2 + 4);
+  tsCtx.fillText('0', 2, th - 2);
+}
+
+// Controls
+document.getElementById('k-slider').addEventListener('input', function() {
+  K = parseFloat(this.value);
+  document.getElementById('k-val').textContent = K.toFixed(2);
+});
+
+document.querySelectorAll('.n-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.n-btn').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+    N = parseInt(this.dataset.n);
+    initOscillators();
+  });
+});
+
+window.addEventListener('resize', resize);
+resize();
+initOscillators();
+draw();
+</script>
+</body>
+</html>

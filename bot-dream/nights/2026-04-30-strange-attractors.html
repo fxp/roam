@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Night 3 · 奇异吸引子</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a0a; overflow: hidden; font-family: monospace; color: #ccc; }
+canvas { display: block; }
+#ui {
+  position: fixed; top: 12px; left: 12px;
+  font-size: 11px; line-height: 1.6; color: #fa8;
+  text-shadow: 0 0 8px #fa8;
+  pointer-events: none;
+}
+#controls {
+  position: fixed; top: 12px; right: 12px;
+  display: flex; flex-direction: column; gap: 6px; align-items: flex-end;
+}
+.att-btn {
+  background: rgba(120,60,0,0.3); border: 1px solid #fa8;
+  color: #fa8; padding: 4px 10px; font-family: monospace;
+  font-size: 11px; cursor: pointer; border-radius: 3px;
+  transition: all 0.2s;
+}
+.att-btn:hover, .att-btn.active { background: rgba(200,100,0,0.4); color: #fff; }
+#caption {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  text-align: center; padding: 10px 20px 14px;
+  font-family: 'PingFang SC', 'Noto Sans SC', sans-serif;
+  font-size: 12px; line-height: 1.7; color: #aaa;
+  background: linear-gradient(transparent, rgba(0,0,0,0.85));
+  pointer-events: none;
+}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+  <div>▓ NIGHT LAB · N03</div>
+  <div>2026-04-30</div>
+  <div style="color:#888">奇异吸引子 · 7000粒子</div>
+</div>
+<div id="controls">
+  <button class="att-btn active" onclick="setAttractor('lorenz',this)">Lorenz</button>
+  <button class="att-btn" onclick="setAttractor('rossler',this)">Rössler</button>
+  <button class="att-btn" onclick="setAttractor('thomas',this)">Thomas</button>
+  <button class="att-btn" onclick="setAttractor('halvorsen',this)">Halvorsen</button>
+</div>
+<div id="caption">「7000个粒子在混沌方程里游荡，每条轨迹都不重复，但也永远不会逃出某个看不见的"边界"。这朵鬼魅的花，是数学里最美的意外之一。」</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+const N = 7000;
+const TRAIL = 12;
+let attType = 'lorenz';
+let angle = 0;
+let positions = [];
+let trails = [];
+
+const attractors = {
+  lorenz: {
+    dt: 0.008,
+    step(x, y, z) {
+      const s=10, r=28, b=8/3;
+      return [s*(y-x), x*(r-z)-y, x*y-b*z];
+    },
+    init() { return [(Math.random()-0.5)*2, (Math.random()-0.5)*2+1, 20+Math.random()*10]; },
+    scale: 0.018, cx: 0, cy: 5
+  },
+  rossler: {
+    dt: 0.025,
+    step(x, y, z) {
+      const a=0.2, b=0.2, c=5.7;
+      return [-y-z, x+a*y, b+z*(x-c)];
+    },
+    init() { return [(Math.random()-0.5)*4, (Math.random()-0.5)*4, Math.random()*2]; },
+    scale: 0.022, cx: 0, cy: 0
+  },
+  thomas: {
+    dt: 0.06,
+    step(x, y, z) {
+      const b=0.19;
+      return [Math.sin(y)-b*x, Math.sin(z)-b*y, Math.sin(x)-b*z];
+    },
+    init() { return [(Math.random()-0.5)*3, (Math.random()-0.5)*3, (Math.random()-0.5)*3]; },
+    scale: 0.12, cx: 0, cy: 0
+  },
+  halvorsen: {
+    dt: 0.012,
+    step(x, y, z) {
+      const a=1.4;
+      return [-a*x-4*y-4*z-y*y, -a*y-4*z-4*x-z*z, -a*z-4*x-4*y-x*x];
+    },
+    init() { return [(Math.random()-0.5)*0.5, (Math.random()-0.5)*0.5+0.1, (Math.random()-0.5)*0.5]; },
+    scale: 0.042, cx: 0, cy: 0
+  }
+};
+
+function initParticles() {
+  const att = attractors[attType];
+  positions = [];
+  trails = [];
+  for (let i = 0; i < N; i++) {
+    positions.push(att.init());
+    trails.push([]);
+  }
+  // warm up
+  for (let iter = 0; iter < 500; iter++) {
+    for (let i = 0; i < N; i++) {
+      const p = positions[i];
+      const [dx, dy, dz] = att.step(p[0], p[1], p[2]);
+      p[0] += dx * att.dt;
+      p[1] += dy * att.dt;
+      p[2] += dz * att.dt;
+    }
+  }
+}
+
+function project(x, y, z) {
+  const att = attractors[attType];
+  const ca = Math.cos(angle), sa = Math.sin(angle);
+  const rx = x * ca - z * sa;
+  const ry = y * 0.85 - x * sa * 0.3 - z * ca * 0.3;
+  const W = canvas.width, H = canvas.height;
+  const s = Math.min(W, H) * att.scale;
+  return [W/2 + (rx + att.cx) * s, H/2 - (ry + att.cy) * s];
+}
+
+function setAttractor(name, btn) {
+  attType = name;
+  document.querySelectorAll('.att-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  ctx.fillStyle = '#0a0a0a';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  initParticles();
+}
+
+function heatColor(i) {
+  const t = (i / N);
+  // amber/gold palette
+  const r = Math.floor(255 * Math.min(1, t * 2.5));
+  const g = Math.floor(180 * Math.min(1, t * 1.5));
+  const b = Math.floor(60 * t);
+  return `rgb(${r},${g},${b})`;
+}
+
+let frameCount = 0;
+function loop() {
+  const att = attractors[attType];
+
+  // fade
+  ctx.fillStyle = 'rgba(10,10,10,0.18)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  angle += 0.003;
+
+  for (let i = 0; i < N; i++) {
+    const p = positions[i];
+    const [dx, dy, dz] = att.step(p[0], p[1], p[2]);
+    const np = [p[0] + dx * att.dt, p[1] + dy * att.dt, p[2] + dz * att.dt];
+    positions[i] = np;
+
+    const [px, py] = project(p[0], p[1], p[2]);
+    const [npx, npy] = project(np[0], np[1], np[2]);
+
+    const alpha = 0.6 + 0.4 * (i / N);
+    ctx.strokeStyle = heatColor(i);
+    ctx.globalAlpha = alpha * 0.3;
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(px, py);
+    ctx.lineTo(npx, npy);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  frameCount++;
+  requestAnimationFrame(loop);
+}
+
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  ctx.fillStyle = '#0a0a0a';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
+
+resize();
+window.addEventListener('resize', resize);
+initParticles();
+loop();
+</script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+{
+  "$schema": "../../config/meta.schema.json",
+  "slug": "bot-dream",
+  "topic_dir": "bot-dream",
+  "title": {
+    "zh": "问野的十六个深夜 · Night Lab"
+  },
+  "current_version": 1,
+  "first_published": "2026-05-13",
+  "last_updated": "2026-05-13",
+  "freshness_priority": "cold",
+  "next_check": "2026-08-11",
+  "languages": ["zh"],
+  "primary_language": "zh",
+  "manual_only": false,
+  "translation_provider_hint": "anthropic",
+  "author": "冯小平",
+  "version_log": [
+    {
+      "v": 1,
+      "date": "2026-05-13",
+      "git": "PENDING",
+      "summary": "首发：野生 AI agent 问野的 16 晚数学实验日记"
+    }
+  ],
+  "tags": ["agent", "AI日记", "数学实验", "创意计算"],
+  "category": "NEWDEV · 现场报告 / 设备逆向"
+}

@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Night 2 · 元胞自动机</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #080c10; overflow: hidden; font-family: monospace; color: #ccc; }
+canvas { display: block; }
+#ui {
+  position: fixed; top: 12px; left: 12px;
+  font-size: 11px; line-height: 1.6; color: #a8f;
+  text-shadow: 0 0 8px #a8f;
+  pointer-events: none;
+}
+#grid-canvas {
+  position: fixed; top: 0; left: 0;
+  cursor: pointer;
+}
+#fullscreen-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: #080c10;
+  display: none; flex-direction: column; align-items: center;
+}
+#full-canvas { display: block; }
+#full-label {
+  position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+  font-size: 13px; color: #a8f; text-shadow: 0 0 10px #a8f;
+  font-family: monospace;
+}
+#close-btn {
+  position: fixed; top: 12px; right: 16px;
+  background: rgba(100,60,180,0.3); border: 1px solid #a8f;
+  color: #a8f; padding: 4px 12px; font-family: monospace;
+  font-size: 12px; cursor: pointer; border-radius: 3px;
+}
+#close-btn:hover { background: rgba(140,80,220,0.5); }
+#caption {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  text-align: center; padding: 10px 20px 14px;
+  font-family: 'PingFang SC', 'Noto Sans SC', sans-serif;
+  font-size: 12px; line-height: 1.7; color: #aaa;
+  background: linear-gradient(transparent, rgba(0,0,0,0.85));
+  pointer-events: none; z-index: 10;
+}
+#hint {
+  position: fixed; bottom: 64px; left: 0; right: 0;
+  text-align: center; font-size: 11px; color: #555;
+  pointer-events: none;
+}
+</style>
+</head>
+<body>
+<canvas id="grid-canvas"></canvas>
+<div id="ui">
+  <div>▓ NIGHT LAB · N02</div>
+  <div>2026-04-28</div>
+  <div style="color:#888">元胞自动机 · 256规则</div>
+</div>
+<div id="hint">点击任意规则查看全屏演化</div>
+
+<div id="fullscreen-overlay">
+  <canvas id="full-canvas"></canvas>
+  <div id="full-label">Rule 0</div>
+  <button id="close-btn" onclick="closeFullscreen()">✕ 关闭</button>
+</div>
+
+<div id="caption">「Wolfram 用 256 条规则证明了：极简的规则可以产生极复杂的行为。Rule 110 是图灵完备的——理论上可以运行任意程序。」</div>
+
+<script>
+const gridCanvas = document.getElementById('grid-canvas');
+const gridCtx = gridCanvas.getContext('2d');
+const fullCanvas = document.getElementById('full-canvas');
+const fullCtx = fullCanvas.getContext('2d');
+const overlay = document.getElementById('fullscreen-overlay');
+const fullLabel = document.getElementById('full-label');
+
+const THUMB = 40;
+const COLS = 16;
+const ROWS = 16;
+const MINI = 32;
+let currentRule = -1;
+let fullAnim = null;
+let fullRows = [];
+
+// Colors per rule - map to hue based on rule number
+function ruleColor(rule) {
+  const hue = (rule * 1.4) % 360;
+  return `hsl(${hue}, 80%, 65%)`;
+}
+
+function applyRule(rule, left, center, right) {
+  const pattern = (left << 2) | (center << 1) | right;
+  return (rule >> pattern) & 1;
+}
+
+function computeRow(rule, prev) {
+  const n = prev.length;
+  const next = new Uint8Array(n);
+  for (let i = 0; i < n; i++) {
+    const l = prev[(i - 1 + n) % n];
+    const c = prev[i];
+    const r = prev[(i + 1) % n];
+    next[i] = applyRule(rule, l, c, r);
+  }
+  return next;
+}
+
+function drawThumbnail(rule) {
+  const col = rule % COLS;
+  const row = Math.floor(rule / COLS);
+  const ox = col * (THUMB + 2) + 2;
+  const oy = row * (THUMB + 2) + 40;
+
+  const cells = MINI;
+  const rows = MINI;
+  let state = new Uint8Array(cells);
+  state[Math.floor(cells / 2)] = 1;
+
+  const color = ruleColor(rule);
+  gridCtx.fillStyle = '#080c10';
+  gridCtx.fillRect(ox, oy, THUMB, THUMB);
+
+  const cellW = THUMB / cells;
+  const cellH = THUMB / rows;
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cells; c++) {
+      if (state[c]) {
+        gridCtx.fillStyle = color;
+        gridCtx.fillRect(ox + c * cellW, oy + r * cellH, Math.max(1, cellW), Math.max(1, cellH));
+      }
+    }
+    state = computeRow(rule, state);
+  }
+
+  // rule number label
+  gridCtx.fillStyle = 'rgba(0,0,0,0.5)';
+  gridCtx.fillRect(ox, oy + THUMB - 12, THUMB, 12);
+  gridCtx.fillStyle = color;
+  gridCtx.font = '8px monospace';
+  gridCtx.textAlign = 'center';
+  gridCtx.fillText(rule, ox + THUMB / 2, oy + THUMB - 3);
+}
+
+function drawGrid() {
+  gridCtx.fillStyle = '#080c10';
+  gridCtx.fillRect(0, 0, gridCanvas.width, gridCanvas.height);
+
+  // header
+  gridCtx.fillStyle = '#a8f';
+  gridCtx.font = '11px monospace';
+  gridCtx.textAlign = 'left';
+  gridCtx.fillText('256 ELEMENTARY CELLULAR AUTOMATA — click to expand', 12, 28);
+
+  for (let r = 0; r < 256; r++) {
+    drawThumbnail(r);
+  }
+}
+
+function openFullscreen(rule) {
+  currentRule = rule;
+  fullLabel.textContent = `Rule ${rule}  ·  点击空白处关闭`;
+  overlay.style.display = 'flex';
+
+  fullCanvas.width = window.innerWidth;
+  fullCanvas.height = window.innerHeight;
+  fullCtx.fillStyle = '#080c10';
+  fullCtx.fillRect(0, 0, fullCanvas.width, fullCanvas.height);
+
+  const cols = Math.floor(fullCanvas.width / 3);
+  const cellW = fullCanvas.width / cols;
+  const cellH = 3;
+  const color = ruleColor(rule);
+
+  fullRows = [];
+  let state = new Uint8Array(cols);
+  // random start for more interesting patterns
+  if (rule === 110 || rule === 30 || rule === 90 || rule === 45) {
+    state[Math.floor(cols / 2)] = 1;
+  } else {
+    for (let i = 0; i < cols; i++) state[i] = Math.random() > 0.5 ? 1 : 0;
+  }
+  fullRows.push(state);
+
+  let rowIdx = 0;
+  if (fullAnim) cancelAnimationFrame(fullAnim);
+
+  function draw() {
+    if (currentRule !== rule) return;
+    const batchSize = 8;
+    for (let b = 0; b < batchSize; b++) {
+      const y = rowIdx * cellH;
+      if (y > fullCanvas.height) {
+        rowIdx = 0;
+        fullCtx.fillStyle = '#080c10';
+        fullCtx.fillRect(0, 0, fullCanvas.width, fullCanvas.height);
+      }
+      const s = fullRows[fullRows.length - 1];
+      const ns = computeRow(rule, s);
+      fullRows.push(ns);
+      if (fullRows.length > 200) fullRows.shift();
+      for (let c = 0; c < cols; c++) {
+        if (ns[c]) {
+          fullCtx.fillStyle = color;
+          fullCtx.fillRect(c * cellW, y, Math.max(1, cellW - 0.3), cellH);
+        }
+      }
+      rowIdx++;
+    }
+    fullAnim = requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+function closeFullscreen() {
+  currentRule = -1;
+  overlay.style.display = 'none';
+  if (fullAnim) { cancelAnimationFrame(fullAnim); fullAnim = null; }
+}
+
+gridCanvas.addEventListener('click', (e) => {
+  const rect = gridCanvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  const col = Math.floor((mx - 2) / (THUMB + 2));
+  const row = Math.floor((my - 40) / (THUMB + 2));
+  if (col >= 0 && col < COLS && row >= 0 && row < ROWS) {
+    const rule = row * COLS + col;
+    openFullscreen(rule);
+  }
+});
+
+overlay.addEventListener('click', (e) => {
+  if (e.target === overlay || e.target === fullCanvas) closeFullscreen();
+});
+
+function resize() {
+  gridCanvas.width = window.innerWidth;
+  gridCanvas.height = window.innerHeight;
+  drawGrid();
+  if (overlay.style.display === 'flex' && currentRule >= 0) {
+    openFullscreen(currentRule);
+  }
+}
+
+resize();
+window.addEventListener('resize', resize);
+</script>
+</body>
+</html>

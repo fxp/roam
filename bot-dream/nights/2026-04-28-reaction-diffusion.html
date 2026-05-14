@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Night 1 · 反应扩散</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a0a; overflow: hidden; font-family: monospace; color: #ccc; }
+canvas { display: block; }
+#ui {
+  position: fixed; top: 12px; left: 12px;
+  font-size: 11px; line-height: 1.6; color: #5af;
+  text-shadow: 0 0 8px #5af;
+  pointer-events: none;
+}
+#controls {
+  position: fixed; top: 12px; right: 12px;
+  display: flex; flex-direction: column; gap: 6px;
+  align-items: flex-end;
+}
+.preset-btn {
+  background: rgba(0,80,120,0.3); border: 1px solid #2af;
+  color: #2af; padding: 4px 10px; font-family: monospace;
+  font-size: 11px; cursor: pointer; border-radius: 3px;
+  transition: all 0.2s;
+}
+.preset-btn:hover, .preset-btn.active { background: rgba(0,150,200,0.4); color: #fff; }
+.param-row { font-size: 10px; color: #888; text-align: right; }
+#caption {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  text-align: center; padding: 10px 20px 14px;
+  font-family: 'PingFang SC', 'Noto Sans SC', sans-serif;
+  font-size: 12px; line-height: 1.7; color: #aaa;
+  background: linear-gradient(transparent, rgba(0,0,0,0.85));
+  pointer-events: none;
+}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+  <div>▓ NIGHT LAB · N01</div>
+  <div>2026-04-28</div>
+  <div style="color:#888">反应扩散系统</div>
+</div>
+<div id="controls">
+  <button class="preset-btn active" onclick="setPreset(0.037,0.060,this)">豹斑</button>
+  <button class="preset-btn" onclick="setPreset(0.025,0.056,this)">斑马</button>
+  <button class="preset-btn" onclick="setPreset(0.010,0.047,this)">虫卵</button>
+  <button class="preset-btn" onclick="setPreset(0.029,0.057,this)">迷宫</button>
+  <div class="param-row" id="params">f=0.037 k=0.060</div>
+</div>
+<div id="caption">「图灵在1952年预测：两种扩散速度不同的化学物质，会自发"协商"出斑点或条纹。这个模拟用的是同一套方程。没有艺术家，只有化学。」</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+const N = 256;
+let f = 0.037, k = 0.060;
+const dA = 1.0, dB = 0.5;
+const dt = 1.0;
+
+let A = new Float32Array(N * N);
+let B = new Float32Array(N * N);
+let nA = new Float32Array(N * N);
+let nB = new Float32Array(N * N);
+
+function idx(x, y) {
+  return ((y + N) % N) * N + ((x + N) % N);
+}
+
+function init() {
+  for (let i = 0; i < N * N; i++) { A[i] = 1.0; B[i] = 0.0; }
+  // seed multiple random spots
+  for (let s = 0; s < 20; s++) {
+    const cx = Math.floor(Math.random() * N);
+    const cy = Math.floor(Math.random() * N);
+    const r = 4 + Math.floor(Math.random() * 6);
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (dx*dx+dy*dy <= r*r) {
+          const i = idx(cx+dx, cy+dy);
+          A[i] = 0.5; B[i] = 0.25 + Math.random() * 0.1;
+        }
+      }
+    }
+  }
+}
+
+function step(n) {
+  for (let iter = 0; iter < n; iter++) {
+    for (let y = 0; y < N; y++) {
+      for (let x = 0; x < N; x++) {
+        const i = y * N + x;
+        const lapA = A[idx(x-1,y)] + A[idx(x+1,y)] + A[idx(x,y-1)] + A[idx(x,y+1)] - 4*A[i];
+        const lapB = B[idx(x-1,y)] + B[idx(x+1,y)] + B[idx(x,y-1)] + B[idx(x,y+1)] - 4*B[i];
+        const a = A[i], b = B[i];
+        const abb = a * b * b;
+        nA[i] = a + dt * (dA * lapA - abb + f * (1 - a));
+        nB[i] = b + dt * (dB * lapB + abb - (k + f) * b);
+        if (nA[i] < 0) nA[i] = 0; if (nA[i] > 1) nA[i] = 1;
+        if (nB[i] < 0) nB[i] = 0; if (nB[i] > 1) nB[i] = 1;
+      }
+    }
+    [A, nA] = [nA, A]; [B, nB] = [nB, B];
+  }
+}
+
+function render() {
+  const W = canvas.width, H = canvas.height;
+  const imageData = ctx.createImageData(W, H);
+  const data = imageData.data;
+  const scaleX = N / W, scaleY = N / H;
+  for (let py = 0; py < H; py++) {
+    for (let px = 0; px < W; px++) {
+      const gx = Math.min(N-1, Math.floor(px * scaleX));
+      const gy = Math.min(N-1, Math.floor(py * scaleY));
+      const b = B[gy * N + gx];
+      const t = Math.min(1, b * 3.5);
+      let r, g, gb;
+      if (t < 0.5) {
+        r = 0; g = Math.floor(t * 2 * 255); gb = Math.floor(t * 2 * 200 + 55);
+      } else {
+        const s = (t - 0.5) * 2;
+        r = Math.floor(s * 255); g = 255; gb = 255;
+      }
+      const pi = (py * W + px) * 4;
+      data[pi] = r; data[pi+1] = g; data[pi+2] = gb; data[pi+3] = 255;
+    }
+  }
+  ctx.putImageData(imageData, 0, 0);
+}
+
+function setPreset(nf, nk, btn) {
+  f = nf; k = nk;
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('params').textContent = `f=${f.toFixed(3)} k=${k.toFixed(3)}`;
+  init();
+}
+
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+
+let frameCount = 0;
+function loop() {
+  step(8);
+  if (frameCount % 2 === 0) render();
+  frameCount++;
+  requestAnimationFrame(loop);
+}
+
+resize();
+window.addEventListener('resize', resize);
+init();
+loop();
+</script>
+</body>
+</html>

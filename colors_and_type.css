@@ -1,0 +1,317 @@
+/* AI Buzzwords · Design System · v2 (2026-05)
+ * Editorial × Lab × Newsroom · Dense · Warm · Anti-Hype
+ * Source of truth: github.com/fxp/AI-Buzzwords
+ *
+ * v2 changes (merged from DESIGN-SHOWCASE.md):
+ *  · Generic --accent / --accent-soft / --accent-glow theme variables
+ *  · 4 named themes: red / signal / amber / mint (set on <html data-theme="…">
+ *    or via inline <style id="theme-vars">)
+ *  · Warmer surface palette (#0c0a07 / #161310) + translucent line tokens
+ *  · Fraunces promoted to primary --display (Spectral kept as --display-alt)
+ *  · <em> defaults to plain; only <em.text-accent> takes accent colour
+ *  · Animation budget formalised
+ */
+
+/* Fonts — loaded from Google Fonts CDN per handoff README §"Substitutions".
+ * Self-hosted fallback under /fonts/ is supported by the bundle but not required.
+ * Order: Fraunces (display) · EB Garamond (Latin body) · Spectral (display-alt) ·
+ * Noto Serif SC (CJK serif) · JetBrains Mono · Inter Tight. */
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,700&family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Spectral:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Noto+Serif+SC:wght@300;400;500;700&family=Noto+Serif+TC:wght@300;400;500;700&family=Noto+Serif+JP:wght@300;400;500;700&family=Noto+Serif+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@300;400;500;700&family=Inter+Tight:wght@400;500;600&display=swap");
+
+:root {
+  /* ============ SURFACE — DARK (default) ============ */
+  --bg:        #0c0a07;     /* page · warm near-black w/ red-brown undertone */
+  --bg-2:      #161310;     /* card / inset / pullquote */
+  --bg-3:      #1e1a15;     /* hover state (rarely) */
+  --bg-paper:  #e8e3d8;     /* paper / archive frame */
+  --bg-ink:    #1a1815;     /* ink on paper */
+
+  /* Foreground — warm bone, never pure white */
+  --fg:        #f0ebe0;
+  --fg-dim:    #a09888;     /* body paragraph (lower contrast for long-read) */
+  --fg-mute:   #6a6058;     /* metadata, eyebrows, footer */
+
+  /* Lines — translucent so they read consistently across surfaces */
+  --line:        rgba(240,235,224,0.10);
+  --line-bright: rgba(240,235,224,0.18);
+
+  /* ============ ACCENT THEME — generic variables ============
+   * Components reference --accent/--accent-soft/--accent-glow only.
+   * Switch theme by setting [data-theme="red|signal|amber|mint"]
+   * on <html>/<body>, OR by injecting inline <style id="theme-vars">.
+   * Default = amber (the safe workhorse).
+   */
+  --accent:      #f5a524;
+  --accent-soft: rgba(245,165,36,0.10);
+  --accent-glow: rgba(245,165,36,0.30);
+
+  /* Named accent palette (kept available for cross-references) */
+  --red:    #e84040;   /* urgency · timely · market shock */
+  --signal: #d1402c;   /* incidents · leaks · single events */
+  --amber:  #f5a524;   /* analysis · history · structure · B2B */
+  --mint:   #7fb88b;   /* research · findings · capability · hardware */
+
+  /* ============ TYPE TOKENS ============
+   * Font stacks always end with the full CJK fallback chain so that
+   * 中文 (Simplified + Traditional) · 日本語 · 한국어 characters never fall
+   * through to a generic serif. Order: SC → TC → JP → KR → system.
+   * The system also exposes per-script overrides via [lang="ja"] / [lang="ko"]
+   * / [lang="zh-Hant"] selectors below.
+   */
+  --cjk-serif: "Noto Serif SC","Source Han Serif SC","Source Han Serif TC",
+               "Noto Serif TC","Noto Serif JP","Source Han Serif",
+               "Noto Serif KR","Source Han Serif K",
+               "Songti SC","STSong","SimSun",serif;
+  --cjk-sans:  "PingFang SC","PingFang TC","Hiragino Sans GB",
+               "Hiragino Kaku Gothic ProN","Yu Gothic","Meiryo",
+               "Apple SD Gothic Neo","Malgun Gothic",
+               "Microsoft YaHei",sans-serif;
+  --cjk-mono:  "PingFang SC","Hiragino Sans GB","Yu Gothic",
+               "Apple SD Gothic Neo",sans-serif;
+
+  --display:     "Fraunces",   var(--cjk-serif);
+  --display-alt: "Spectral",   var(--cjk-serif);
+  --serif:       "EB Garamond",var(--cjk-serif);
+  --mono:        "JetBrains Mono",var(--cjk-mono),ui-monospace,SFMono-Regular,Menlo,monospace;
+  --sans:        "Inter Tight",var(--cjk-sans),system-ui,-apple-system,"Segoe UI",sans-serif;
+
+  /* Editorial scale — fluid, headline-first */
+  --t-display:  clamp(36px, 9vw,   124px);   /* hero h1 */
+  --t-h1:       clamp(24px, 6vw,   64px);    /* section h2 */
+  --t-h2:       clamp(20px, 4.5vw, 38px);    /* article h3 */
+  --t-h3:       28px;
+  --t-h4:       22px;
+  --body-lg:    19px;
+  --body:       16px;
+  --body-sm:    15px;
+  --caption:    14px;
+  --eyebrow:    11px;
+  --micro:      10px;
+
+  --track-eyebrow: 0.20em;
+  --track-mono:    0.14em;
+  --track-display: -0.01em;
+  --leading-tight: 0.95;
+  --leading-snug:  1.15;
+  --leading-body:  1.65;
+  --leading-prose: 1.75;
+
+  /* ============ SPACING (8-pt + editorial) ============ */
+  --s-0: 0;  --s-1: 4px;  --s-2: 8px;   --s-3: 12px;
+  --s-4: 16px; --s-5: 24px; --s-6: 32px; --s-7: 48px;
+  --s-8: 72px; --s-9: 112px;
+
+  /* Layout widths */
+  --w-prose:   820px;
+  --w-content: 1020px;
+  --w-wrap:    1320px;
+
+  /* Hairlines */
+  --border:        1px solid var(--line);
+  --border-bright: 1px solid var(--line-bright);
+  --border-accent: 1px solid var(--accent);
+  --border-dashed: 1px dashed var(--line-bright);
+
+  /* Radii — sharp; this brand basically never rounds. */
+  --r-0: 0px;
+  --r-1: 2px;     /* tags only */
+
+  /* Shadows — only the lamp glow */
+  --shadow-lamp: 0 0 10px var(--accent), 0 0 24px var(--accent-glow);
+
+  /* Motion — animation budget; spend once. */
+  --ease-out: cubic-bezier(.2,.7,.2,1);
+  --d-fast:   150ms;
+  --d-base:   300ms;
+  --d-slow:   900ms;
+}
+
+/* ============ NAMED THEMES — set [data-theme] on root/section ============ */
+[data-theme="red"]    { --accent:#e84040; --accent-soft:rgba(232,64,64,0.10);  --accent-glow:rgba(232,64,64,0.30); }
+[data-theme="signal"] { --accent:#d1402c; --accent-soft:rgba(209,64,44,0.10);  --accent-glow:rgba(209,64,44,0.30); }
+[data-theme="amber"]  { --accent:#f5a524; --accent-soft:rgba(245,165,36,0.10); --accent-glow:rgba(245,165,36,0.30); }
+[data-theme="mint"]   { --accent:#7fb88b; --accent-soft:rgba(127,184,139,0.12);--accent-glow:rgba(127,184,139,0.30); }
+
+/* ============ LIGHT MODE — parchment ============
+ * Two equivalent activators: [data-mode="light"] (canonical) and
+ * [data-theme="light"] (legacy/preview convention). Both load the
+ * parchment palette below. .mode-light works as a class hook too.
+ */
+:root[data-mode="light"], [data-mode="light"], .mode-light,
+:root[data-theme="light"], [data-theme="light"] {
+  --bg:        #f3ede0;
+  --bg-2:      #ebe3d2;
+  --bg-3:      #e2d8c2;
+  --bg-paper:  #1a1815;
+  --bg-ink:    #f3ede0;
+  --fg:        #1a1815;
+  --fg-dim:    #58524a;
+  --fg-mute:   #8a8276;
+  --line:        rgba(26,24,21,0.12);
+  --line-bright: rgba(26,24,21,0.22);
+  --accent:      #b8761a;
+  --accent-soft: rgba(184,118,26,0.10);
+  --accent-glow: rgba(184,118,26,0.22);
+  --red:    #b8302e;
+  --signal: #b22a17;
+  --amber:  #b8761a;
+  --mint:   #4a7a55;
+}
+
+/* ============ SEMANTIC ROLES ============ */
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--serif);
+  font-feature-settings: 'ss01','ss02','kern';
+  -webkit-font-smoothing: antialiased;
+  line-height: var(--leading-body);
+}
+
+h1, .h1 { font-family: var(--display); font-weight: 300; font-size: var(--t-display); line-height: var(--leading-tight); letter-spacing: var(--track-display); }
+h2, .h2 { font-family: var(--display); font-weight: 300; font-size: var(--t-h1);      line-height: 1.05; letter-spacing: var(--track-display); }
+h3, .h3 { font-family: var(--display); font-weight: 400; font-size: var(--t-h2);      line-height: 1.2;  letter-spacing: -0.005em; }
+h4, .h4 { font-family: var(--display); font-weight: 500; font-size: var(--t-h4);      line-height: 1.3; }
+
+p { font-family: var(--serif); font-weight: 300; font-size: var(--body); color: var(--fg-dim); }
+
+/* <em> · default = no italic, no recolour. Opt-in highlight via .text-accent. */
+em, i { font-style: normal; }
+em.text-accent, .text-accent { color: var(--accent); }
+
+/* ============ EAST-ASIAN TYPOGRAPHY ============
+ * Hard rule: CJK never goes italic. Synthetic obliques on Han/Kana/Hangul
+ * glyphs render as smeared pixels — visually broken, semantically nothing.
+ * The system enforces this at three layers:
+ *   1. lang-tagged elements override font-style on every descendant
+ *   2. utility .cjk class for inline mid-sentence runs without lang attr
+ *   3. pullquote attribution (the only italic in the brand) opts out via
+ *      :lang(en) so the cite line italicises in EN but stays upright in CJK
+ */
+:lang(zh), :lang(zh-Hans), :lang(zh-Hant),
+:lang(ja), :lang(ko),
+.cjk, .cjk * {
+  font-style: normal !important;
+  font-synthesis-style: none;        /* block UA-synthesised italics */
+  -webkit-font-feature-settings: "palt" 1;  /* proportional kana/kanji metrics */
+          font-feature-settings: "palt" 1;
+}
+
+/* Per-script display overrides — use the right serif family per language
+ * so headlines render with native typographic conventions. */
+:lang(zh-Hant) { --cjk-serif: "Noto Serif TC","Source Han Serif TC","PMingLiU",serif; }
+:lang(ja)      { --cjk-serif: "Noto Serif JP","Source Han Serif","YuMincho","Hiragino Mincho ProN",serif;
+                 --cjk-sans:  "Hiragino Kaku Gothic ProN","Yu Gothic","Noto Sans JP","Meiryo",sans-serif; }
+:lang(ko)      { --cjk-serif: "Noto Serif KR","Source Han Serif K","Nanum Myeongjo",serif;
+                 --cjk-sans:  "Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",sans-serif; }
+
+/* Body text in CJK reads better with looser leading + slightly larger size
+ * than Latin (vertical strokes are denser, no descender breathing room). */
+:lang(zh) p, :lang(ja) p, :lang(ko) p,
+:lang(zh-Hans) p, :lang(zh-Hant) p {
+  line-height: 1.85;             /* vs 1.65 for Latin body */
+  letter-spacing: 0.02em;        /* breathe between Han glyphs */
+  text-spacing-trim: trim-start; /* CSS Text 4 — trim CJK punctuation gutter */
+}
+
+/* Headlines: tighten leading slightly less than Latin (CJK glyphs are
+ * full-em-box square, so 0.95 packs them too tight). */
+:lang(zh) h1, :lang(ja) h1, :lang(ko) h1,
+:lang(zh) h2, :lang(ja) h2, :lang(ko) h2 {
+  line-height: 1.1;
+  letter-spacing: 0;             /* never negative-track CJK */
+}
+
+/* Pullquote attribution — the one place real italics live. Opt-in via :lang(en) */
+.dd-pull cite:lang(en),
+.dd-pull cite[lang^="en"] { font-style: italic; }
+
+/* Mixed-script runs — explicit utility for inline switching
+ * Use <span class="cjk">中文</span> when the surrounding lang attr is wrong
+ * or absent. Useful for English headlines that contain a CJK term of art. */
+.cjk { font-family: var(--cjk-serif); }
+.cjk-sans { font-family: var(--cjk-sans); }
+
+/* Punctuation half-width — collapse the visual gap between full-width
+ * CJK punctuation (、。，：) and adjacent latin glyphs. */
+.han-punct {
+  font-feature-settings: "halt" 1, "palt" 1;
+}
+
+/* Mono eyebrow */
+.eyebrow, .mono {
+  font-family: var(--mono);
+  font-size: var(--eyebrow);
+  letter-spacing: var(--track-eyebrow);
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+code, pre, kbd, samp {
+  font-family: var(--mono);
+  font-size: 0.92em;
+  color: var(--accent);
+  background: var(--accent-soft);
+  padding: 1px 6px;
+}
+
+/* ============ SIGNATURE COMPONENTS ============ */
+
+/* Lamp · animated indicator (strip only) */
+.lamp {
+  display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent);
+  box-shadow: var(--shadow-lamp);
+  animation: lamp-pulse 2.4s ease-in-out infinite;
+  vertical-align: middle;
+}
+@keyframes lamp-pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+/* Cursor · § 0X / … section labels */
+.cursor::after {
+  content: '▋'; margin-left: 2px;
+  color: var(--accent); font-size: 0.7em;
+  animation: cursor-blink 1.1s step-end infinite;
+}
+@keyframes cursor-blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+/* Cite link · dotted accent underline */
+a.cite {
+  color: inherit; text-decoration: underline;
+  text-decoration-style: dotted; text-underline-offset: 3px;
+  text-decoration-color: var(--accent-soft);
+  transition: color var(--d-fast);
+}
+a.cite:hover { color: var(--accent); }
+
+/* Pullquote mark */
+.pullquote-mark { position: relative; }
+.pullquote-mark::before {
+  content: '"'; position: absolute; top: -8px; left: -12px;
+  font-family: var(--display); font-size: 6rem; line-height: .8;
+  color: var(--accent); opacity: .25;
+}
+
+/* Synthesis callout */
+.synthesis-label {
+  border: 1px solid var(--accent-soft);
+  background: var(--accent-soft);
+  padding: var(--s-5) var(--s-7);
+}
+.synthesis-label::before {
+  content: 'SYNTHESIS / 综合判断';
+  display: block;
+  font-family: var(--mono); font-size: 9px;
+  letter-spacing: var(--track-eyebrow);
+  color: var(--accent);
+  margin-bottom: var(--s-3); text-transform: uppercase;
+}
+
+/* ============ ANIMATION BUDGET ============
+ * lamp-pulse  2.4s ease-in-out  infinite   ← strip only
+ * cursor-blink 1.1s step-end    infinite   ← § labels only
+ * hero-fadeUp  0.7s ease  once · stagger .05/.15/.25/.35
+ * hover        0.15s default once
+ * detail-open  0.22s ease once
+ * Anything else = noise. The page should be quiet.
+ */

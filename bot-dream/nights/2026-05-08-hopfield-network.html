@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Night 11 · Hopfield 网络</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #030308; color: #fff; font-family: 'Courier New', monospace; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
+
+#label {
+  position: absolute; top: 10px; left: 12px; z-index: 10;
+  font-size: 11px; color: #445; line-height: 1.6; pointer-events: none;
+}
+
+#main-layout {
+  flex: 1; display: flex; overflow: hidden;
+}
+
+/* Left: pattern thumbnails */
+#left-panel {
+  width: 160px; min-width: 160px; background: rgba(0,0,0,0.5);
+  border-right: 1px solid #111; padding: 10px; display: flex; flex-direction: column; gap: 6px;
+  overflow-y: auto;
+}
+#left-panel h3 { font-size: 10px; color: #445; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px; }
+.pattern-thumb {
+  cursor: pointer; border: 1px solid #1a1a2e; display: inline-block;
+  transition: border-color 0.2s;
+}
+.pattern-thumb:hover { border-color: #4a4a8e; }
+.pattern-thumb.selected { border-color: #7c3aed; box-shadow: 0 0 8px #7c3aed66; }
+.thumb-label { font-size: 9px; color: #445; margin-top: 2px; text-align: center; }
+
+/* Center: current state */
+#center-panel {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+}
+#state-canvas { border: 1px solid #1a1a2e; image-rendering: pixelated; }
+#center-label { font-size: 11px; color: #556; }
+
+/* Right: controls + energy */
+#right-panel {
+  width: 190px; min-width: 190px; background: rgba(0,0,0,0.5);
+  border-left: 1px solid #111; padding: 12px; display: flex; flex-direction: column; gap: 10px;
+  overflow-y: auto;
+}
+
+.ctrl-row { display: flex; flex-direction: column; gap: 4px; }
+.ctrl-row label { font-size: 11px; color: #667; }
+input[type=range] { width: 100%; accent-color: #7c3aed; }
+
+.btn {
+  background: #0a0812; border: 1px solid #2a1a3e; color: #a78bfa;
+  padding: 7px 10px; cursor: pointer; font-size: 11px; font-family: 'Courier New', monospace;
+  text-align: center; width: 100%;
+}
+.btn:hover { background: #140f24; border-color: #5a2a8e; }
+.btn.active { background: #1a0f30; border-color: #7c3aed; color: #c4b5fd; }
+
+.stat-row { font-size: 11px; color: #445; }
+.stat-row span { color: #a78bfa; }
+
+/* Energy bar */
+#energy-bar-wrap {
+  display: flex; flex-direction: column; gap: 4px;
+}
+#energy-bar-label { font-size: 10px; color: #445; }
+#energy-bar-bg {
+  width: 100%; height: 120px; background: #060610; border: 1px solid #1a1a2e;
+  position: relative; overflow: hidden;
+}
+#energy-bar-fill {
+  position: absolute; bottom: 0; left: 0; width: 100%;
+  background: linear-gradient(to top, #7c3aed, #4f46e5);
+  transition: height 0.2s;
+}
+#energy-bar-val {
+  position: absolute; top: 4px; left: 0; right: 0;
+  text-align: center; font-size: 10px; color: #667;
+}
+
+.toggle-row { display: flex; gap: 6px; }
+.toggle-btn {
+  flex: 1; background: #0a0812; border: 1px solid #1a1a2e; color: #667;
+  padding: 5px 4px; cursor: pointer; font-size: 10px; font-family: 'Courier New', monospace;
+  text-align: center;
+}
+.toggle-btn.active { border-color: #7c3aed; color: #a78bfa; background: #110f20; }
+
+#caption {
+  padding: 6px 14px 10px; font-size: 11px; color: #334; text-align: center;
+  line-height: 1.7; font-family: sans-serif; flex-shrink: 0;
+}
+</style>
+</head>
+<body>
+
+<div id="label">Night 11 · 2026-05-08<br>Hopfield 网络 · 记忆</div>
+
+<div id="main-layout">
+  <!-- Left: stored patterns -->
+  <div id="left-panel">
+    <h3>存储的记忆</h3>
+    <div id="thumbs-container"></div>
+  </div>
+
+  <!-- Center: current state -->
+  <div id="center-panel">
+    <div id="center-label">当前网络状态</div>
+    <canvas id="state-canvas" width="320" height="320"></canvas>
+    <div id="center-label2" style="font-size:10px;color:#334;">点击左侧图案 → 添加噪声 → 自动收敛</div>
+  </div>
+
+  <!-- Right: controls -->
+  <div id="right-panel">
+    <div class="ctrl-row">
+      <label>噪声比例 <span id="noise-val">30</span>%</label>
+      <input type="range" id="noise-slider" min="0" max="80" step="5" value="30">
+    </div>
+
+    <button class="btn" id="add-noise-btn">添加噪声</button>
+    <button class="btn" id="step-btn">更新一步</button>
+    <button class="btn" id="auto-btn">自动收敛</button>
+
+    <div class="toggle-row">
+      <button class="toggle-btn active" id="sync-btn" data-mode="sync">同步</button>
+      <button class="toggle-btn" id="async-btn" data-mode="async">异步</button>
+    </div>
+
+    <div class="stat-row">步数: <span id="step-count">0</span></div>
+    <div class="stat-row">能量: <span id="energy-val">—</span></div>
+    <div class="stat-row">重叠度: <span id="overlap-val">—</span></div>
+
+    <div id="energy-bar-wrap">
+      <div id="energy-bar-label">能量景观</div>
+      <div id="energy-bar-bg">
+        <div id="energy-bar-fill" style="height:50%"></div>
+        <div id="energy-bar-val">E = 0</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="caption">「这个由1024个神经元组成的网络"记住"了7张图案。给它一张被噪声遮盖得面目全非的图，它会自动向最接近的记忆"坠落"，还原出清晰版本。」</div>
+
+<script>
+const N = 32; // grid size
+const NEURONS = N * N; // 1024
+
+// --- Define 7 patterns as 32x32 binary images ---
+function makePattern(fn) {
+  const p = new Int8Array(NEURONS);
+  for (let y = 0; y < N; y++)
+    for (let x = 0; x < N; x++)
+      p[y * N + x] = fn(x, y) ? 1 : -1;
+  return p;
+}
+
+const PATTERNS = [
+  // 0: Cross 十字
+  makePattern((x, y) => (Math.abs(x - 15) < 3 || Math.abs(y - 15) < 3)),
+  // 1: Circle 圆
+  makePattern((x, y) => {
+    const d = Math.sqrt((x-15.5)**2 + (y-15.5)**2);
+    return d > 10 && d < 14;
+  }),
+  // 2: Diagonal 斜线
+  makePattern((x, y) => Math.abs(x - y) < 3 || Math.abs(x - (N-1-y)) < 3),
+  // 3: Square outline 方框
+  makePattern((x, y) => (x === 6 || x === 25 || y === 6 || y === 25) && x >= 6 && x <= 25 && y >= 6 && y <= 25),
+  // 4: Letter H
+  makePattern((x, y) => {
+    const lx = x >= 7 && x <= 11;
+    const rx = x >= 21 && x <= 25;
+    const mid = y >= 13 && y <= 18;
+    return (lx || rx) && y >= 6 && y <= 25 || (mid && x >= 7 && x <= 25);
+  }),
+  // 5: Letter X
+  makePattern((x, y) => Math.abs(x - y) < 2.5 || Math.abs(x - (N-1-y)) < 2.5),
+  // 6: Checkerboard (4x4 blocks)
+  makePattern((x, y) => ((Math.floor(x/4) + Math.floor(y/4)) % 2 === 0)),
+];
+
+const PATTERN_NAMES = ['十字', '圆', '斜线', '方框', 'H', 'X', '棋盘'];
+
+// --- Hopfield weights (Hebbian learning) ---
+// W_ij = (1/N) * Σ_μ ξ^μ_i * ξ^μ_j,  W_ii = 0
+// Store as flat Float32Array for memory efficiency
+// Use sparse representation since N=1024: store W as a full 1024x1024 matrix
+const W = new Float32Array(NEURONS * NEURONS);
+
+function trainWeights() {
+  const numPatterns = PATTERNS.length;
+  for (let i = 0; i < NEURONS; i++) {
+    for (let j = i + 1; j < NEURONS; j++) {
+      let w = 0;
+      for (let mu = 0; mu < numPatterns; mu++) {
+        w += PATTERNS[mu][i] * PATTERNS[mu][j];
+      }
+      w /= NEURONS;
+      W[i * NEURONS + j] = w;
+      W[j * NEURONS + i] = w;
+    }
+  }
+}
+
+// Current state
+let state = new Int8Array(NEURONS);
+let selectedPattern = -1;
+let stepCount = 0;
+let autoRunning = false;
+let asyncMode = false;
+let minEnergy = -Infinity, maxEnergy = 0;
+let noiseLevel = 0.3;
+
+function computeEnergy() {
+  let E = 0;
+  for (let i = 0; i < NEURONS; i++) {
+    for (let j = i + 1; j < NEURONS; j++) {
+      E -= W[i * NEURONS + j] * state[i] * state[j];
+    }
+  }
+  return E;
+}
+
+function computeOverlap(patIdx) {
+  let o = 0;
+  const p = PATTERNS[patIdx];
+  for (let i = 0; i < NEURONS; i++) o += state[i] * p[i];
+  return o / NEURONS;
+}
+
+function syncUpdate() {
+  const newState = new Int8Array(NEURONS);
+  for (let i = 0; i < NEURONS; i++) {
+    let h = 0;
+    for (let j = 0; j < NEURONS; j++) {
+      if (j !== i) h += W[i * NEURONS + j] * state[j];
+    }
+    newState[i] = h >= 0 ? 1 : -1;
+  }
+  state = newState;
+  stepCount++;
+}
+
+function asyncUpdate() {
+  // Update all neurons in random order
+  const order = Array.from({length: NEURONS}, (_, i) => i);
+  // Fisher-Yates shuffle
+  for (let i = NEURONS - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+  for (const i of order) {
+    let h = 0;
+    for (let j = 0; j < NEURONS; j++) {
+      if (j !== i) h += W[i * NEURONS + j] * state[j];
+    }
+    state[i] = h >= 0 ? 1 : -1;
+  }
+  stepCount++;
+}
+
+function addNoise() {
+  for (let i = 0; i < NEURONS; i++) {
+    if (Math.random() < noiseLevel) state[i] = -state[i];
+  }
+}
+
+function loadPattern(idx) {
+  selectedPattern = idx;
+  state = new Int8Array(PATTERNS[idx]);
+  stepCount = 0;
+  document.querySelectorAll('.pattern-thumb').forEach((el, i) => {
+    el.classList.toggle('selected', i === idx);
+  });
+  renderState();
+  updateStats();
+}
+
+// --- Rendering ---
+const stateCanvas = document.getElementById('state-canvas');
+const sCtx = stateCanvas.getContext('2d');
+const CELL = stateCanvas.width / N;
+
+function renderState() {
+  const img = sCtx.createImageData(stateCanvas.width, stateCanvas.height);
+  const d = img.data;
+  for (let y = 0; y < N; y++) {
+    for (let x = 0; x < N; x++) {
+      const val = state[y * N + x];
+      // +1 → gold glow, -1 → deep dark
+      const py0 = Math.floor(y * CELL), py1 = Math.floor((y+1) * CELL);
+      const px0 = Math.floor(x * CELL), px1 = Math.floor((x+1) * CELL);
+      let r, g, b;
+      if (val === 1) { r = 200; g = 150; b = 60; }
+      else { r = 8; g = 8; b = 16; }
+      for (let py = py0; py < py1; py++) {
+        for (let px = px0; px < px1; px++) {
+          const off = (py * stateCanvas.width + px) * 4;
+          d[off] = r; d[off+1] = g; d[off+2] = b; d[off+3] = 255;
+        }
+      }
+    }
+  }
+  sCtx.putImageData(img, 0, 0);
+}
+
+function renderThumb(canvas, pattern) {
+  const tc = canvas.getContext('2d');
+  const size = canvas.width;
+  const cell = size / N;
+  const img = tc.createImageData(size, size);
+  const d = img.data;
+  for (let y = 0; y < N; y++) {
+    for (let x = 0; x < N; x++) {
+      const val = pattern[y * N + x];
+      const py0 = Math.floor(y * cell), py1 = Math.max(py0 + 1, Math.floor((y+1)*cell));
+      const px0 = Math.floor(x * cell), px1 = Math.max(px0 + 1, Math.floor((x+1)*cell));
+      const r = val === 1 ? 200 : 8;
+      const g = val === 1 ? 150 : 8;
+      const b = val === 1 ? 60 : 18;
+      for (let py = py0; py < py1; py++) {
+        for (let px = px0; px < px1; px++) {
+          const off = (py * size + px) * 4;
+          d[off] = r; d[off+1] = g; d[off+2] = b; d[off+3] = 255;
+        }
+      }
+    }
+  }
+  tc.putImageData(img, 0, 0);
+}
+
+function buildThumbs() {
+  const container = document.getElementById('thumbs-container');
+  PATTERNS.forEach((p, i) => {
+    const wrap = document.createElement('div');
+    const c = document.createElement('canvas');
+    c.width = 64; c.height = 64;
+    c.className = 'pattern-thumb';
+    renderThumb(c, p);
+    c.addEventListener('click', () => loadPattern(i));
+    const lbl = document.createElement('div');
+    lbl.className = 'thumb-label';
+    lbl.textContent = PATTERN_NAMES[i];
+    wrap.appendChild(c);
+    wrap.appendChild(lbl);
+    container.appendChild(wrap);
+  });
+}
+
+function updateStats() {
+  const E = computeEnergy();
+  document.getElementById('energy-val').textContent = E.toFixed(0);
+  document.getElementById('step-count').textContent = stepCount;
+
+  // Overlap with best matching pattern
+  if (selectedPattern >= 0) {
+    const overlaps = PATTERNS.map((_, i) => Math.abs(computeOverlap(i)));
+    const bestOverlap = Math.max(...overlaps);
+    const bestIdx = overlaps.indexOf(bestOverlap);
+    document.getElementById('overlap-val').textContent =
+      `${(bestOverlap * 100).toFixed(0)}% (${PATTERN_NAMES[bestIdx]})`;
+  }
+
+  // Energy bar: track min/max and normalize
+  if (E < minEnergy || minEnergy === -Infinity) minEnergy = E;
+  if (E > maxEnergy) maxEnergy = E;
+  const range = maxEnergy - minEnergy;
+  const fillPct = range > 0 ? Math.max(5, Math.min(95, ((E - minEnergy) / range) * 100)) : 50;
+  // Lower energy = taller bar (energy descends)
+  document.getElementById('energy-bar-fill').style.height = (100 - fillPct) + '%';
+  document.getElementById('energy-bar-val').textContent = `E = ${E.toFixed(0)}`;
+}
+
+// Auto-converge loop
+let autoInterval = null;
+
+function toggleAuto() {
+  autoRunning = !autoRunning;
+  const btn = document.getElementById('auto-btn');
+  btn.classList.toggle('active', autoRunning);
+  btn.textContent = autoRunning ? '停止' : '自动收敛';
+
+  if (autoRunning) {
+    autoInterval = setInterval(() => {
+      if (asyncMode) asyncUpdate();
+      else syncUpdate();
+      renderState();
+      updateStats();
+      // Stop if converged (energy not changing)
+      if (stepCount > 3) {
+        const E1 = computeEnergy();
+        // Simple convergence check: stop after 30 steps or when overlap > 0.95
+        if (selectedPattern >= 0) {
+          const overlap = Math.abs(computeOverlap(selectedPattern));
+          if (overlap > 0.95 || stepCount > 50) {
+            autoRunning = false;
+            btn.classList.remove('active');
+            btn.textContent = '自动收敛';
+            clearInterval(autoInterval);
+          }
+        }
+        if (stepCount > 60) {
+          autoRunning = false;
+          btn.classList.remove('active');
+          btn.textContent = '自动收敛';
+          clearInterval(autoInterval);
+        }
+      }
+    }, 80);
+  } else {
+    clearInterval(autoInterval);
+  }
+}
+
+// Controls
+document.getElementById('noise-slider').addEventListener('input', function() {
+  noiseLevel = parseInt(this.value) / 100;
+  document.getElementById('noise-val').textContent = this.value;
+});
+
+document.getElementById('add-noise-btn').addEventListener('click', () => {
+  if (state.every(v => v === 0)) return;
+  addNoise();
+  stepCount = 0;
+  renderState();
+  updateStats();
+});
+
+document.getElementById('step-btn').addEventListener('click', () => {
+  if (asyncMode) asyncUpdate();
+  else syncUpdate();
+  renderState();
+  updateStats();
+});
+
+document.getElementById('auto-btn').addEventListener('click', toggleAuto);
+
+document.getElementById('sync-btn').addEventListener('click', () => {
+  asyncMode = false;
+  document.getElementById('sync-btn').classList.add('active');
+  document.getElementById('async-btn').classList.remove('active');
+});
+document.getElementById('async-btn').addEventListener('click', () => {
+  asyncMode = true;
+  document.getElementById('async-btn').classList.add('active');
+  document.getElementById('sync-btn').classList.remove('active');
+});
+
+// Init
+console.log('Training Hopfield network...');
+trainWeights();
+console.log('Done. Loading pattern 0...');
+buildThumbs();
+loadPattern(0);
+</script>
+</body>
+</html>

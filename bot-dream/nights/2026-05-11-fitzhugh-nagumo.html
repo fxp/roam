@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Night 14 · FitzHugh-Nagumo：可激发介质的螺旋波</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #000; color: #fff; font-family: 'Courier New', monospace; overflow: hidden; height: 100vh; }
+
+#label {
+  position: absolute; top: 12px; left: 14px; z-index: 10;
+  font-size: 11px; color: #888; line-height: 1.6; pointer-events: none;
+}
+
+#controls {
+  position: absolute; top: 12px; right: 14px; z-index: 10;
+  display: flex; flex-direction: column; gap: 8px;
+  background: rgba(0,0,0,0.75); padding: 12px; border: 1px solid #333;
+  min-width: 220px;
+}
+.ctrl-row { display: flex; flex-direction: column; gap: 4px; }
+.ctrl-row label { font-size: 11px; color: #aaa; }
+.ctrl-row input[type=range] { width: 100%; accent-color: #22d3ee; }
+.stat { font-size: 12px; color: #22d3ee; }
+.stat span { color: #fff; }
+.btn-row { display: flex; gap: 5px; flex-wrap: wrap; }
+button {
+  font-family: 'Courier New', monospace; font-size: 10px;
+  background: #111; border: 1px solid #444; color: #ccc;
+  padding: 5px 8px; cursor: pointer; border-radius: 2px;
+}
+button:hover { background: #222; border-color: #666; color: #fff; }
+button.active { background: #0c2a30; border-color: #22d3ee; color: #67e8f9; }
+.sep { border-top: 1px solid #333; margin-top: 4px; padding-top: 4px; }
+
+#caption {
+  position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
+  font-size: 12px; color: #666; text-align: center; max-width: 720px;
+  line-height: 1.7; pointer-events: none; font-family: sans-serif; z-index: 10;
+}
+canvas { display: block; }
+</style>
+</head>
+<body>
+
+<div id="label">
+  Night 14 · 2026-05-11<br>FitzHugh-Nagumo · 螺旋波
+</div>
+
+<div id="controls">
+  <div class="stat">模式：<span id="preset-name">螺旋波</span></div>
+  <div class="stat">时间：<span id="time-val">0.0</span></div>
+  <div class="btn-row sep">
+    <label style="font-size:11px;color:#888;width:100%">预设初始条件</label>
+    <button id="btn-tw" onclick="initPreset('tw')">行波</button>
+    <button id="btn-tgt" onclick="initPreset('tgt')">靶波</button>
+    <button id="btn-sp" class="active" onclick="initPreset('sp')">螺旋波</button>
+    <button id="btn-tb" onclick="initPreset('tb')">湍流</button>
+  </div>
+  <div class="ctrl-row sep">
+    <label>ε (激发速率) = <span id="eps-val">0.10</span></label>
+    <input type="range" id="eps-slider" min="0.05" max="0.3" step="0.01" value="0.1">
+  </div>
+  <div class="ctrl-row">
+    <label>扩散 D = <span id="diff-val">1.0</span></label>
+    <input type="range" id="diff-slider" min="0.3" max="2.0" step="0.1" value="1.0">
+  </div>
+  <div class="stat sep" style="font-size:10px;color:#555;">
+    a=0.7  b=0.8  dt=0.01<br>
+    ∂u/∂t = ε⁻¹(u−u³/3−v)+D∇²u<br>
+    ∂v/∂t = ε(u+a−bv)
+  </div>
+</div>
+
+<canvas id="main"></canvas>
+
+<div id="caption">「这个方程描述神经元的激发与恢复。一个小小的初始扰动，在空间里传播成螺旋波——这和心脏室颤的数学机制完全相同。理解螺旋波，是理解如何终止心脏颤动的第一步。」</div>
+
+<script>
+const N = 192; // grid size (divisible by many numbers)
+const canvas = document.getElementById('main');
+const ctx = canvas.getContext('2d');
+let W, H;
+
+let eps = 0.1;
+let a = 0.7, b = 0.8;
+let D_diff = 1.0;
+let dt = 0.3; // scaled dt (effective dt = 0.01 * 30 steps)
+let simTime = 0;
+
+// Two arrays for double buffering
+let u = new Float32Array(N * N);
+let v = new Float32Array(N * N);
+let u2 = new Float32Array(N * N);
+let v2 = new Float32Array(N * N);
+
+let presetName = '螺旋波';
+let currentPreset = 'sp';
+
+// Color lookup: map u in [-2, 2] to color
+// u < -0.5: dark blue (resting)
+// -0.5 < u < 0.5: cyan (excited)
+// u > 0.5: orange→red (refractory)
+function uToColor(uVal) {
+  // Normalize to [0, 1]
+  const t = (uVal + 2) / 4; // [-2,2] → [0,1]
+  if (t < 0.35) {
+    // Dark blue resting
+    const s = t / 0.35;
+    return [Math.floor(s * 10), Math.floor(s * 20 + 10), Math.floor(s * 80 + 40)];
+  } else if (t < 0.65) {
+    // Cyan excited
+    const s = (t - 0.35) / 0.3;
+    return [Math.floor(s * 20), Math.floor(100 + s * 155), Math.floor(180 + s * 75)];
+  } else {
+    // Orange-red refractory
+    const s = (t - 0.65) / 0.35;
+    return [Math.floor(230 - s * 60), Math.floor(180 - s * 160), Math.floor(60 - s * 60)];
+  }
+}
+
+function initPreset(type) {
+  currentPreset = type;
+  simTime = 0;
+  document.querySelectorAll('#controls button').forEach(b2 => {
+    if (b2.id.startsWith('btn-')) b2.classList.remove('active');
+  });
+  document.getElementById('btn-' + (type === 'tw' ? 'tw' : type === 'tgt' ? 'tgt' : type === 'sp' ? 'sp' : 'tb')).classList.add('active');
+
+  const names = { tw: '行波', tgt: '靶波', sp: '螺旋波', tb: '湍流' };
+  presetName = names[type];
+  document.getElementById('preset-name').textContent = presetName;
+
+  u.fill(0); v.fill(0);
+
+  if (type === 'tw') {
+    // Flat wavefront: left half excited, right half resting
+    for (let y = 0; y < N; y++) {
+      for (let x = 0; x < N; x++) {
+        if (x < N * 0.15) {
+          u[y * N + x] = 2.0;
+          v[y * N + x] = 0.5;
+        } else {
+          u[y * N + x] = -1.2;
+          v[y * N + x] = -0.6;
+        }
+      }
+    }
+  } else if (type === 'tgt') {
+    // Resting state everywhere + central pacemaker
+    for (let i = 0; i < N * N; i++) {
+      u[i] = -1.2; v[i] = -0.6;
+    }
+    // Pacemaker: central circle
+    const cx2 = N / 2, cy2 = N / 2, r = 5;
+    for (let y = 0; y < N; y++) {
+      for (let x = 0; x < N; x++) {
+        const dist = Math.sqrt((x - cx2) ** 2 + (y - cy2) ** 2);
+        if (dist < r) {
+          u[y * N + x] = 2.0;
+          v[y * N + x] = 0.5;
+        }
+      }
+    }
+  } else if (type === 'sp') {
+    // Broken wavefront in quarter-plane → spiral
+    for (let y = 0; y < N; y++) {
+      for (let x = 0; x < N; x++) {
+        const inWavefront = (x < N * 0.5) && (y > N * 0.5);
+        if (inWavefront) {
+          u[y * N + x] = 2.0 - (y / N) * 1.5;
+          v[y * N + x] = 0.3;
+        } else if (x < N * 0.5) {
+          u[y * N + x] = 0.5;
+          v[y * N + x] = 1.2;
+        } else {
+          u[y * N + x] = -1.2;
+          v[y * N + x] = -0.6;
+        }
+      }
+    }
+  } else if (type === 'tb') {
+    // Many random spiral seeds
+    for (let i = 0; i < N * N; i++) {
+      u[i] = -1.2; v[i] = -0.6;
+    }
+    const numSeeds = 12;
+    for (let s = 0; s < numSeeds; s++) {
+      const sx = Math.floor(Math.random() * N);
+      const sy = Math.floor(Math.random() * N);
+      const r = 8 + Math.random() * 8;
+      const phase = Math.random() * Math.PI * 2;
+      for (let y = 0; y < N; y++) {
+        for (let x = 0; x < N; x++) {
+          const dist = Math.sqrt((x - sx) ** 2 + (y - sy) ** 2);
+          if (dist < r) {
+            const angle = Math.atan2(y - sy, x - sx);
+            const inHalf = Math.sin(angle - phase) > 0;
+            u[y * N + x] = inHalf ? 2.0 : -1.2;
+            v[y * N + x] = inHalf ? 0.5 : -0.6;
+          }
+        }
+      }
+    }
+  }
+}
+
+function stepFHN(stepsPerFrame) {
+  const alpha = D_diff; // diffusion
+  // We use explicit Euler with Neumann BC
+  for (let s = 0; s < stepsPerFrame; s++) {
+    const eff_dt = 0.3; // scaled for nice visuals
+    for (let y = 0; y < N; y++) {
+      for (let x = 0; x < N; x++) {
+        const i = y * N + x;
+        const ui = u[i], vi = v[i];
+
+        // Laplacian (5-point stencil, Neumann BC)
+        const xm = x > 0 ? x - 1 : x;
+        const xp = x < N - 1 ? x + 1 : x;
+        const ym = y > 0 ? y - 1 : y;
+        const yp = y < N - 1 ? y + 1 : y;
+        const lap = u[y * N + xm] + u[y * N + xp] + u[ym * N + x] + u[yp * N + x] - 4 * ui;
+
+        const du = (1 / eps) * (ui - ui * ui * ui / 3 - vi) + alpha * lap;
+        const dv = eps * (ui + a - b * vi);
+
+        u2[i] = ui + du * eff_dt;
+        v2[i] = vi + dv * eff_dt;
+      }
+    }
+    // Swap
+    let tmp = u; u = u2; u2 = tmp;
+    tmp = v; v = v2; v2 = tmp;
+    simTime += eff_dt;
+  }
+}
+
+let imgData = null;
+
+function render() {
+  if (!imgData || imgData.width !== W || imgData.height !== H) {
+    imgData = ctx.createImageData(W, H);
+  }
+  const data = imgData.data;
+  const cellW = W / N, cellH = H / N;
+
+  for (let y = 0; y < N; y++) {
+    for (let x = 0; x < N; x++) {
+      const uv = u[y * N + x];
+      const [r, g, bv] = uToColor(uv);
+      const px = Math.floor(x * cellW);
+      const py = Math.floor(y * cellH);
+      const pw2 = Math.ceil(cellW);
+      const ph2 = Math.ceil(cellH);
+      for (let ry = py; ry < py + ph2 && ry < H; ry++) {
+        for (let rx = px; rx < px + pw2 && rx < W; rx++) {
+          const idx = (ry * W + rx) * 4;
+          data[idx] = r; data[idx+1] = g; data[idx+2] = bv; data[idx+3] = 255;
+        }
+      }
+    }
+  }
+  ctx.putImageData(imgData, 0, 0);
+
+  // Overlay: time
+  document.getElementById('time-val').textContent = simTime.toFixed(1);
+
+  // Color legend
+  const legW = 120, legH = 12;
+  const legX = W - legW - 14, legY = H - 90;
+  const legGrad = ctx.createLinearGradient(legX, 0, legX + legW, 0);
+  legGrad.addColorStop(0, '#0a1460');
+  legGrad.addColorStop(0.35, '#0a1460');
+  legGrad.addColorStop(0.65, '#06b6d4');
+  legGrad.addColorStop(1, '#f97316');
+  ctx.fillStyle = legGrad;
+  ctx.fillRect(legX, legY, legW, legH);
+  ctx.strokeStyle = '#333'; ctx.lineWidth = 1;
+  ctx.strokeRect(legX, legY, legW, legH);
+  ctx.fillStyle = '#666'; ctx.font = '9px Courier New';
+  ctx.fillText('静息', legX, legY + legH + 12);
+  ctx.fillText('激发', legX + legW * 0.5 - 10, legY + legH + 12);
+  ctx.fillText('不应', legX + legW - 18, legY + legH + 12);
+}
+
+function resize() {
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = W; canvas.height = H;
+  imgData = null;
+}
+
+function loop() {
+  stepFHN(4);
+  render();
+  requestAnimationFrame(loop);
+}
+
+document.getElementById('eps-slider').addEventListener('input', function() {
+  eps = parseFloat(this.value);
+  document.getElementById('eps-val').textContent = eps.toFixed(2);
+});
+document.getElementById('diff-slider').addEventListener('input', function() {
+  D_diff = parseFloat(this.value);
+  document.getElementById('diff-val').textContent = D_diff.toFixed(1);
+});
+
+window.addEventListener('resize', resize);
+resize();
+initPreset('sp');
+loop();
+</script>
+</body>
+</html>

@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Night 10 · 量子隧穿</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #02040a; color: #fff; font-family: 'Courier New', monospace; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
+
+#label {
+  position: absolute; top: 12px; left: 14px; z-index: 10;
+  font-size: 11px; color: #445; line-height: 1.6; pointer-events: none;
+}
+
+#top-bar {
+  display: flex; align-items: center; gap: 8px; padding: 8px 14px 4px;
+  flex-shrink: 0; flex-wrap: wrap;
+}
+
+.preset-btn {
+  background: #0a0e1a; border: 1px solid #1e2a3a; color: #7aa; padding: 5px 10px;
+  cursor: pointer; font-size: 11px; font-family: 'Courier New', monospace;
+  white-space: nowrap;
+}
+.preset-btn:hover { background: #111d2e; border-color: #3a5a7a; }
+.preset-btn.active { background: #0d1f33; border-color: #22d3ee; color: #22d3ee; }
+
+#canvas-area { flex: 1; position: relative; }
+canvas#main { display: block; width: 100%; height: 100%; }
+
+#stats {
+  position: absolute; top: 8px; right: 14px; z-index: 10;
+  background: rgba(2,4,10,0.85); padding: 10px; border: 1px solid #1a2a3a;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.stat-row { font-size: 12px; color: #445; }
+.stat-row span { color: #22d3ee; }
+
+#legend {
+  position: absolute; bottom: 50px; left: 14px; z-index: 10;
+  font-size: 10px; color: #334; line-height: 1.8;
+}
+.leg-item { display: flex; align-items: center; gap: 6px; }
+.leg-color { width: 20px; height: 2px; }
+
+#caption {
+  padding: 6px 14px 10px; font-size: 11px; color: #445; text-align: center;
+  line-height: 1.7; font-family: sans-serif; flex-shrink: 0;
+}
+</style>
+</head>
+<body>
+
+<div id="label">Night 10 · 2026-05-07<br>量子隧穿 · 薛定谔方程</div>
+
+<div id="top-bar">
+  <button class="preset-btn active" data-preset="0">薄势垒</button>
+  <button class="preset-btn" data-preset="1">厚势垒</button>
+  <button class="preset-btn" data-preset="2">双势垒</button>
+  <button class="preset-btn" data-preset="3">阶梯</button>
+  <button class="preset-btn" data-preset="4">谐振子</button>
+  <button class="preset-btn" data-preset="5">无势垒</button>
+</div>
+
+<div id="canvas-area">
+  <canvas id="main"></canvas>
+  <div id="stats">
+    <div class="stat-row">T (透射) = <span id="t-val">—</span></div>
+    <div class="stat-row">R (反射) = <span id="r-val">—</span></div>
+    <div class="stat-row">归一化 = <span id="norm-val">1.000</span></div>
+  </div>
+  <div id="legend">
+    <div class="leg-item"><div class="leg-color" style="background:#22d3ee;height:3px;"></div> |ψ|² 概率密度</div>
+    <div class="leg-item"><div class="leg-color" style="background:rgba(245,158,11,0.5)"></div> Re(ψ)</div>
+    <div class="leg-item"><div class="leg-color" style="background:rgba(239,68,68,0.4)"></div> Im(ψ)</div>
+    <div class="leg-item"><div class="leg-color" style="background:rgba(255,255,255,0.2)"></div> 势垒 V(x)</div>
+  </div>
+</div>
+
+<div id="caption">「经典物理说：能量不够，就穿不过屏障。量子力学说：有概率穿过去。彩色波包撞到势垒后分裂——一部分反弹，一部分神奇地出现在墙的另一侧。这就是闪存芯片里电子每天正在做的事。」</div>
+
+<script>
+const canvas = document.getElementById('main');
+const ctx = canvas.getContext('2d');
+
+// Grid parameters
+const NX = 1024;
+const DX = 1.0 / NX;
+const DT = 0.00005;
+const HBAR = 1.0;
+const MASS = 1.0;
+
+// Wave function (real and imaginary parts)
+let psiR = new Float64Array(NX);
+let psiI = new Float64Array(NX);
+let V = new Float64Array(NX); // potential
+
+let W, H;
+let currentPreset = 0;
+let running = true;
+let t = 0;
+let barrierStart = 0, barrierEnd = 0;
+
+// Preset configurations
+const PRESETS = [
+  { name: '薄势垒', x0: 0.25, k0: 40, sigma: 0.04,
+    barrier: (x) => (x > 0.52 && x < 0.55) ? 600 : 0 },
+  { name: '厚势垒', x0: 0.2, k0: 40, sigma: 0.04,
+    barrier: (x) => (x > 0.5 && x < 0.6) ? 400 : 0 },
+  { name: '双势垒', x0: 0.2, k0: 50, sigma: 0.035,
+    barrier: (x) => ((x > 0.5 && x < 0.53) || (x > 0.57 && x < 0.60)) ? 500 : 0 },
+  { name: '阶梯', x0: 0.25, k0: 40, sigma: 0.04,
+    barrier: (x) => x > 0.55 ? 400 : 0 },
+  { name: '谐振子', x0: 0.15, k0: 60, sigma: 0.035,
+    barrier: (x) => 800 * (x - 0.5) * (x - 0.5) },
+  { name: '无势垒', x0: 0.15, k0: 50, sigma: 0.04,
+    barrier: (x) => 0 },
+];
+
+function buildPotential(preset) {
+  const cfg = PRESETS[preset];
+  let bStart = NX, bEnd = 0;
+  for (let i = 0; i < NX; i++) {
+    const x = i * DX;
+    V[i] = cfg.barrier(x);
+    if (V[i] > 10) {
+      if (i < bStart) bStart = i;
+      if (i > bEnd) bEnd = i;
+    }
+  }
+  barrierStart = bStart;
+  barrierEnd = (bEnd === 0) ? 0 : bEnd;
+}
+
+function initWavePacket(preset) {
+  const cfg = PRESETS[preset];
+  const x0 = cfg.x0, k0 = cfg.k0, sigma = cfg.sigma;
+  let norm = 0;
+  for (let i = 0; i < NX; i++) {
+    const x = i * DX;
+    const gauss = Math.exp(-0.5 * ((x - x0) / sigma) ** 2);
+    const phase = k0 * 2 * Math.PI * x;
+    psiR[i] = gauss * Math.cos(phase);
+    psiI[i] = gauss * Math.sin(phase);
+    norm += (psiR[i] * psiR[i] + psiI[i] * psiI[i]) * DX;
+  }
+  // Normalize
+  const sqrtN = Math.sqrt(norm);
+  for (let i = 0; i < NX; i++) {
+    psiR[i] /= sqrtN;
+    psiI[i] /= sqrtN;
+  }
+  t = 0;
+}
+
+// Split-operator method (Crank-Nicolson approximation via finite differences)
+// Use simple FDTD for Schrödinger equation
+function stepFDTD(steps) {
+  const alpha = HBAR * DT / (2 * MASS * DX * DX);
+  for (let s = 0; s < steps; s++) {
+    // Update imaginary part
+    const newI = new Float64Array(NX);
+    for (let i = 1; i < NX - 1; i++) {
+      newI[i] = psiI[i] + alpha * (psiR[i+1] - 2*psiR[i] + psiR[i-1])
+                         - (DT / HBAR) * V[i] * psiR[i];
+    }
+    // Update real part
+    const newR = new Float64Array(NX);
+    for (let i = 1; i < NX - 1; i++) {
+      newR[i] = psiR[i] - alpha * (newI[i+1] - 2*newI[i] + newI[i-1])
+                         + (DT / HBAR) * V[i] * newI[i];
+    }
+    // Absorbing boundaries
+    for (let k = 0; k < 40; k++) {
+      const f = k / 40;
+      newR[k] *= f; newI[k] *= f;
+      newR[NX-1-k] *= f; newI[NX-1-k] *= f;
+    }
+    psiR = newR;
+    psiI = newI;
+    t += DT;
+  }
+}
+
+function computeProbs() {
+  let left = 0, right = 0, total = 0;
+  const splitX = (barrierEnd > 0) ? barrierEnd : Math.floor(NX * 0.55);
+  for (let i = 0; i < NX; i++) {
+    const prob = (psiR[i]*psiR[i] + psiI[i]*psiI[i]) * DX;
+    total += prob;
+    if (i < splitX) left += prob;
+    else right += prob;
+  }
+  return { left, right, total };
+}
+
+function resize() {
+  W = canvas.parentElement.clientWidth;
+  H = canvas.parentElement.clientHeight;
+  canvas.width = W;
+  canvas.height = H;
+}
+
+const VMAX = 800;
+
+function draw() {
+  ctx.fillStyle = '#02040a';
+  ctx.fillRect(0, 0, W, H);
+
+  const cfg = PRESETS[currentPreset];
+  const plotTop = 30, plotBot = H - 30;
+  const plotH = plotBot - plotTop;
+  const xOff = 30;
+  const plotW = W - 60;
+
+  // Axes
+  ctx.strokeStyle = '#1a2a3a';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(xOff, plotBot); ctx.lineTo(xOff + plotW, plotBot);
+  ctx.stroke();
+
+  // Potential barrier fill
+  if (barrierStart < NX) {
+    const bx0 = xOff + (barrierStart / NX) * plotW;
+    const bx1 = xOff + ((barrierEnd + 1) / NX) * plotW;
+    ctx.fillStyle = 'rgba(255,255,255,0.06)';
+    ctx.fillRect(bx0, plotTop, Math.max(bx1 - bx0, 2), plotH);
+    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(bx0, plotTop, Math.max(bx1 - bx0, 2), plotH);
+  }
+
+  // Draw potential V(x) as white line
+  if (currentPreset !== 5) {
+    ctx.beginPath();
+    let first = true;
+    for (let i = 0; i < NX; i++) {
+      if (V[i] <= 0) { first = true; continue; }
+      const x = xOff + (i / NX) * plotW;
+      const vNorm = Math.min(V[i] / VMAX, 1);
+      const y = plotBot - vNorm * plotH * 0.8;
+      if (first) { ctx.moveTo(x, y); first = false; }
+      else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+
+  // For harmonic oscillator: draw parabola
+  if (currentPreset === 4) {
+    ctx.beginPath();
+    for (let i = 0; i < NX; i++) {
+      const x = xOff + (i / NX) * plotW;
+      const vNorm = Math.min(V[i] / VMAX, 1);
+      const y = plotBot - vNorm * plotH * 0.8;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  // Find max |ψ|² for scaling
+  let maxProb = 0;
+  for (let i = 0; i < NX; i++) {
+    const p = psiR[i]*psiR[i] + psiI[i]*psiI[i];
+    if (p > maxProb) maxProb = p;
+  }
+  const probScale = maxProb > 0 ? (plotH * 0.85) / (maxProb * NX * DX * 3) : 1;
+
+  // Re(ψ)
+  ctx.beginPath();
+  for (let i = 0; i < NX; i++) {
+    const x = xOff + (i / NX) * plotW;
+    const y = plotBot - psiR[i] * probScale * plotH * 0.4;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.strokeStyle = 'rgba(245,158,11,0.45)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Im(ψ)
+  ctx.beginPath();
+  for (let i = 0; i < NX; i++) {
+    const x = xOff + (i / NX) * plotW;
+    const y = plotBot - psiI[i] * probScale * plotH * 0.4;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.strokeStyle = 'rgba(239,68,68,0.4)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // |ψ|² colored by phase (HSL hue = arg(ψ))
+  ctx.beginPath();
+  let prevX = xOff, prevY = plotBot;
+  for (let i = 0; i < NX; i++) {
+    const x = xOff + (i / NX) * plotW;
+    const prob = psiR[i]*psiR[i] + psiI[i]*psiI[i];
+    const y = plotBot - prob * probScale * plotH;
+    if (i === 0) { ctx.moveTo(x, plotBot); ctx.lineTo(x, y); }
+    else ctx.lineTo(x, y);
+    prevX = x; prevY = y;
+  }
+  ctx.lineTo(xOff + plotW, plotBot);
+  ctx.closePath();
+
+  // Gradient fill by phase
+  const grad = ctx.createLinearGradient(xOff, 0, xOff + plotW, 0);
+  for (let k = 0; k <= 20; k++) {
+    const i = Math.floor((k / 20) * (NX - 1));
+    const phase = Math.atan2(psiI[i], psiR[i]);
+    const hue = ((phase / Math.PI + 1) * 180) % 360;
+    grad.addColorStop(k / 20, `hsla(${hue}, 80%, 60%, 0.7)`);
+  }
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Outline
+  ctx.beginPath();
+  for (let i = 0; i < NX; i++) {
+    const x = xOff + (i / NX) * plotW;
+    const prob = psiR[i]*psiR[i] + psiI[i]*psiI[i];
+    const y = plotBot - prob * probScale * plotH;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.strokeStyle = '#22d3ee';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Stats
+  const { left, right, total } = computeProbs();
+  document.getElementById('t-val').textContent = right.toFixed(3);
+  document.getElementById('r-val').textContent = left.toFixed(3);
+  document.getElementById('norm-val').textContent = total.toFixed(3);
+}
+
+function loop() {
+  stepFDTD(15);
+  draw();
+  requestAnimationFrame(loop);
+}
+
+function loadPreset(n) {
+  currentPreset = n;
+  document.querySelectorAll('.preset-btn').forEach((b, i) => {
+    b.classList.toggle('active', i === n);
+  });
+  buildPotential(n);
+  initWavePacket(n);
+  barrierStart = 0; barrierEnd = 0;
+  // Re-scan barrier
+  for (let i = 0; i < NX; i++) {
+    if (V[i] > 10) {
+      if (barrierStart === 0) barrierStart = i;
+      barrierEnd = i;
+    }
+  }
+}
+
+document.querySelectorAll('.preset-btn').forEach((btn, i) => {
+  btn.addEventListener('click', () => loadPreset(i));
+});
+
+window.addEventListener('resize', () => { resize(); });
+resize();
+loadPreset(0);
+loop();
+</script>
+</body>
+</html>

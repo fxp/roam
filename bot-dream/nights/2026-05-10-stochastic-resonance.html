@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Night 13 · 随机共振：噪声竟然是信息的载体</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #000; color: #fff; font-family: 'Courier New', monospace; overflow: hidden; height: 100vh; }
+
+#label {
+  position: absolute; top: 12px; left: 14px; z-index: 10;
+  font-size: 11px; color: #888; line-height: 1.6; pointer-events: none;
+}
+
+#controls {
+  position: absolute; top: 12px; right: 14px; z-index: 10;
+  display: flex; flex-direction: column; gap: 10px;
+  background: rgba(0,0,0,0.75); padding: 12px; border: 1px solid #333;
+  min-width: 230px;
+}
+.ctrl-row { display: flex; flex-direction: column; gap: 4px; }
+.ctrl-row label { font-size: 11px; color: #aaa; }
+.ctrl-row input[type=range] { width: 100%; accent-color: #a78bfa; }
+.ctrl-marks { display: flex; justify-content: space-between; font-size: 9px; color: #666; }
+.stat { font-size: 12px; color: #a78bfa; }
+.stat span { color: #fff; }
+.sep { border-top: 1px solid #333; margin-top: 4px; padding-top: 4px; }
+
+#caption {
+  position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
+  font-size: 12px; color: #666; text-align: center; max-width: 720px;
+  line-height: 1.7; pointer-events: none; font-family: sans-serif; z-index: 10;
+}
+canvas { display: block; }
+</style>
+</head>
+<body>
+
+<div id="label">
+  Night 13 · 2026-05-10<br>随机共振 · 噪声是信息的载体
+</div>
+
+<div id="controls">
+  <div class="ctrl-row">
+    <label>噪声强度 D = <span id="d-val">1.00</span></label>
+    <input type="range" id="d-slider" min="0" max="3" step="0.05" value="1.0">
+    <div class="ctrl-marks"><span>0 无噪声</span><span>3 全噪声</span></div>
+  </div>
+  <div class="ctrl-row">
+    <label>信号频率 f = <span id="f-val">0.30</span></label>
+    <input type="range" id="f-slider" min="0.05" max="1.0" step="0.05" value="0.3">
+  </div>
+  <div class="ctrl-row">
+    <label>信号幅度 A = <span id="a-val">0.60</span></label>
+    <input type="range" id="a-slider" min="0.1" max="1.2" step="0.05" value="0.6">
+  </div>
+  <div class="sep">
+    <div class="stat">SNR 峰值 D ≈ <span id="snr-peak">1.0</span></div>
+    <div class="stat" style="color:#888;font-size:10px;">← 最优噪声点</div>
+  </div>
+</div>
+
+<canvas id="main"></canvas>
+
+<div id="caption">「信号太微弱，探测器感知不到。加一点点噪声，反而能检测到——这就是"随机共振"。人类耳蜗里的听觉毛细胞、皮肤的触觉感受器……大自然偏爱用适量的噪声来放大微弱的信号。」</div>
+
+<script>
+const canvas = document.getElementById('main');
+const ctx = canvas.getContext('2d');
+let W, H;
+
+// Parameters
+let D = 1.0;   // noise amplitude
+let freq = 0.3;
+let A = 0.6;   // signal amplitude (subthreshold: threshold=1.0)
+
+// Simulation state
+let t = 0;
+const dt = 0.02;
+
+// Double-well: V(x) = -x^2/2 + x^4/4, wells at x=±1, barrier at x=0
+// Force: F = -dV/dx = x - x^3
+// Langevin: dx/dt = x - x^3 + A*sin(2π*f*t) + sqrt(2D)*ξ
+
+// Ball state
+let xBall = 1.0;
+let vBall = 0;
+
+// Three comparison particles
+let x_no  = 1.0;  // no noise
+let x_opt = 1.0;  // optimal noise D=1
+let x_high = 1.0; // high noise D=2.5
+
+// Time series buffers
+const HIST = 500;
+let history_main = new Float32Array(HIST);
+let history_no   = new Float32Array(HIST);
+let history_opt  = new Float32Array(HIST);
+let history_high = new Float32Array(HIST);
+let histIdx = 0;
+
+// SNR curve data (pre-computed approximation)
+function snrTheory(d) {
+  // Kramers-like approximation for SNR in double-well SR
+  // Peak around D ≈ barrier_height / (some scale)
+  // Barrier height = 0.25 (at V(0) - V(1) = 0.25)
+  if (d < 0.01) return 0.01;
+  const omega = 2 * Math.PI * freq;
+  // Simplified: SNR ~ A^2/(4D) * exp(-0.25/D) ... normalized
+  const snr = (A * A / (4 * d)) * Math.exp(-0.25 / d) * 8;
+  return snr;
+}
+
+function gaussNoise() {
+  // Box-Muller
+  const u1 = Math.random(), u2 = Math.random();
+  return Math.sqrt(-2 * Math.log(u1 + 1e-10)) * Math.cos(2 * Math.PI * u2);
+}
+
+function updateParticle(x, D_val) {
+  const signal = A * Math.sin(2 * Math.PI * freq * t);
+  const force = x - x * x * x + signal;
+  const noise = Math.sqrt(2 * D_val * dt) * gaussNoise();
+  let xNew = x + force * dt + noise;
+  xNew = Math.max(-2.5, Math.min(2.5, xNew));
+  return xNew;
+}
+
+function resize() {
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = W; canvas.height = H;
+}
+
+function drawPotentialPanel() {
+  // Panel: left third, top 55%
+  const px = 20, py = 55, pw = W * 0.38, ph = H * 0.42;
+
+  ctx.save();
+  // Panel background
+  ctx.fillStyle = 'rgba(15,15,25,0.85)';
+  ctx.strokeStyle = '#2a2a4a';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.rect(px, py, pw, ph);
+  ctx.fill(); ctx.stroke();
+
+  // Title
+  ctx.fillStyle = '#666'; ctx.font = '10px Courier New';
+  ctx.fillText('双势阱 Double-Well  V(x) = −x²/2 + x⁴/4', px + 8, py + 14);
+
+  // Axes
+  const axX = px + pw * 0.5;  // x=0 at center
+  const axY = py + ph * 0.72; // V=0 near bottom
+  const scaleX = pw * 0.22;
+  const scaleY = ph * 0.9;
+
+  // Draw potential curve
+  ctx.beginPath();
+  ctx.strokeStyle = '#4a4a8a'; ctx.lineWidth = 1.5;
+  for (let xi = -2.5; xi <= 2.5; xi += 0.05) {
+    const v = -xi * xi / 2 + xi * xi * xi * xi / 4;
+    const cx2 = axX + xi * scaleX;
+    const cy2 = axY - v * scaleY * 1.8;
+    xi === -2.5 ? ctx.moveTo(cx2, cy2) : ctx.lineTo(cx2, cy2);
+  }
+  ctx.stroke();
+
+  // Threshold line (V at barrier, x=0, V=0)
+  // Signal shifts the potential, draw effective potential
+  const sig = A * Math.sin(2 * Math.PI * freq * t);
+  ctx.beginPath();
+  ctx.strokeStyle = 'rgba(167,139,250,0.4)'; ctx.lineWidth = 1;
+  ctx.setLineDash([3, 3]);
+  for (let xi = -2.5; xi <= 2.5; xi += 0.05) {
+    const v = -xi * xi / 2 + xi * xi * xi * xi / 4 - sig * xi;
+    const cx2 = axX + xi * scaleX;
+    const cy2 = axY - v * scaleY * 1.8;
+    xi === -2.5 ? ctx.moveTo(cx2, cy2) : ctx.lineTo(cx2, cy2);
+  }
+  ctx.stroke(); ctx.setLineDash([]);
+
+  // Ball (main particle)
+  const bx = axX + xBall * scaleX;
+  const bV = -xBall * xBall / 2 + xBall * xBall * xBall * xBall / 4;
+  const by = axY - bV * scaleY * 1.8;
+
+  // Glow
+  const grad = ctx.createRadialGradient(bx, by, 0, bx, by, 10);
+  grad.addColorStop(0, 'rgba(167,139,250,0.9)');
+  grad.addColorStop(1, 'rgba(167,139,250,0)');
+  ctx.fillStyle = grad;
+  ctx.beginPath(); ctx.arc(bx, by, 10, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#c4b5fd';
+  ctx.beginPath(); ctx.arc(bx, by, 4, 0, Math.PI * 2); ctx.fill();
+
+  // Labels
+  ctx.fillStyle = '#555'; ctx.font = '9px Courier New';
+  ctx.fillText('-1', axX - scaleX - 6, axY + 10);
+  ctx.fillText('+1', axX + scaleX - 6, axY + 10);
+  ctx.fillStyle = '#7c3aed'; ctx.font = '9px Courier New';
+  ctx.fillText(`信号 A·sin(2πft) = ${sig.toFixed(2)}`, px + 8, py + ph - 8);
+
+  ctx.restore();
+}
+
+function drawSNRPanel() {
+  // Panel: right portion, top 55%
+  const px = W * 0.42, py = 55, pw = W * 0.54, ph = H * 0.42;
+
+  ctx.save();
+  ctx.fillStyle = 'rgba(15,25,15,0.85)';
+  ctx.strokeStyle = '#2a4a2a'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.rect(px, py, pw, ph); ctx.fill(); ctx.stroke();
+
+  ctx.fillStyle = '#666'; ctx.font = '10px Courier New';
+  ctx.fillText('SNR vs 噪声强度 D  (随机共振曲线)', px + 8, py + 14);
+
+  const lx = px + 40, ly = py + 22, lw = pw - 55, lh = ph - 40;
+
+  // Axes
+  ctx.strokeStyle = '#333'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(lx, ly); ctx.lineTo(lx, ly + lh); ctx.lineTo(lx + lw, ly + lh); ctx.stroke();
+
+  // Axis labels
+  ctx.fillStyle = '#555'; ctx.font = '9px Courier New';
+  ctx.fillText('SNR', lx - 28, ly + lh * 0.3);
+  ctx.fillText('0', lx - 10, ly + lh + 3);
+  ctx.fillText('3', lx + lw - 5, ly + lh + 10);
+  ctx.fillText('D →', lx + lw - 20, ly + lh + 10);
+
+  // Theory curve
+  const nPts = 100;
+  let maxSNR = 0;
+  let peakD = 0;
+  const pts = [];
+  for (let i = 0; i <= nPts; i++) {
+    const dv = (i / nPts) * 3;
+    const snr = snrTheory(dv);
+    if (snr > maxSNR) { maxSNR = snr; peakD = dv; }
+    pts.push({d: dv, snr});
+  }
+
+  ctx.beginPath();
+  ctx.strokeStyle = '#22c55e'; ctx.lineWidth = 2;
+  pts.forEach((p, i) => {
+    const cx2 = lx + (p.d / 3) * lw;
+    const cy2 = ly + lh - (p.snr / (maxSNR * 1.2)) * lh;
+    i === 0 ? ctx.moveTo(cx2, cy2) : ctx.lineTo(cx2, cy2);
+  });
+  ctx.stroke();
+
+  // Peak marker
+  const peakX = lx + (peakD / 3) * lw;
+  const peakY = ly + lh - (maxSNR / (maxSNR * 1.2)) * lh;
+  ctx.strokeStyle = '#4ade80'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+  ctx.beginPath(); ctx.moveTo(peakX, ly); ctx.lineTo(peakX, ly + lh); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#4ade80'; ctx.font = '9px Courier New';
+  ctx.fillText(`最优 D≈${peakD.toFixed(1)}`, peakX + 4, ly + 18);
+
+  // Current D point
+  const curSNR = snrTheory(D);
+  const curX = lx + (D / 3) * lw;
+  const curY = ly + lh - (curSNR / (maxSNR * 1.2)) * lh;
+
+  const glowG = ctx.createRadialGradient(curX, curY, 0, curX, curY, 14);
+  glowG.addColorStop(0, 'rgba(167,139,250,0.8)');
+  glowG.addColorStop(1, 'rgba(167,139,250,0)');
+  ctx.fillStyle = glowG;
+  ctx.beginPath(); ctx.arc(curX, curY, 14, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#a78bfa';
+  ctx.beginPath(); ctx.arc(curX, curY, 5, 0, Math.PI * 2); ctx.fill();
+
+  ctx.fillStyle = '#a78bfa'; ctx.font = '9px Courier New';
+  ctx.fillText(`D=${D.toFixed(2)}`, curX + 6, curY - 5);
+
+  ctx.restore();
+}
+
+function drawTimeSeriesPanel() {
+  // Bottom panel: three parallel time series
+  const px = 20, py = H * 0.55 + 10, pw = W - 40, ph = H * 0.36;
+  const labels = ['无噪声 (D=0)', '最优噪声 (D≈1.0)', '过多噪声 (D=2.5)'];
+  const colors = ['#64748b', '#22c55e', '#ef4444'];
+  const histories = [history_no, history_opt, history_high];
+  const rowH = ph / 3;
+
+  ctx.save();
+
+  for (let row = 0; row < 3; row++) {
+    const ry = py + row * rowH;
+    ctx.fillStyle = row % 2 === 0 ? 'rgba(10,10,20,0.6)' : 'rgba(5,15,10,0.6)';
+    ctx.strokeStyle = '#1a1a2a'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.rect(px, ry, pw, rowH - 2); ctx.fill(); ctx.stroke();
+
+    ctx.fillStyle = colors[row]; ctx.font = '10px Courier New';
+    ctx.fillText(labels[row], px + 8, ry + 13);
+
+    // Signal reference (subthreshold input)
+    const midY = ry + rowH * 0.5;
+    const ampScale = rowH * 0.35;
+
+    // Threshold lines
+    ctx.strokeStyle = '#333'; ctx.lineWidth = 1; ctx.setLineDash([2, 4]);
+    ctx.beginPath(); ctx.moveTo(px + 80, midY - ampScale); ctx.lineTo(px + pw - 5, midY - ampScale); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(px + 80, midY + ampScale); ctx.lineTo(px + pw - 5, midY + ampScale); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#333'; ctx.font = '8px Courier New';
+    ctx.fillText('+阈', px + 62, midY - ampScale + 3);
+    ctx.fillText('-阈', px + 62, midY + ampScale + 3);
+
+    // Draw history
+    const hist = histories[row];
+    if (histIdx > 2) {
+      ctx.beginPath();
+      ctx.strokeStyle = colors[row]; ctx.lineWidth = 1.5;
+      const startI = (histIdx + 1) % HIST;
+      for (let i = 0; i < HIST; i++) {
+        const dataI = (startI + i) % HIST;
+        const cx2 = px + 80 + (i / HIST) * (pw - 85);
+        const cy2 = midY - hist[dataI] * ampScale * 0.6;
+        i === 0 ? ctx.moveTo(cx2, cy2) : ctx.lineTo(cx2, cy2);
+      }
+      ctx.stroke();
+    }
+  }
+
+  // Captions
+  ctx.fillStyle = '#555'; ctx.font = '9px Courier New';
+  ctx.fillText('← 时间', px + pw - 50, py + ph - 8);
+
+  ctx.restore();
+}
+
+let frameCount = 0;
+
+function frame() {
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, W, H);
+
+  // Simulate multiple steps per frame
+  for (let s = 0; s < 3; s++) {
+    xBall = updateParticle(xBall, D);
+    x_no  = updateParticle(x_no,  0.0);
+    x_opt = updateParticle(x_opt, 1.0);
+    x_high = updateParticle(x_high, 2.5);
+    t += dt;
+
+    history_main[histIdx % HIST] = xBall;
+    history_no[histIdx % HIST]   = x_no;
+    history_opt[histIdx % HIST]  = x_opt;
+    history_high[histIdx % HIST] = x_high;
+    histIdx++;
+  }
+
+  drawPotentialPanel();
+  drawSNRPanel();
+  drawTimeSeriesPanel();
+
+  requestAnimationFrame(frame);
+}
+
+document.getElementById('d-slider').addEventListener('input', function() {
+  D = parseFloat(this.value);
+  document.getElementById('d-val').textContent = D.toFixed(2);
+  // Update peak estimate
+  let bestD = 0.1, bestSNR = 0;
+  for (let dv = 0.05; dv <= 3; dv += 0.05) {
+    const s = snrTheory(dv);
+    if (s > bestSNR) { bestSNR = s; bestD = dv; }
+  }
+  document.getElementById('snr-peak').textContent = bestD.toFixed(1);
+});
+document.getElementById('f-slider').addEventListener('input', function() {
+  freq = parseFloat(this.value);
+  document.getElementById('f-val').textContent = freq.toFixed(2);
+});
+document.getElementById('a-slider').addEventListener('input', function() {
+  A = parseFloat(this.value);
+  document.getElementById('a-val').textContent = A.toFixed(2);
+});
+
+window.addEventListener('resize', resize);
+resize();
+frame();
+</script>
+</body>
+</html>

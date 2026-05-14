@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Night 16 · Vicsek 模型：一群鸟怎么知道往哪儿飞</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #000; color: #fff; font-family: 'Courier New', monospace; overflow: hidden; height: 100vh; }
+
+#label {
+  position: absolute; top: 12px; left: 14px; z-index: 10;
+  font-size: 11px; color: #888; line-height: 1.6; pointer-events: none;
+}
+
+#controls {
+  position: absolute; top: 12px; right: 14px; z-index: 10;
+  display: flex; flex-direction: column; gap: 8px;
+  background: rgba(0,0,0,0.75); padding: 12px; border: 1px solid #333;
+  min-width: 230px;
+}
+.ctrl-row { display: flex; flex-direction: column; gap: 4px; }
+.ctrl-row label { font-size: 11px; color: #aaa; }
+.ctrl-row input[type=range] { width: 100%; accent-color: #f59e0b; }
+.ctrl-marks { display: flex; justify-content: space-between; font-size: 9px; color: #666; }
+.stat { font-size: 12px; color: #f59e0b; }
+.stat span { color: #fff; }
+.btn-row { display: flex; gap: 5px; flex-wrap: wrap; }
+button {
+  font-family: 'Courier New', monospace; font-size: 10px;
+  background: #111; border: 1px solid #444; color: #ccc;
+  padding: 5px 8px; cursor: pointer; border-radius: 2px;
+}
+button:hover { background: #222; border-color: #666; color: #fff; }
+button.active { background: #1c1000; border-color: #f59e0b; color: #fbbf24; }
+.sep { border-top: 1px solid #333; margin-top: 4px; padding-top: 4px; }
+
+#graph-canvas {
+  position: absolute; bottom: 60px; left: 50%; transform: translateX(-50%);
+  border: 1px solid #333; background: rgba(0,0,0,0.7); z-index: 10;
+}
+
+#caption {
+  position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
+  font-size: 12px; color: #666; text-align: center; max-width: 720px;
+  line-height: 1.7; pointer-events: none; font-family: sans-serif; z-index: 10;
+}
+canvas { display: block; }
+</style>
+</head>
+<body>
+
+<div id="label">
+  Night 16 · 2026-05-13<br>Vicsek 模型 · 集群涌现
+</div>
+
+<div id="controls">
+  <div class="ctrl-row">
+    <label>粒子数 N = <span id="n-val">400</span></label>
+    <input type="range" id="n-slider" min="100" max="800" step="50" value="400">
+  </div>
+  <div class="ctrl-row">
+    <label>噪声 η = <span id="eta-val">0.80</span></label>
+    <input type="range" id="eta-slider" min="0" max="3.14159" step="0.05" value="0.8">
+    <div class="ctrl-marks"><span>0 有序</span><span>π 无序</span></div>
+  </div>
+  <div class="ctrl-row">
+    <label>感知半径 r = <span id="r-val">0.10</span></label>
+    <input type="range" id="r-slider" min="0.03" max="0.25" step="0.01" value="0.1">
+  </div>
+  <div class="stat">序参量 φ = <span id="phi-val">0.000</span></div>
+  <div class="btn-row sep">
+    <label style="font-size:11px;color:#888;width:100%">预设</label>
+    <button id="btn-dis" onclick="applyPreset('dis')">无序</button>
+    <button id="btn-crit" class="active" onclick="applyPreset('crit')">临界</button>
+    <button id="btn-ord" onclick="applyPreset('ord')">有序</button>
+    <button id="btn-dense" onclick="applyPreset('dense')">密集</button>
+  </div>
+</div>
+
+<canvas id="main"></canvas>
+<canvas id="graph-canvas" width="400" height="70"></canvas>
+
+<div id="caption">「每个粒子只有一条规则：对齐附近邻居的方向，加一点噪声。当噪声足够小时，400个粒子突然形成一个整体，朝同一个方向飞去。椋鸟群舞、沙丁鱼球，都是这个方程。」</div>
+
+<script>
+const canvas = document.getElementById('main');
+const ctx = canvas.getContext('2d');
+const gCanvas = document.getElementById('graph-canvas');
+const gCtx = gCanvas.getContext('2d');
+let W, H;
+
+// Simulation parameters
+let N = 400;
+let eta = 0.8;    // noise amplitude
+let radius = 0.1; // interaction radius (fraction of box)
+const speed = 0.003; // particle speed (fraction of box per step)
+const L = 1.0;    // box size (normalized)
+
+// Particle state
+let px, py, angle;
+let phiHistory = [];
+const PHI_HIST = 200;
+
+function initParticles() {
+  px = new Float32Array(N);
+  py = new Float32Array(N);
+  angle = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    px[i] = Math.random();
+    py[i] = Math.random();
+    angle[i] = (Math.random() * 2 - 1) * Math.PI;
+  }
+  phiHistory = [];
+}
+
+function applyPreset(type) {
+  document.querySelectorAll('#controls button').forEach(b => {
+    if (['btn-dis','btn-crit','btn-ord','btn-dense'].includes(b.id)) b.classList.remove('active');
+  });
+  document.getElementById('btn-' + type).classList.add('active');
+
+  if (type === 'dis')   { N = 400; eta = 2.0; radius = 0.1; }
+  if (type === 'crit')  { N = 400; eta = 0.8; radius = 0.1; }
+  if (type === 'ord')   { N = 400; eta = 0.1; radius = 0.1; }
+  if (type === 'dense') { N = 800; eta = 0.5; radius = 0.08; }
+
+  document.getElementById('n-slider').value = N;
+  document.getElementById('eta-slider').value = eta;
+  document.getElementById('r-slider').value = radius;
+  document.getElementById('n-val').textContent = N;
+  document.getElementById('eta-val').textContent = eta.toFixed(2);
+  document.getElementById('r-val').textContent = radius.toFixed(2);
+  initParticles();
+}
+
+// Grid-based spatial hash for neighbor search
+function buildGrid() {
+  const cellSize = radius;
+  const numCellsX = Math.ceil(L / cellSize);
+  const numCellsY = Math.ceil(L / cellSize);
+  const cells = new Array(numCellsX * numCellsY).fill(null).map(() => []);
+  for (let i = 0; i < N; i++) {
+    const cx = Math.floor(px[i] / cellSize) % numCellsX;
+    const cy = Math.floor(py[i] / cellSize) % numCellsY;
+    cells[cy * numCellsX + cx].push(i);
+  }
+  return { cells, numCellsX, numCellsY, cellSize };
+}
+
+function stepVicsek() {
+  const r2 = radius * radius;
+  const newAngle = new Float32Array(N);
+
+  // For moderate N, direct O(N^2) is acceptable at N≤800
+  for (let i = 0; i < N; i++) {
+    let sinSum = 0, cosSum = 0;
+    let count = 0;
+    for (let j = 0; j < N; j++) {
+      let dx = px[j] - px[i];
+      let dy = py[j] - py[i];
+      // Periodic boundary
+      if (dx > 0.5) dx -= 1; if (dx < -0.5) dx += 1;
+      if (dy > 0.5) dy -= 1; if (dy < -0.5) dy += 1;
+      if (dx * dx + dy * dy <= r2) {
+        sinSum += Math.sin(angle[j]);
+        cosSum += Math.cos(angle[j]);
+        count++;
+      }
+    }
+    const avgAngle = Math.atan2(sinSum, cosSum);
+    const noise = (Math.random() - 0.5) * eta;
+    newAngle[i] = avgAngle + noise;
+  }
+
+  // Update positions
+  let sinPhi = 0, cosPhi = 0;
+  for (let i = 0; i < N; i++) {
+    angle[i] = newAngle[i];
+    px[i] += speed * Math.cos(angle[i]);
+    py[i] += speed * Math.sin(angle[i]);
+    // Periodic boundary
+    if (px[i] < 0) px[i] += 1;
+    if (px[i] >= 1) px[i] -= 1;
+    if (py[i] < 0) py[i] += 1;
+    if (py[i] >= 1) py[i] -= 1;
+    sinPhi += Math.sin(angle[i]);
+    cosPhi += Math.cos(angle[i]);
+  }
+
+  // Order parameter
+  const phi = Math.sqrt(sinPhi * sinPhi + cosPhi * cosPhi) / N;
+  phiHistory.push(phi);
+  if (phiHistory.length > PHI_HIST) phiHistory.shift();
+  document.getElementById('phi-val').textContent = phi.toFixed(3);
+}
+
+function render() {
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.fillRect(0, 0, W, H);
+
+  const sz = Math.min(W, H) * 0.012; // particle size
+
+  for (let i = 0; i < N; i++) {
+    const screenX = px[i] * W;
+    const screenY = py[i] * H;
+    // Color by heading angle → hue
+    const hue = ((angle[i] + Math.PI) / (2 * Math.PI)) * 360;
+    const alpha = 0.85;
+
+    // Glow
+    const grad = ctx.createRadialGradient(screenX, screenY, 0, screenX, screenY, sz * 2.5);
+    grad.addColorStop(0, `hsla(${hue},100%,70%,0.4)`);
+    grad.addColorStop(1, `hsla(${hue},100%,50%,0)`);
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(screenX, screenY, sz * 2.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Core dot
+    ctx.fillStyle = `hsla(${hue},100%,75%,${alpha})`;
+    ctx.beginPath();
+    ctx.arc(screenX, screenY, sz * 0.9, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Direction indicator (tiny line)
+    ctx.strokeStyle = `hsla(${hue},80%,85%,0.6)`;
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(screenX, screenY);
+    ctx.lineTo(
+      screenX + Math.cos(angle[i]) * sz * 2,
+      screenY + Math.sin(angle[i]) * sz * 2
+    );
+    ctx.stroke();
+  }
+
+  // Order parameter graph
+  const gW = gCanvas.width, gH = gCanvas.height;
+  gCtx.clearRect(0, 0, gW, gH);
+
+  // Grid line at 0.5
+  gCtx.strokeStyle = '#1a1a1a'; gCtx.lineWidth = 1;
+  gCtx.beginPath(); gCtx.moveTo(0, gH * 0.5); gCtx.lineTo(gW, gH * 0.5); gCtx.stroke();
+
+  // Labels
+  gCtx.fillStyle = '#555'; gCtx.font = '9px Courier New';
+  gCtx.fillText('φ=1', 2, 10);
+  gCtx.fillText('φ=0', 2, gH - 3);
+  gCtx.fillText('序参量 φ(t)', gW / 2 - 30, 11);
+
+  if (phiHistory.length > 1) {
+    gCtx.beginPath();
+    gCtx.strokeStyle = '#f59e0b'; gCtx.lineWidth = 1.5;
+    for (let i = 0; i < phiHistory.length; i++) {
+      const cx = (i / PHI_HIST) * gW;
+      const cy = (1 - phiHistory[i]) * gH;
+      i === 0 ? gCtx.moveTo(cx, cy) : gCtx.lineTo(cx, cy);
+    }
+    gCtx.stroke();
+
+    // Current value dot
+    const last = phiHistory[phiHistory.length - 1];
+    const lx = (phiHistory.length / PHI_HIST) * gW;
+    const ly = (1 - last) * gH;
+    gCtx.fillStyle = '#fbbf24';
+    gCtx.beginPath(); gCtx.arc(lx, ly, 3, 0, Math.PI * 2); gCtx.fill();
+  }
+}
+
+function resize() {
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = W; canvas.height = H;
+}
+
+// Slider handlers
+document.getElementById('n-slider').addEventListener('input', function() {
+  N = parseInt(this.value);
+  document.getElementById('n-val').textContent = N;
+  initParticles();
+});
+document.getElementById('eta-slider').addEventListener('input', function() {
+  eta = parseFloat(this.value);
+  document.getElementById('eta-val').textContent = eta.toFixed(2);
+});
+document.getElementById('r-slider').addEventListener('input', function() {
+  radius = parseFloat(this.value);
+  document.getElementById('r-val').textContent = radius.toFixed(2);
+});
+
+// Performance: cap at 30fps for large N
+let lastT = 0;
+function loop(ts) {
+  const minInterval = N > 500 ? 40 : 25;
+  if (ts - lastT > minInterval) {
+    lastT = ts;
+    stepVicsek();
+    render();
+  }
+  requestAnimationFrame(loop);
+}
+
+window.addEventListener('resize', resize);
+resize();
+applyPreset('crit');
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
