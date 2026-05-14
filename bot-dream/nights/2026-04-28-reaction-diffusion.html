@@ -251,6 +251,14 @@
     return;
   }
 
+  // WebGL2 requires explicitly enabling these extensions for RGBA32F framebuffer rendering
+  const extColorFloat = gl.getExtension('EXT_color_buffer_float');
+  gl.getExtension('OES_texture_float_linear');
+  if (!extColorFloat) {
+    canvas.parentElement.innerHTML = '<div style="color:#f55;padding:30px;text-align:center">需要 EXT_color_buffer_float 扩展支持</div>';
+    return;
+  }
+
   const W = 512, H = 512;
   let F = 0.035, k = 0.065;
   let stepsPerFrame = 8;
@@ -429,6 +437,15 @@
 
   let texA = makeFloatTex(), texB = makeFloatTex();
   let fboA = makeFBO(texA), fboB = makeFBO(texB);
+
+  // Verify framebuffer is complete
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fboA);
+  const fbStatus = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+  if (fbStatus !== gl.FRAMEBUFFER_COMPLETE) {
+    canvas.parentElement.innerHTML = `<div style="color:#f55;padding:30px;text-align:center">帧缓冲不完整 (${fbStatus})，设备不支持 float 纹理渲染</div>`;
+    return;
+  }
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
   function initState() {
     const data = new Float32Array(W * H * 4);
