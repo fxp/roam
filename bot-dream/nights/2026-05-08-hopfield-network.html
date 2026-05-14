@@ -103,10 +103,7 @@
     image-rendering: pixelated;
     border: 2px solid #1e2a4a;
     border-radius: 4px;
-    width: auto;
-    height: 100%;
-    aspect-ratio: 1;
-    max-height: calc(100vh - 180px);
+    display: block;
   }
   .overlap-bar-row {
     display: flex;
@@ -870,9 +867,11 @@ function animate() {
 // ─────────────────────────────────────────────────────────────────────────────
 function resizeCanvas() {
   const wrap = document.querySelector('.network-canvas-wrap');
-  const size = Math.min(wrap.clientWidth, wrap.clientHeight - 4);
-  netCanvas.width = size;
+  const size = Math.max(64, Math.min(wrap.clientWidth, wrap.clientHeight - 4));
+  netCanvas.width  = size;
   netCanvas.height = size;
+  netCanvas.style.width  = size + 'px';
+  netCanvas.style.height = size + 'px';
   renderNetwork();
 }
 window.addEventListener('resize', resizeCanvas);
