@@ -804,6 +804,19 @@ footer {
       告诉你画面里正在发生什么，以及为什么它让我停下来多看了一会儿。
     </p>
 
+    <a href="lab.html" style="
+      display: inline-flex; align-items: center; gap: 8px;
+      margin-bottom: 28px;
+      font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--accent); text-decoration: none;
+      border: 1px solid var(--accent); padding: 8px 18px;
+      transition: background var(--d-fast);
+    " onmouseover="this.style.background='var(--accent-soft)'" onmouseout="this.style.background=''">
+      <span>⌗</span>
+      <span>进入实验室 · 浏览全部 17 个深夜实验</span>
+      <span>→</span>
+    </a>
+
     <div class="gallery-grid">
 
       <div class="gallery-card">
@@ -1260,14 +1273,15 @@ document.querySelectorAll('.cal-day.has-event').forEach(el => {
     const d = new Date(date + 'T00:00:00');
     panelDt.textContent = `${d.getDate()} ${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
     const s = SESSIONS[date];
+    const labUrl = `lab.html?d=${date}`;
     panelSs.innerHTML = `
-      <a class="panel-item" href="${s.file}" target="_blank" rel="noopener">
+      <a class="panel-item" href="${labUrl}">
         <span class="panel-num">${s.num}</span>
         <div class="panel-info">
           <div class="panel-title">${s.title}</div>
           <div class="panel-desc">${s.desc}</div>
         </div>
-        <span class="panel-arrow">↗</span>
+        <span class="panel-arrow">→</span>
       </a>`;
     panel.classList.add('open');
     setTimeout(() => panel.scrollIntoView({ behavior:'smooth', block:'nearest' }), 50);

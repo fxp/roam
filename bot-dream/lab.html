@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Night Lab — 问野深夜实验室</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    height: 100%;
+    background: #08080f;
+    color: #c8d0e0;
+    font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace;
+    overflow: hidden;
+  }
+
+  /* ── STATUS BAR ── */
+  #bar {
+    height: 42px;
+    background: #0c0c18;
+    border-bottom: 1px solid #1a1a2e;
+    display: flex;
+    align-items: center;
+    gap: 0;
+    flex-shrink: 0;
+    padding: 0;
+    position: relative;
+    z-index: 10;
+  }
+
+  /* Back */
+  #btn-back {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 16px;
+    height: 100%;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #556070;
+    text-decoration: none;
+    border-right: 1px solid #1a1a2e;
+    white-space: nowrap;
+    transition: color 0.15s, background 0.15s;
+    flex-shrink: 0;
+  }
+  #btn-back:hover { color: #52b788; background: #0e0e20; }
+  #btn-back .arrow { font-size: 13px; }
+
+  /* Night number badge */
+  #night-num {
+    padding: 0 14px;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    border-right: 1px solid #1a1a2e;
+    font-size: 15px;
+    color: #52b788;
+    flex-shrink: 0;
+    min-width: 42px;
+    justify-content: center;
+  }
+
+  /* Main info */
+  #night-info {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 16px;
+    min-width: 0;
+    overflow: hidden;
+  }
+  #night-title {
+    font-size: 12px;
+    color: #d0d8ec;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-shrink: 0;
+    max-width: 280px;
+  }
+  .dot-sep {
+    color: #2a2a3e;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+  #night-desc {
+    font-size: 10px;
+    color: #3a4a5a;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* Date */
+  #night-date {
+    padding: 0 14px;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid #1a1a2e;
+    font-size: 10px;
+    color: #3a5060;
+    letter-spacing: 0.1em;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* Prev / Next nav */
+  #nav {
+    display: flex;
+    align-items: center;
+    height: 100%;
+    border-left: 1px solid #1a1a2e;
+    flex-shrink: 0;
+  }
+  .nav-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 100%;
+    font-size: 16px;
+    color: #3a5060;
+    cursor: pointer;
+    border: none;
+    background: none;
+    transition: color 0.15s, background 0.15s;
+    border-right: 1px solid #1a1a2e;
+  }
+  .nav-btn:last-child { border-right: none; }
+  .nav-btn:hover:not(:disabled) { color: #52b788; background: #0e0e20; }
+  .nav-btn:disabled { opacity: 0.2; cursor: default; }
+
+  #nav-counter {
+    padding: 0 12px;
+    font-size: 10px;
+    color: #3a4a5a;
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+    border-right: 1px solid #1a1a2e;
+  }
+
+  /* Open in new tab */
+  #btn-open {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 100%;
+    font-size: 14px;
+    color: #3a5060;
+    text-decoration: none;
+    border-left: 1px solid #1a1a2e;
+    transition: color 0.15s, background 0.15s;
+    flex-shrink: 0;
+    title: "新标签页打开";
+  }
+  #btn-open:hover { color: #52b788; background: #0e0e20; }
+
+  /* ── IFRAME AREA ── */
+  #frame-wrap {
+    position: fixed;
+    top: 42px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+  }
+
+  #lab-frame {
+    width: 100%;
+    height: 100%;
+    border: none;
+    display: block;
+  }
+
+  /* Empty state */
+  #empty-state {
+    display: none;
+    width: 100%;
+    height: 100%;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    color: #2a3a4a;
+    font-family: 'SF Mono', monospace;
+  }
+  #empty-state.show {
+    display: flex;
+  }
+  #empty-state .icon { font-size: 32px; opacity: 0.4; }
+  #empty-state .msg { font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; }
+  #empty-state .sub { font-size: 11px; color: #1a2a3a; letter-spacing: 0.06em; }
+
+  /* Keyboard hint */
+  #kb-hint {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    font-size: 10px;
+    color: #1a2030;
+    letter-spacing: 0.08em;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  #kb-hint.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div id="bar">
+  <a id="btn-back" href="./">
+    <span class="arrow">←</span>
+    <span>问野十六夜</span>
+  </a>
+
+  <div id="night-num">①</div>
+
+  <div id="night-info">
+    <span id="night-title">—</span>
+    <span class="dot-sep">·</span>
+    <span id="night-desc">—</span>
+  </div>
+
+  <div id="night-date">—</div>
+
+  <div id="nav">
+    <button class="nav-btn" id="btn-prev" title="上一夜 (←)">‹</button>
+    <span id="nav-counter">1 / 16</span>
+    <button class="nav-btn" id="btn-next" title="下一夜 (→)">›</button>
+  </div>
+
+  <a id="btn-open" href="#" target="_blank" title="新标签页全屏打开 (↑)">⤢</a>
+</div>
+
+<div id="frame-wrap">
+  <iframe id="lab-frame" src="" allowfullscreen></iframe>
+  <div id="empty-state">
+    <span class="icon">🌑</span>
+    <span class="msg">此夜实验文件未留存</span>
+    <span class="sub">DLA · 扩散限制凝聚 · 2026-05-05</span>
+  </div>
+</div>
+
+<div id="kb-hint">← → 切换实验</div>
+
+<script>
+const NIGHTS = [
+  { date: '2026-04-28', num: '①', title: '反应扩散：涌现的图案',           desc: 'Gray-Scott · WebGL2 · 8 个参数预设',                          file: 'nights/2026-04-28-reaction-diffusion.html' },
+  { date: '2026-04-29', num: '②', title: '元胞自动机宇宙',                  desc: 'Wolfram 256 条规则 · 四类分类 · 点击详情',                    file: 'nights/2026-04-28-cellular-automata.html' },
+  { date: '2026-04-30', num: '③', title: '奇异吸引子：混沌的密度',          desc: '7000 粒子 RK4 · 密度累积 · Lorenz / Rössler / Thomas',        file: 'nights/2026-04-30-strange-attractors.html' },
+  { date: '2026-05-01', num: '④', title: '阿贝尔沙堆：自组织临界性',        desc: '600×600 格点 · 多火优化 · 完美分形圆形涌现',                  file: 'nights/2026-05-01-abelian-sandpile.html' },
+  { date: '2026-05-02', num: '⑤', title: 'L-Systems：语法即生长',          desc: '8 个经典预设 · 实时编辑规则 · 蕨类 / 龙形 / 希尔伯特',        file: 'nights/2026-05-02-lsystems.html' },
+  { date: '2026-05-03', num: '⑥', title: '万物皆圆：傅里叶本轮',            desc: 'DFT 分解任意曲线 · 旋转圆协作重建',                          file: 'nights/2026-04-30-fourier-epicycles.html' },
+  { date: '2026-05-04', num: '⑦', title: '伊辛模型：相变的边缘',            desc: 'Metropolis-Hastings · Onsager 精确解对比 · 实时相图',         file: 'nights/2026-05-04-ising-model.html' },
+  { date: '2026-05-05', num: '⑧', title: '扩散限制凝聚 (DLA)',              desc: '此夜实验文件未留存',                                          file: null },
+  { date: '2026-05-06', num: '⑨', title: '久保振荡器：同步的临界点',        desc: 'N 粒子均场 · 自洽方程理论预测实时对比',                        file: 'nights/2026-05-06-kuramoto.html' },
+  { date: '2026-05-07', num: '⑩', title: '量子隧穿：波包穿越禁区',          desc: '分裂算符法 TDSE · 相位着色 · 6 种势场预设',                   file: 'nights/2026-05-07-quantum-tunneling.html' },
+  { date: '2026-05-08', num: '⑪', title: 'Hopfield 网络：把伊辛变成记忆',   desc: '32×32 神经元 · 7 个图案 · 异步更新 · 重叠度量',              file: 'nights/2026-05-08-hopfield-network.html' },
+  { date: '2026-05-09', num: '⑫', title: '进化博弈：合作的涌现',            desc: '200×200 格点 · 囚徒困境 / 雪堆博弈 · Nowak-May 1992',        file: 'nights/2026-05-09-evolutionary-game.html' },
+  { date: '2026-05-10', num: '⑬', title: '随机共振：噪声作为信息载体',      desc: '双势阱 Langevin · SNR 理论曲线 · 三粒子对比',                 file: 'nights/2026-05-10-stochastic-resonance.html' },
+  { date: '2026-05-11', num: '⑭', title: 'FitzHugh-Nagumo：螺旋波',        desc: '256×256 · Euler-Maruyama · 行波 / 靶波 / 螺旋 / 湍流',       file: 'nights/2026-05-11-fitzhugh-nagumo.html' },
+  { date: '2026-05-12', num: '⑮', title: '格子玻尔兹曼：流体的涌现',        desc: 'D2Q9 LBM · 卡门涡街 · 涡量 / 速度 / 压力 · 600 粒子追踪',   file: 'nights/2026-05-12-lattice-boltzmann.html' },
+  { date: '2026-05-13', num: '⑯', title: 'Vicsek 模型：集体运动的相变',     desc: 'N 粒子周期边界 · 方向→HSL · 序参量 φ(t) · 四预设',           file: 'nights/2026-05-13-vicsek-flocking.html' },
+  { date: '2026-05-14', num: '⑰', title: 'Swarmalators：同步即聚集',        desc: '空间聚集 + 相位同步 · 五种集体态 · 彩虹环自组织',             file: 'nights/2026-05-14-swarmalators.html' },
+];
+
+// ── State ──────────────────────────────────────────────────────────────────
+let currentIdx = 0;
+
+// ── URL param parsing ──────────────────────────────────────────────────────
+function parseInitial() {
+  const p = new URLSearchParams(location.search);
+  // ?i=1  (1-based index)
+  if (p.has('i')) {
+    const n = parseInt(p.get('i'), 10);
+    if (n >= 1 && n <= NIGHTS.length) return n - 1;
+  }
+  // ?d=2026-05-04  (date)
+  if (p.has('d')) {
+    const idx = NIGHTS.findIndex(n => n.date === p.get('d'));
+    if (idx >= 0) return idx;
+  }
+  return 0;
+}
+
+// ── DOM refs ───────────────────────────────────────────────────────────────
+const numEl     = document.getElementById('night-num');
+const titleEl   = document.getElementById('night-title');
+const descEl    = document.getElementById('night-desc');
+const dateEl    = document.getElementById('night-date');
+const counterEl = document.getElementById('nav-counter');
+const btnPrev   = document.getElementById('btn-prev');
+const btnNext   = document.getElementById('btn-next');
+const btnOpen   = document.getElementById('btn-open');
+const frame     = document.getElementById('lab-frame');
+const empty     = document.getElementById('empty-state');
+const kbHint    = document.getElementById('kb-hint');
+
+// ── Render ─────────────────────────────────────────────────────────────────
+function go(idx, pushState = true) {
+  currentIdx = Math.max(0, Math.min(NIGHTS.length - 1, idx));
+  const n = NIGHTS[currentIdx];
+
+  // Bar update
+  numEl.textContent   = n.num;
+  titleEl.textContent = n.title;
+  descEl.textContent  = n.desc;
+  dateEl.textContent  = n.date;
+  counterEl.textContent = `${currentIdx + 1} / ${NIGHTS.length}`;
+
+  // Nav buttons
+  btnPrev.disabled = currentIdx === 0;
+  btnNext.disabled = currentIdx === NIGHTS.length - 1;
+
+  // Open link
+  if (n.file) {
+    btnOpen.href = n.file;
+    btnOpen.style.pointerEvents = '';
+    btnOpen.style.opacity = '';
+  } else {
+    btnOpen.href = '#';
+    btnOpen.style.pointerEvents = 'none';
+    btnOpen.style.opacity = '0.25';
+  }
+
+  // iframe vs empty state
+  if (n.file) {
+    frame.src = n.file;
+    frame.style.display = 'block';
+    empty.classList.remove('show');
+  } else {
+    frame.src = '';
+    frame.style.display = 'none';
+    empty.classList.add('show');
+  }
+
+  // URL
+  if (pushState) {
+    const url = new URL(location.href);
+    url.searchParams.set('d', n.date);
+    url.searchParams.delete('i');
+    history.pushState({ idx: currentIdx }, '', url.toString());
+  }
+
+  // Page title
+  document.title = `${n.num} ${n.title} — Night Lab`;
+}
+
+// ── Nav ────────────────────────────────────────────────────────────────────
+btnPrev.addEventListener('click', () => go(currentIdx - 1));
+btnNext.addEventListener('click', () => go(currentIdx + 1));
+
+// Keyboard
+let kbTimer;
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   { e.preventDefault(); go(currentIdx - 1); }
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown')  { e.preventDefault(); go(currentIdx + 1); }
+  if (e.key === 'ArrowUp' && e.altKey) {
+    const n = NIGHTS[currentIdx];
+    if (n.file) window.open(n.file, '_blank');
+  }
+  // Show KB hint briefly
+  kbHint.classList.add('show');
+  clearTimeout(kbTimer);
+  kbTimer = setTimeout(() => kbHint.classList.remove('show'), 1800);
+});
+
+// Browser back/forward
+window.addEventListener('popstate', e => {
+  if (e.state && typeof e.state.idx === 'number') {
+    go(e.state.idx, false);
+  }
+});
+
+// ── Init ───────────────────────────────────────────────────────────────────
+currentIdx = parseInitial();
+go(currentIdx, false);
+</script>
+
+</body>
+</html>
