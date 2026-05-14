@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Swarmalators — 空间-相位耦合自组织</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #080a0f;
+    color: #e0e0e0;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 16px;
+  }
+  h1 {
+    font-size: 1.3rem;
+    font-weight: 400;
+    color: #c8a8f5;
+    margin-bottom: 4px;
+    letter-spacing: 0.05em;
+  }
+  .subtitle {
+    font-size: 0.72rem;
+    color: #445;
+    margin-bottom: 14px;
+    letter-spacing: 0.08em;
+  }
+  .main-layout {
+    display: flex;
+    gap: 18px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  canvas#main {
+    border: 1px solid #1a1a2e;
+    border-radius: 4px;
+    background: #020308;
+    display: block;
+  }
+  .side-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 260px;
+  }
+  .panel-box {
+    background: #0c0e1a;
+    border: 1px solid #1a1a2e;
+    border-radius: 6px;
+    padding: 12px;
+  }
+  .panel-box h3 {
+    font-size: 0.68rem;
+    color: #7755aa;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 8px;
+  }
+  .state-name {
+    font-size: 1.1rem;
+    font-weight: 300;
+    color: #c8a8f5;
+    text-align: center;
+    margin: 4px 0;
+  }
+  .state-desc {
+    font-size: 0.65rem;
+    color: #6655aa;
+    text-align: center;
+    line-height: 1.5;
+    margin-bottom: 6px;
+  }
+  .order-params {
+    display: flex;
+    justify-content: space-around;
+    margin-top: 6px;
+  }
+  .order-param {
+    text-align: center;
+  }
+  .order-param .val {
+    font-size: 1.4rem;
+    font-weight: 300;
+    line-height: 1;
+  }
+  .order-param .lbl {
+    font-size: 0.58rem;
+    color: #557;
+    margin-top: 2px;
+  }
+  canvas#phaseChart {
+    width: 100%;
+    height: 110px;
+    display: block;
+    margin-top: 6px;
+  }
+  .controls {
+    background: #0c0e1a;
+    border: 1px solid #1a1a2e;
+    border-radius: 6px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 260px;
+  }
+  .ctrl-row {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .ctrl-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.68rem;
+    color: #9888cc;
+  }
+  .ctrl-label span.val { color: #ddd; font-size: 0.72rem; }
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 4px;
+    background: #1a1a2e;
+    border-radius: 2px;
+    outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: #9966dd;
+    cursor: pointer;
+  }
+  .btn-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  button {
+    background: #100e1e;
+    border: 1px solid #2a1a4a;
+    color: #9888cc;
+    font-family: inherit;
+    font-size: 0.67rem;
+    padding: 5px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  button:hover { background: #1a1530; border-color: #6644aa; color: #ccc; }
+  button.active { background: #1e1040; border-color: #9966dd; color: #c8a8f5; }
+  .preset-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5px;
+  }
+  .preset-btn {
+    padding: 6px 4px;
+    font-size: 0.63rem;
+    line-height: 1.4;
+    text-align: center;
+  }
+  .preset-btn.highlight {
+    border-color: #9966dd;
+    color: #c8a8f5;
+    background: #120e22;
+  }
+  .toggle-check {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.68rem;
+    color: #9888cc;
+    cursor: pointer;
+  }
+  .toggle-check input[type=checkbox] {
+    accent-color: #9966dd;
+    cursor: pointer;
+  }
+  .insight-box {
+    background: #0c0e1a;
+    border: 1px solid #1a1a2e;
+    border-left: 3px solid #6644aa;
+    border-radius: 4px;
+    padding: 10px 12px;
+    font-size: 0.65rem;
+    color: #7766aa;
+    line-height: 1.6;
+    width: 260px;
+  }
+  .insight-box strong { color: #c8a8f5; }
+  .step-count {
+    font-size: 0.62rem;
+    color: #334;
+    text-align: right;
+    margin-top: 2px;
+  }
+  .speed-label {
+    font-size: 0.6rem;
+    color: #445566;
+  }
+</style>
+</head>
+<body>
+<h1>Swarmalators — 群振子</h1>
+<div class="subtitle">O'Keeffe, Hong & Strogatz 2017 · 空间-相位耦合自组织</div>
+
+<div class="main-layout">
+  <div>
+    <canvas id="main" width="560" height="560"></canvas>
+    <div class="step-count" id="stepCount">t = 0.00</div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px;">
+    <div class="side-panel">
+      <!-- State display -->
+      <div class="panel-box">
+        <h3>当前集体态</h3>
+        <div class="state-name" id="stateName">彩虹环</div>
+        <div class="state-desc" id="stateDesc">粒子形成环形，相位沿环连续渐变，构成彩虹色带</div>
+        <div class="order-params">
+          <div class="order-param">
+            <div class="val" id="r1Val" style="color:#7de0ff;">0.00</div>
+            <div class="lbl">r₁ 空间聚集</div>
+          </div>
+          <div class="order-param">
+            <div class="val" id="r2Val" style="color:#c8a8f5;">0.00</div>
+            <div class="lbl">r₂ 相位同步</div>
+          </div>
+        </div>
+        <canvas id="phaseChart" width="236" height="110"></canvas>
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+      <div style="font-size:0.7rem;color:#7755aa;text-transform:uppercase;letter-spacing:0.1em;">参数控制</div>
+
+      <div class="ctrl-row">
+        <div class="ctrl-label"><span>空间-相位耦合 J</span><span class="val" id="jVal">1.00</span></div>
+        <input type="range" id="jSlider" min="-2" max="2" step="0.05" value="1.0">
+      </div>
+
+      <div class="ctrl-row">
+        <div class="ctrl-label"><span>相位耦合 K（Kuramoto）</span><span class="val" id="kVal">0.00</span></div>
+        <input type="range" id="kSlider" min="-2" max="2" step="0.05" value="0.0">
+      </div>
+
+      <div class="ctrl-row">
+        <div class="ctrl-label"><span>固有频率 ω</span><span class="val" id="omegaVal">均匀=0</span></div>
+        <div class="btn-row" style="margin-top:2px;">
+          <button id="omegaZeroBtn" class="active" onclick="setOmegaMode(0)">ω=0</button>
+          <button id="omegaRandBtn" onclick="setOmegaMode(1)">ω∈[-1,1]</button>
+        </div>
+      </div>
+
+      <div class="ctrl-row">
+        <div class="ctrl-label"><span>粒子数 N</span><span class="val" id="nVal">100</span></div>
+        <input type="range" id="nSlider" min="50" max="200" step="10" value="100">
+      </div>
+
+      <div class="ctrl-row">
+        <div class="ctrl-label"><span>模拟速度 dt 倍率</span><span class="val" id="speedVal">1×</span></div>
+        <input type="range" id="speedSlider" min="1" max="8" step="1" value="2">
+      </div>
+
+      <label class="toggle-check">
+        <input type="checkbox" id="showArrows"> 显示相位箭头
+      </label>
+
+      <div class="btn-row">
+        <button id="pauseBtn">暂停</button>
+        <button id="resetBtn">重置</button>
+      </div>
+    </div>
+
+    <!-- Presets -->
+    <div class="controls" style="gap:8px;">
+      <div style="font-size:0.7rem;color:#7755aa;text-transform:uppercase;letter-spacing:0.1em;">5 种集体态预设</div>
+      <div class="preset-grid">
+        <button class="preset-btn" id="p1" onclick="loadPreset(1)">静态同步<br><span style="color:#665">J=1 K=1</span></button>
+        <button class="preset-btn" id="p2" onclick="loadPreset(2)">静态波<br><span style="color:#665">J=1 K=-1</span></button>
+        <button class="preset-btn highlight" id="p3" onclick="loadPreset(3)">★彩虹环<br><span style="color:#9966dd">J=1 K=0</span></button>
+        <button class="preset-btn" id="p4" onclick="loadPreset(4)">活跃波<br><span style="color:#665">J=1 K=0 ω±1</span></button>
+        <button class="preset-btn" id="p5" onclick="loadPreset(5)" style="grid-column:1/-1">混沌散布<br><span style="color:#665">J=-1 K=0</span></button>
+      </div>
+    </div>
+
+    <div class="insight-box">
+      <strong>核心洞见</strong><br>
+      当 K=0 时粒子间无直接相位通信。<br>
+      但仅凭 J&gt;0（相似相位互相吸引）就能自组织为<strong>彩虹环</strong>——<br>
+      秩序不需要直接协商，<strong>从约束本身涌现</strong>。
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── Parameters ───────────────────────────────────────────────────────────────
+let N = 100;
+let J = 1.0;
+let K = 0.0;
+let dt = 0.05;
+let speedMult = 2;
+let omegaMode = 0; // 0=zero, 1=random
+let showArrows = false;
+let paused = false;
+let simTime = 0;
+
+// ─── State ────────────────────────────────────────────────────────────────────
+let px, py, ptheta, pomega;
+let r1History = [], r2History = [];
+const HIST_LEN = 200;
+
+function initParticles() {
+  px = new Float64Array(N);
+  py = new Float64Array(N);
+  ptheta = new Float64Array(N);
+  pomega = new Float64Array(N);
+
+  for (let i = 0; i < N; i++) {
+    // start on small random circle
+    const angle = Math.random() * Math.PI * 2;
+    const r = 0.5 + Math.random() * 0.5;
+    px[i] = r * Math.cos(angle);
+    py[i] = r * Math.sin(angle);
+    ptheta[i] = (Math.random() * 2 - 1) * Math.PI;
+    pomega[i] = omegaMode === 0 ? 0 : (Math.random() * 2 - 1);
+  }
+  r1History = [];
+  r2History = [];
+  simTime = 0;
+}
+
+// ─── Simulation ───────────────────────────────────────────────────────────────
+function simulate(steps) {
+  for (let s = 0; s < steps; s++) {
+    const dxArr = new Float64Array(N);
+    const dyArr = new Float64Array(N);
+    const dthetaArr = new Float64Array(N);
+
+    for (let i = 0; i < N; i++) {
+      let fx = 0, fy = 0, ftA = 0;
+      for (let j = 0; j < N; j++) {
+        if (i === j) continue;
+        const dx = px[j] - px[i];
+        const dy = py[j] - py[i];
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        const d = Math.max(dist, 0.01);
+        const dth = ptheta[j] - ptheta[i];
+
+        // Attraction-repulsion with phase modulation
+        const attract = (1.0 + J * Math.cos(dth)) / d;
+        const repel = 1.0 / (d * d * d);
+
+        fx += (dx / d) * attract - (dx / d) * repel;
+        fy += (dy / d) * attract - (dy / d) * repel;
+
+        // Phase coupling (Kuramoto)
+        ftA += K * Math.sin(dth) / d;
+      }
+      dxArr[i] = fx / N;
+      dyArr[i] = fy / N;
+      dthetaArr[i] = pomega[i] + ftA / N;
+    }
+
+    for (let i = 0; i < N; i++) {
+      px[i] += dxArr[i] * dt;
+      py[i] += dyArr[i] * dt;
+      ptheta[i] += dthetaArr[i] * dt;
+      // wrap theta to [-pi, pi]
+      while (ptheta[i] > Math.PI) ptheta[i] -= 2 * Math.PI;
+      while (ptheta[i] < -Math.PI) ptheta[i] += 2 * Math.PI;
+    }
+    simTime += dt;
+  }
+
+  // Compute order parameters
+  // r1: spatial clustering (normalized centroid distance from origin)
+  let cx = 0, cy = 0;
+  let sx = 0, sy = 0;
+  for (let i = 0; i < N; i++) {
+    cx += px[i]; cy += py[i];
+    sx += Math.cos(ptheta[i]); sy += Math.sin(ptheta[i]);
+  }
+  cx /= N; cy /= N;
+  // r1: mean distance from centroid (inverted for "clustering")
+  let meanDist = 0;
+  for (let i = 0; i < N; i++) {
+    meanDist += Math.sqrt((px[i]-cx)*(px[i]-cx) + (py[i]-cy)*(py[i]-cy));
+  }
+  meanDist /= N;
+  // Normalize: r1 high when clustered (small meanDist), low when spread
+  const r1 = Math.max(0, Math.min(1, 1 / (1 + meanDist * 0.5)));
+  const r2 = Math.sqrt(sx*sx + sy*sy) / N;
+
+  r1History.push(r1);
+  r2History.push(r2);
+  if (r1History.length > HIST_LEN) r1History.shift();
+  if (r2History.length > HIST_LEN) r2History.shift();
+
+  return { r1, r2 };
+}
+
+// ─── Drawing ──────────────────────────────────────────────────────────────────
+const mainCanvas = document.getElementById('main');
+const ctx = mainCanvas.getContext('2d');
+const W = mainCanvas.width, H = mainCanvas.height;
+
+const phaseCanvas = document.getElementById('phaseChart');
+const pctx = phaseCanvas.getContext('2d');
+
+function thetaToColor(t, alpha) {
+  const hue = ((t + Math.PI) / (2 * Math.PI) * 360) | 0;
+  return alpha < 1 ? `hsla(${hue},100%,65%,${alpha})` : `hsl(${hue},100%,65%)`;
+}
+
+function worldToCanvas(wx, wy) {
+  // Fit world coords into canvas with some margin
+  // World typically spans -3 to 3
+  const scale = W / 10;
+  return [W/2 + wx * scale, H/2 - wy * scale];
+}
+
+function drawMain() {
+  ctx.fillStyle = '#020308';
+  ctx.fillRect(0, 0, W, H);
+
+  // Subtle grid
+  ctx.strokeStyle = 'rgba(20,15,40,0.8)';
+  ctx.lineWidth = 0.5;
+  const scale = W / 10;
+  for (let g = -5; g <= 5; g++) {
+    const gx = W/2 + g * scale;
+    const gy = H/2 - g * scale;
+    ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, H); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke();
+  }
+
+  // Axes
+  ctx.strokeStyle = 'rgba(40,30,70,0.6)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(W/2, 0); ctx.lineTo(W/2, H); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, H/2); ctx.lineTo(W, H/2); ctx.stroke();
+
+  // Particles
+  const dotR = Math.max(3, Math.min(6, 400 / N));
+
+  for (let i = 0; i < N; i++) {
+    const [cx, cy] = worldToCanvas(px[i], py[i]);
+    const color = thetaToColor(ptheta[i], 1);
+
+    // Glow
+    const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, dotR * 2.5);
+    const hue = ((ptheta[i] + Math.PI) / (2 * Math.PI) * 360) | 0;
+    gradient.addColorStop(0, `hsla(${hue},100%,75%,0.6)`);
+    gradient.addColorStop(1, `hsla(${hue},100%,55%,0)`);
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(cx, cy, dotR * 2.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Core dot
+    ctx.fillStyle = color;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 4;
+    ctx.beginPath();
+    ctx.arc(cx, cy, dotR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Phase arrows
+    if (showArrows) {
+      ctx.shadowBlur = 0;
+      const arLen = dotR * 2.5;
+      const ax = Math.cos(ptheta[i]) * arLen;
+      const ay = -Math.sin(ptheta[i]) * arLen;
+      ctx.strokeStyle = `hsla(${hue},80%,70%,0.7)`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + ax, cy + ay);
+      ctx.stroke();
+    }
+  }
+  ctx.shadowBlur = 0;
+}
+
+function drawPhaseChart() {
+  const cw = phaseCanvas.width, ch = phaseCanvas.height;
+  pctx.fillStyle = '#06081a';
+  pctx.fillRect(0, 0, cw, ch);
+
+  // Grid
+  pctx.strokeStyle = '#0e1025';
+  pctx.lineWidth = 1;
+  for (let v = 0; v <= 1; v += 0.25) {
+    const yp = ch - v * (ch - 4) - 2;
+    pctx.beginPath(); pctx.moveTo(0, yp); pctx.lineTo(cw, yp); pctx.stroke();
+  }
+
+  const len = r1History.length;
+  if (len < 2) return;
+
+  function drawLine(data, color) {
+    pctx.strokeStyle = color;
+    pctx.lineWidth = 1.5;
+    pctx.beginPath();
+    for (let k = 0; k < len; k++) {
+      const xp = k / (HIST_LEN - 1) * cw;
+      const yp = ch - 4 - data[k] * (ch - 8);
+      if (k === 0) pctx.moveTo(xp, yp);
+      else pctx.lineTo(xp, yp);
+    }
+    pctx.stroke();
+  }
+
+  drawLine(r1History, '#3de0ff');
+  drawLine(r2History, '#c8a8f5');
+
+  // Legend
+  pctx.fillStyle = '#3de0ff'; pctx.font = '9px monospace';
+  pctx.fillText('r₁ 聚集', 4, 12);
+  pctx.fillStyle = '#c8a8f5';
+  pctx.fillText('r₂ 同步', 60, 12);
+}
+
+// ─── State names & presets ───────────────────────────────────────────────────
+const STATE_INFO = {
+  1: { name: '静态同步', desc: '粒子聚成一团，相位趋向相同\n空间和相位都"锁定"', J: 1, K: 1, omega: 0 },
+  2: { name: '静态波', desc: '粒子聚集但相位反向\n空间聚集，相位分裂', J: 1, K: -1, omega: 0 },
+  3: { name: '★ 彩虹环', desc: '粒子排成环，相位沿环渐变\n构成绚丽彩虹色带——最美！', J: 1, K: 0, omega: 0 },
+  4: { name: '活跃波', desc: '彩虹环旋转起来\n固有频率驱动集体旋转', J: 1, K: 0, omega: 1 },
+  5: { name: '混沌散布', desc: 'J<0：相异相位互相吸引\n空间和相位均无序', J: -1, K: 0, omega: 0 }
+};
+
+let currentPreset = 3;
+
+function loadPreset(n) {
+  const s = STATE_INFO[n];
+  currentPreset = n;
+  J = s.J; K = s.K;
+  document.getElementById('jSlider').value = J;
+  document.getElementById('kSlider').value = K;
+  document.getElementById('jVal').textContent = J.toFixed(2);
+  document.getElementById('kVal').textContent = K.toFixed(2);
+  setOmegaMode(s.omega);
+  document.getElementById('stateName').textContent = s.name;
+  document.getElementById('stateDesc').textContent = s.desc;
+  for (let i = 1; i <= 5; i++) {
+    document.getElementById('p'+i).classList.toggle('active', i === n);
+  }
+  initParticles();
+}
+
+function setOmegaMode(mode) {
+  omegaMode = mode;
+  document.getElementById('omegaZeroBtn').classList.toggle('active', mode === 0);
+  document.getElementById('omegaRandBtn').classList.toggle('active', mode === 1);
+  document.getElementById('omegaVal').textContent = mode === 0 ? '均匀=0' : 'Uniform±1';
+  initParticles();
+}
+
+function updateStateFromSliders() {
+  // Auto-detect state based on J, K
+  let name = '自定义';
+  let desc = `J=${J.toFixed(2)}, K=${K.toFixed(2)}`;
+  if (J > 0.8 && K > 0.8) { name = '→静态同步'; desc = '趋向聚集同步'; }
+  else if (J > 0.8 && K < -0.8) { name = '→静态波'; desc = '趋向聚集反相'; }
+  else if (J > 0.8 && Math.abs(K) < 0.2) { name = omegaMode === 0 ? '→彩虹环' : '→活跃波'; desc = omegaMode === 0 ? '趋向彩虹环' : '趋向旋转环'; }
+  else if (J < -0.5) { name = '→混沌'; desc = '趋向散布无序'; }
+  document.getElementById('stateName').textContent = name;
+  document.getElementById('stateDesc').textContent = desc;
+}
+
+// ─── Controls ─────────────────────────────────────────────────────────────────
+document.getElementById('jSlider').addEventListener('input', function() {
+  J = parseFloat(this.value);
+  document.getElementById('jVal').textContent = J.toFixed(2);
+  updateStateFromSliders();
+  for (let i = 1; i <= 5; i++) document.getElementById('p'+i).classList.remove('active');
+});
+document.getElementById('kSlider').addEventListener('input', function() {
+  K = parseFloat(this.value);
+  document.getElementById('kVal').textContent = K.toFixed(2);
+  updateStateFromSliders();
+  for (let i = 1; i <= 5; i++) document.getElementById('p'+i).classList.remove('active');
+});
+document.getElementById('nSlider').addEventListener('input', function() {
+  N = parseInt(this.value);
+  document.getElementById('nVal').textContent = N;
+  initParticles();
+});
+document.getElementById('speedSlider').addEventListener('input', function() {
+  speedMult = parseInt(this.value);
+  document.getElementById('speedVal').textContent = speedMult + '×';
+});
+document.getElementById('showArrows').addEventListener('change', function() {
+  showArrows = this.checked;
+});
+document.getElementById('pauseBtn').addEventListener('click', function() {
+  paused = !paused;
+  this.textContent = paused ? '继续' : '暂停';
+  this.classList.toggle('active', paused);
+});
+document.getElementById('resetBtn').addEventListener('click', () => initParticles());
+
+// ─── Main loop ────────────────────────────────────────────────────────────────
+loadPreset(3);
+
+function loop() {
+  if (!paused) {
+    const stepsPerFrame = Math.max(1, speedMult);
+    const { r1, r2 } = simulate(stepsPerFrame);
+    drawMain();
+    drawPhaseChart();
+    document.getElementById('r1Val').textContent = r1.toFixed(3);
+    document.getElementById('r2Val').textContent = r2.toFixed(3);
+    document.getElementById('stepCount').textContent = `t = ${simTime.toFixed(1)}`;
+  } else {
+    drawMain();
+  }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

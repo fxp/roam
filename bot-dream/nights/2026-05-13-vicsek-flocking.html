@@ -3,306 +3,646 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Night 16 · Vicsek 模型：一群鸟怎么知道往哪儿飞</title>
+<title>Vicsek 模型 — 椋鸟群舞</title>
 <style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { background: #000; color: #fff; font-family: 'Courier New', monospace; overflow: hidden; height: 100vh; }
-
-#label {
-  position: absolute; top: 12px; left: 14px; z-index: 10;
-  font-size: 11px; color: #888; line-height: 1.6; pointer-events: none;
-}
-
-#controls {
-  position: absolute; top: 12px; right: 14px; z-index: 10;
-  display: flex; flex-direction: column; gap: 8px;
-  background: rgba(0,0,0,0.75); padding: 12px; border: 1px solid #333;
-  min-width: 230px;
-}
-.ctrl-row { display: flex; flex-direction: column; gap: 4px; }
-.ctrl-row label { font-size: 11px; color: #aaa; }
-.ctrl-row input[type=range] { width: 100%; accent-color: #f59e0b; }
-.ctrl-marks { display: flex; justify-content: space-between; font-size: 9px; color: #666; }
-.stat { font-size: 12px; color: #f59e0b; }
-.stat span { color: #fff; }
-.btn-row { display: flex; gap: 5px; flex-wrap: wrap; }
-button {
-  font-family: 'Courier New', monospace; font-size: 10px;
-  background: #111; border: 1px solid #444; color: #ccc;
-  padding: 5px 8px; cursor: pointer; border-radius: 2px;
-}
-button:hover { background: #222; border-color: #666; color: #fff; }
-button.active { background: #1c1000; border-color: #f59e0b; color: #fbbf24; }
-.sep { border-top: 1px solid #333; margin-top: 4px; padding-top: 4px; }
-
-#graph-canvas {
-  position: absolute; bottom: 60px; left: 50%; transform: translateX(-50%);
-  border: 1px solid #333; background: rgba(0,0,0,0.7); z-index: 10;
-}
-
-#caption {
-  position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
-  font-size: 12px; color: #666; text-align: center; max-width: 720px;
-  line-height: 1.7; pointer-events: none; font-family: sans-serif; z-index: 10;
-}
-canvas { display: block; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0f;
+    color: #e0e0e0;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 16px;
+  }
+  h1 {
+    font-size: 1.3rem;
+    font-weight: 400;
+    color: #aad4f5;
+    margin-bottom: 4px;
+    letter-spacing: 0.05em;
+  }
+  .subtitle {
+    font-size: 0.72rem;
+    color: #556;
+    margin-bottom: 14px;
+    letter-spacing: 0.08em;
+  }
+  .main-layout {
+    display: flex;
+    gap: 18px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  canvas#main {
+    border: 1px solid #1a2a3a;
+    border-radius: 4px;
+    background: #03050a;
+    display: block;
+  }
+  .side-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 260px;
+  }
+  .panel-box {
+    background: #0e1420;
+    border: 1px solid #1c2a3a;
+    border-radius: 6px;
+    padding: 12px;
+  }
+  .panel-box h3 {
+    font-size: 0.68rem;
+    color: #5588aa;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 8px;
+  }
+  .phi-display {
+    font-size: 2.4rem;
+    font-weight: 300;
+    color: #7de0a0;
+    text-align: center;
+    line-height: 1;
+    margin: 6px 0;
+  }
+  .phi-label {
+    font-size: 0.65rem;
+    color: #445;
+    text-align: center;
+    margin-bottom: 4px;
+  }
+  canvas#phiChart {
+    width: 100%;
+    height: 80px;
+    display: block;
+  }
+  canvas#roseChart {
+    width: 100%;
+    height: 120px;
+    display: block;
+  }
+  .controls {
+    background: #0e1420;
+    border: 1px solid #1c2a3a;
+    border-radius: 6px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 260px;
+  }
+  .ctrl-row {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .ctrl-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.68rem;
+    color: #8ab;
+  }
+  .ctrl-label span.val {
+    color: #ddd;
+    font-size: 0.72rem;
+  }
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 4px;
+    background: #1a2a3a;
+    border-radius: 2px;
+    outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #4a9edd;
+    cursor: pointer;
+  }
+  .eta-track {
+    position: relative;
+    margin-top: 2px;
+  }
+  .eta-marker {
+    position: absolute;
+    top: -14px;
+    font-size: 0.55rem;
+    color: #f0a040;
+    transform: translateX(-50%);
+    pointer-events: none;
+  }
+  .eta-marker::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 14px;
+    width: 1px;
+    height: 8px;
+    background: #f0a040;
+    transform: translateX(-50%);
+  }
+  .btn-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  button {
+    background: #152030;
+    border: 1px solid #2a4060;
+    color: #9bc;
+    font-family: inherit;
+    font-size: 0.68rem;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  button:hover { background: #1e3050; border-color: #4a80b0; color: #cde; }
+  button.active { background: #1a4060; border-color: #4a9edd; color: #7dd0ff; }
+  .preset-btn {
+    flex: 1;
+    min-width: 70px;
+  }
+  .toggle-check {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.68rem;
+    color: #8ab;
+    cursor: pointer;
+  }
+  .toggle-check input[type=checkbox] {
+    accent-color: #4a9edd;
+    width: 13px;
+    height: 13px;
+    cursor: pointer;
+  }
+  .phase-info {
+    font-size: 0.62rem;
+    color: #5577aa;
+    line-height: 1.5;
+    margin-top: 4px;
+  }
+  .step-count {
+    font-size: 0.62rem;
+    color: #445566;
+    text-align: right;
+  }
 </style>
 </head>
 <body>
+<h1>Vicsek 模型 — 椋鸟群舞</h1>
+<div class="subtitle">Vicsek et al. 1995 · 粒子方向对齐 · 涌现相变</div>
 
-<div id="label">
-  Night 16 · 2026-05-13<br>Vicsek 模型 · 集群涌现
+<div class="main-layout">
+  <div>
+    <canvas id="main" width="560" height="560"></canvas>
+    <div class="step-count" id="stepCount">step: 0</div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px;">
+    <div class="side-panel">
+      <!-- Phi display -->
+      <div class="panel-box">
+        <h3>序参数 Φ（速度对齐度）</h3>
+        <div class="phi-display" id="phiVal">0.00</div>
+        <div class="phi-label">Φ = 0 (混沌) ↔ 1 (完全对齐)</div>
+        <canvas id="phiChart" width="236" height="80"></canvas>
+      </div>
+
+      <!-- Rose chart -->
+      <div class="panel-box">
+        <h3>速度方向分布</h3>
+        <canvas id="roseChart" width="236" height="120"></canvas>
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+      <div style="font-size:0.7rem;color:#5588aa;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:2px;">控制参数</div>
+
+      <div class="ctrl-row">
+        <div class="ctrl-label">
+          <span>噪声强度 η <span style="color:#f0a040;font-size:0.6rem;">← 最关键参数</span></span>
+          <span class="val" id="etaVal">0.20</span>
+        </div>
+        <div class="eta-track">
+          <div class="eta-marker" id="etaMarker" style="left:20%">η_c≈0.2</div>
+          <input type="range" id="etaSlider" min="0" max="1" step="0.01" value="0.2">
+        </div>
+      </div>
+
+      <div class="ctrl-row">
+        <div class="ctrl-label"><span>粒子数 N</span><span class="val" id="nVal">400</span></div>
+        <input type="range" id="nSlider" min="100" max="800" step="50" value="400">
+      </div>
+
+      <div class="ctrl-row">
+        <div class="ctrl-label"><span>速度 v₀</span><span class="val" id="v0Val">0.10</span></div>
+        <input type="range" id="v0Slider" min="0.05" max="0.2" step="0.01" value="0.1">
+      </div>
+
+      <div class="ctrl-row">
+        <div class="ctrl-label"><span>邻域半径 R</span><span class="val" id="rVal">1.00</span></div>
+        <input type="range" id="rSlider" min="0.5" max="3.0" step="0.1" value="1.0">
+      </div>
+
+      <div class="ctrl-row">
+        <div class="ctrl-label"><span>密度 ρ = N/L²</span><span class="val" id="rhoVal">1.00</span></div>
+        <div style="font-size:0.6rem;color:#445566;">（调 N 和 L，当前 L = <span id="lVal">20</span>）</div>
+      </div>
+
+      <label class="toggle-check">
+        <input type="checkbox" id="showNeighbors"> 显示邻域圆（R 圆）
+      </label>
+
+      <div class="btn-row">
+        <button id="pauseBtn">暂停</button>
+        <button id="resetBtn">重置</button>
+      </div>
+
+      <div style="font-size:0.68rem;color:#5588aa;margin-top:2px;">预设场景</div>
+      <div class="btn-row">
+        <button class="preset-btn" id="presetOrder">有序<br><span style="font-size:0.6rem;color:#556">η=0.05</span></button>
+        <button class="preset-btn" id="presetCritical">临界<br><span style="font-size:0.6rem;color:#f0a040">η=0.2</span></button>
+        <button class="preset-btn" id="presetChaos">混沌<br><span style="font-size:0.6rem;color:#556">η=0.6</span></button>
+      </div>
+
+      <div class="phase-info" id="phaseInfo">
+        临界点附近（η≈0.2）：有序与无序共存，涌现集体运动
+      </div>
+    </div>
+  </div>
 </div>
-
-<div id="controls">
-  <div class="ctrl-row">
-    <label>粒子数 N = <span id="n-val">400</span></label>
-    <input type="range" id="n-slider" min="100" max="800" step="50" value="400">
-  </div>
-  <div class="ctrl-row">
-    <label>噪声 η = <span id="eta-val">0.80</span></label>
-    <input type="range" id="eta-slider" min="0" max="3.14159" step="0.05" value="0.8">
-    <div class="ctrl-marks"><span>0 有序</span><span>π 无序</span></div>
-  </div>
-  <div class="ctrl-row">
-    <label>感知半径 r = <span id="r-val">0.10</span></label>
-    <input type="range" id="r-slider" min="0.03" max="0.25" step="0.01" value="0.1">
-  </div>
-  <div class="stat">序参量 φ = <span id="phi-val">0.000</span></div>
-  <div class="btn-row sep">
-    <label style="font-size:11px;color:#888;width:100%">预设</label>
-    <button id="btn-dis" onclick="applyPreset('dis')">无序</button>
-    <button id="btn-crit" class="active" onclick="applyPreset('crit')">临界</button>
-    <button id="btn-ord" onclick="applyPreset('ord')">有序</button>
-    <button id="btn-dense" onclick="applyPreset('dense')">密集</button>
-  </div>
-</div>
-
-<canvas id="main"></canvas>
-<canvas id="graph-canvas" width="400" height="70"></canvas>
-
-<div id="caption">「每个粒子只有一条规则：对齐附近邻居的方向，加一点噪声。当噪声足够小时，400个粒子突然形成一个整体，朝同一个方向飞去。椋鸟群舞、沙丁鱼球，都是这个方程。」</div>
 
 <script>
-const canvas = document.getElementById('main');
-const ctx = canvas.getContext('2d');
-const gCanvas = document.getElementById('graph-canvas');
-const gCtx = gCanvas.getContext('2d');
-let W, H;
-
-// Simulation parameters
+// ─── Parameters ───────────────────────────────────────────────────────────────
 let N = 400;
-let eta = 0.8;    // noise amplitude
-let radius = 0.1; // interaction radius (fraction of box)
-const speed = 0.003; // particle speed (fraction of box per step)
-const L = 1.0;    // box size (normalized)
+let v0 = 0.1;
+let R = 1.0;
+let eta = 0.2;
+let L = 20;
+let showNeighbors = false;
+let paused = false;
+let step = 0;
 
-// Particle state
-let px, py, angle;
-let phiHistory = [];
-const PHI_HIST = 200;
+// ─── State ────────────────────────────────────────────────────────────────────
+let x, y, theta;
+const phiHistory = new Array(300).fill(0);
+let phiPtr = 0;
 
 function initParticles() {
-  px = new Float32Array(N);
-  py = new Float32Array(N);
-  angle = new Float32Array(N);
+  x = new Float32Array(N);
+  y = new Float32Array(N);
+  theta = new Float32Array(N);
   for (let i = 0; i < N; i++) {
-    px[i] = Math.random();
-    py[i] = Math.random();
-    angle[i] = (Math.random() * 2 - 1) * Math.PI;
+    x[i] = Math.random() * L;
+    y[i] = Math.random() * L;
+    theta[i] = (Math.random() * 2 - 1) * Math.PI;
   }
-  phiHistory = [];
+  phiHistory.fill(0);
+  phiPtr = 0;
+  step = 0;
 }
 
-function applyPreset(type) {
-  document.querySelectorAll('#controls button').forEach(b => {
-    if (['btn-dis','btn-crit','btn-ord','btn-dense'].includes(b.id)) b.classList.remove('active');
-  });
-  document.getElementById('btn-' + type).classList.add('active');
+// ─── Simulation step ─────────────────────────────────────────────────────────
+function simulate() {
+  const R2 = R * R;
+  const newTheta = new Float32Array(N);
 
-  if (type === 'dis')   { N = 400; eta = 2.0; radius = 0.1; }
-  if (type === 'crit')  { N = 400; eta = 0.8; radius = 0.1; }
-  if (type === 'ord')   { N = 400; eta = 0.1; radius = 0.1; }
-  if (type === 'dense') { N = 800; eta = 0.5; radius = 0.08; }
-
-  document.getElementById('n-slider').value = N;
-  document.getElementById('eta-slider').value = eta;
-  document.getElementById('r-slider').value = radius;
-  document.getElementById('n-val').textContent = N;
-  document.getElementById('eta-val').textContent = eta.toFixed(2);
-  document.getElementById('r-val').textContent = radius.toFixed(2);
-  initParticles();
-}
-
-// Grid-based spatial hash for neighbor search
-function buildGrid() {
-  const cellSize = radius;
-  const numCellsX = Math.ceil(L / cellSize);
-  const numCellsY = Math.ceil(L / cellSize);
-  const cells = new Array(numCellsX * numCellsY).fill(null).map(() => []);
   for (let i = 0; i < N; i++) {
-    const cx = Math.floor(px[i] / cellSize) % numCellsX;
-    const cy = Math.floor(py[i] / cellSize) % numCellsY;
-    cells[cy * numCellsX + cx].push(i);
-  }
-  return { cells, numCellsX, numCellsY, cellSize };
-}
+    let sumSin = Math.sin(theta[i]);
+    let sumCos = Math.cos(theta[i]);
+    let count = 1;
 
-function stepVicsek() {
-  const r2 = radius * radius;
-  const newAngle = new Float32Array(N);
+    const xi = x[i], yi = y[i];
 
-  // For moderate N, direct O(N^2) is acceptable at N≤800
-  for (let i = 0; i < N; i++) {
-    let sinSum = 0, cosSum = 0;
-    let count = 0;
     for (let j = 0; j < N; j++) {
-      let dx = px[j] - px[i];
-      let dy = py[j] - py[i];
-      // Periodic boundary
-      if (dx > 0.5) dx -= 1; if (dx < -0.5) dx += 1;
-      if (dy > 0.5) dy -= 1; if (dy < -0.5) dy += 1;
-      if (dx * dx + dy * dy <= r2) {
-        sinSum += Math.sin(angle[j]);
-        cosSum += Math.cos(angle[j]);
+      if (i === j) continue;
+      let dx = x[j] - xi;
+      let dy = y[j] - yi;
+      // periodic
+      if (dx > L/2) dx -= L;
+      else if (dx < -L/2) dx += L;
+      if (dy > L/2) dy -= L;
+      else if (dy < -L/2) dy += L;
+
+      if (dx*dx + dy*dy < R2) {
+        sumSin += Math.sin(theta[j]);
+        sumCos += Math.cos(theta[j]);
         count++;
       }
     }
-    const avgAngle = Math.atan2(sinSum, cosSum);
-    const noise = (Math.random() - 0.5) * eta;
-    newAngle[i] = avgAngle + noise;
+
+    const avgAngle = Math.atan2(sumSin, sumCos);
+    const noise = (Math.random() * 2 - 1) * Math.PI * eta;
+    newTheta[i] = avgAngle + noise;
   }
 
   // Update positions
-  let sinPhi = 0, cosPhi = 0;
   for (let i = 0; i < N; i++) {
-    angle[i] = newAngle[i];
-    px[i] += speed * Math.cos(angle[i]);
-    py[i] += speed * Math.sin(angle[i]);
-    // Periodic boundary
-    if (px[i] < 0) px[i] += 1;
-    if (px[i] >= 1) px[i] -= 1;
-    if (py[i] < 0) py[i] += 1;
-    if (py[i] >= 1) py[i] -= 1;
-    sinPhi += Math.sin(angle[i]);
-    cosPhi += Math.cos(angle[i]);
+    theta[i] = newTheta[i];
+    x[i] += v0 * Math.cos(theta[i]);
+    y[i] += v0 * Math.sin(theta[i]);
+    // periodic boundary
+    if (x[i] < 0) x[i] += L;
+    else if (x[i] >= L) x[i] -= L;
+    if (y[i] < 0) y[i] += L;
+    else if (y[i] >= L) y[i] -= L;
   }
 
-  // Order parameter
-  const phi = Math.sqrt(sinPhi * sinPhi + cosPhi * cosPhi) / N;
-  phiHistory.push(phi);
-  if (phiHistory.length > PHI_HIST) phiHistory.shift();
-  document.getElementById('phi-val').textContent = phi.toFixed(3);
+  // Compute order parameter
+  let sx = 0, sy = 0;
+  for (let i = 0; i < N; i++) {
+    sx += Math.cos(theta[i]);
+    sy += Math.sin(theta[i]);
+  }
+  const phi = Math.sqrt(sx*sx + sy*sy) / N;
+  phiHistory[phiPtr % 300] = phi;
+  phiPtr++;
+  step++;
+  return phi;
 }
 
-function render() {
-  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+// ─── Canvas rendering ─────────────────────────────────────────────────────────
+const mainCanvas = document.getElementById('main');
+const ctx = mainCanvas.getContext('2d');
+const W = mainCanvas.width;
+const H = mainCanvas.height;
+
+const phiCanvas = document.getElementById('phiChart');
+const pctx = phiCanvas.getContext('2d');
+
+const roseCanvas = document.getElementById('roseChart');
+const rctx = roseCanvas.getContext('2d');
+
+function angleToColor(angle) {
+  // angle in [-pi, pi] -> hue [0, 360]
+  const hue = ((angle + Math.PI) / (2 * Math.PI) * 360) | 0;
+  return `hsl(${hue},90%,60%)`;
+}
+
+function drawMain() {
+  const scale = W / L;
+
+  ctx.fillStyle = '#03050a';
   ctx.fillRect(0, 0, W, H);
 
-  const sz = Math.min(W, H) * 0.012; // particle size
+  // Draw grid lines faintly
+  ctx.strokeStyle = 'rgba(30,50,70,0.3)';
+  ctx.lineWidth = 0.5;
+  for (let g = 0; g <= L; g += 5) {
+    const p = g * scale;
+    ctx.beginPath(); ctx.moveTo(p, 0); ctx.lineTo(p, H); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, p); ctx.lineTo(W, p); ctx.stroke();
+  }
+
+  // Neighbor circles (only for first 10 particles to avoid clutter)
+  if (showNeighbors) {
+    ctx.globalAlpha = 0.04;
+    ctx.fillStyle = '#4488bb';
+    for (let i = 0; i < Math.min(N, 15); i++) {
+      const px = x[i] * scale;
+      const py = y[i] * scale;
+      ctx.beginPath();
+      ctx.arc(px, py, R * scale, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 0.12;
+    ctx.strokeStyle = '#4488bb';
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i < Math.min(N, 15); i++) {
+      const px = x[i] * scale;
+      const py = y[i] * scale;
+      ctx.beginPath();
+      ctx.arc(px, py, R * scale, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // Arrows
+  const arrowLen = Math.max(4, scale * 0.35);
+  const arrowW = arrowLen * 0.32;
 
   for (let i = 0; i < N; i++) {
-    const screenX = px[i] * W;
-    const screenY = py[i] * H;
-    // Color by heading angle → hue
-    const hue = ((angle[i] + Math.PI) / (2 * Math.PI)) * 360;
-    const alpha = 0.85;
+    const px = x[i] * scale;
+    const py = y[i] * scale;
+    const t = theta[i];
+    const color = angleToColor(t);
 
-    // Glow
-    const grad = ctx.createRadialGradient(screenX, screenY, 0, screenX, screenY, sz * 2.5);
-    grad.addColorStop(0, `hsla(${hue},100%,70%,0.4)`);
-    grad.addColorStop(1, `hsla(${hue},100%,50%,0)`);
-    ctx.fillStyle = grad;
+    const cos = Math.cos(t), sin = Math.sin(t);
+    const tx = cos * arrowLen, ty = sin * arrowLen;
+    const nx = -sin * arrowW, ny = cos * arrowW;
+
+    ctx.fillStyle = color;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 3;
     ctx.beginPath();
-    ctx.arc(screenX, screenY, sz * 2.5, 0, Math.PI * 2);
+    ctx.moveTo(px + tx, py + ty);
+    ctx.lineTo(px - tx * 0.5 + nx, py - ty * 0.5 + ny);
+    ctx.lineTo(px - tx * 0.5 - nx, py - ty * 0.5 - ny);
+    ctx.closePath();
     ctx.fill();
+  }
+  ctx.shadowBlur = 0;
+}
 
-    // Core dot
-    ctx.fillStyle = `hsla(${hue},100%,75%,${alpha})`;
-    ctx.beginPath();
-    ctx.arc(screenX, screenY, sz * 0.9, 0, Math.PI * 2);
-    ctx.fill();
+function drawPhiChart(phi) {
+  const cw = phiCanvas.width, ch = phiCanvas.height;
+  pctx.fillStyle = '#080e18';
+  pctx.fillRect(0, 0, cw, ch);
 
-    // Direction indicator (tiny line)
-    ctx.strokeStyle = `hsla(${hue},80%,85%,0.6)`;
-    ctx.lineWidth = 0.8;
-    ctx.beginPath();
-    ctx.moveTo(screenX, screenY);
-    ctx.lineTo(
-      screenX + Math.cos(angle[i]) * sz * 2,
-      screenY + Math.sin(angle[i]) * sz * 2
-    );
-    ctx.stroke();
+  // grid
+  pctx.strokeStyle = '#1a2a3a';
+  pctx.lineWidth = 1;
+  for (let v = 0; v <= 1; v += 0.25) {
+    const yp = ch - v * ch;
+    pctx.beginPath(); pctx.moveTo(0, yp); pctx.lineTo(cw, yp); pctx.stroke();
   }
 
-  // Order parameter graph
-  const gW = gCanvas.width, gH = gCanvas.height;
-  gCtx.clearRect(0, 0, gW, gH);
+  // Phi line
+  const len = Math.min(phiPtr, 300);
+  if (len < 2) return;
+  pctx.strokeStyle = '#3dc87a';
+  pctx.lineWidth = 1.5;
+  pctx.beginPath();
+  for (let k = 0; k < len; k++) {
+    const idx = (phiPtr - len + k) % 300;
+    const xp = k / 299 * cw;
+    const yp = ch - phiHistory[idx] * ch;
+    if (k === 0) pctx.moveTo(xp, yp);
+    else pctx.lineTo(xp, yp);
+  }
+  pctx.stroke();
 
-  // Grid line at 0.5
-  gCtx.strokeStyle = '#1a1a1a'; gCtx.lineWidth = 1;
-  gCtx.beginPath(); gCtx.moveTo(0, gH * 0.5); gCtx.lineTo(gW, gH * 0.5); gCtx.stroke();
+  // Current phi marker
+  pctx.fillStyle = '#7de0a0';
+  pctx.beginPath();
+  const lastIdx = (phiPtr - 1 + 300) % 300;
+  pctx.arc(cw - 2, ch - phiHistory[lastIdx] * ch, 3, 0, Math.PI*2);
+  pctx.fill();
+}
 
-  // Labels
-  gCtx.fillStyle = '#555'; gCtx.font = '9px Courier New';
-  gCtx.fillText('φ=1', 2, 10);
-  gCtx.fillText('φ=0', 2, gH - 3);
-  gCtx.fillText('序参量 φ(t)', gW / 2 - 30, 11);
+function drawRose() {
+  const cw = roseCanvas.width, ch = roseCanvas.height;
+  rctx.fillStyle = '#080e18';
+  rctx.fillRect(0, 0, cw, ch);
 
-  if (phiHistory.length > 1) {
-    gCtx.beginPath();
-    gCtx.strokeStyle = '#f59e0b'; gCtx.lineWidth = 1.5;
-    for (let i = 0; i < phiHistory.length; i++) {
-      const cx = (i / PHI_HIST) * gW;
-      const cy = (1 - phiHistory[i]) * gH;
-      i === 0 ? gCtx.moveTo(cx, cy) : gCtx.lineTo(cx, cy);
-    }
-    gCtx.stroke();
+  const cx = cw / 2, cy = ch / 2;
+  const maxR = Math.min(cx, cy) - 4;
+  const bins = 36;
+  const counts = new Int32Array(bins);
+  for (let i = 0; i < N; i++) {
+    const b = Math.floor(((theta[i] + Math.PI) / (2 * Math.PI)) * bins) % bins;
+    counts[b]++;
+  }
+  const maxCount = Math.max(...counts, 1);
 
-    // Current value dot
-    const last = phiHistory[phiHistory.length - 1];
-    const lx = (phiHistory.length / PHI_HIST) * gW;
-    const ly = (1 - last) * gH;
-    gCtx.fillStyle = '#fbbf24';
-    gCtx.beginPath(); gCtx.arc(lx, ly, 3, 0, Math.PI * 2); gCtx.fill();
+  rctx.lineWidth = 0.5;
+  for (let b = 0; b < bins; b++) {
+    const angle = (b / bins) * Math.PI * 2 - Math.PI;
+    const r = (counts[b] / maxCount) * maxR;
+    const hue = (b / bins * 360) | 0;
+    rctx.fillStyle = `hsla(${hue},90%,60%,0.7)`;
+    rctx.strokeStyle = `hsla(${hue},90%,80%,0.9)`;
+    rctx.beginPath();
+    rctx.moveTo(cx, cy);
+    const a1 = angle - Math.PI / bins;
+    const a2 = angle + Math.PI / bins;
+    rctx.arc(cx, cy, r, a1, a2);
+    rctx.closePath();
+    rctx.fill();
+    rctx.stroke();
+  }
+
+  // circles
+  rctx.strokeStyle = 'rgba(40,60,80,0.5)';
+  rctx.lineWidth = 0.5;
+  for (let r = maxR * 0.33; r <= maxR; r += maxR * 0.33) {
+    rctx.beginPath();
+    rctx.arc(cx, cy, r, 0, Math.PI * 2);
+    rctx.stroke();
+  }
+
+  // axes
+  rctx.strokeStyle = 'rgba(80,120,160,0.3)';
+  for (let a = 0; a < 4; a++) {
+    const angle = a * Math.PI / 2;
+    rctx.beginPath();
+    rctx.moveTo(cx, cy);
+    rctx.lineTo(cx + Math.cos(angle) * maxR, cy + Math.sin(angle) * maxR);
+    rctx.stroke();
   }
 }
 
-function resize() {
-  W = window.innerWidth; H = window.innerHeight;
-  canvas.width = W; canvas.height = H;
+// ─── UI Controls ──────────────────────────────────────────────────────────────
+function updateL() {
+  L = Math.sqrt(N / 1.0); // keep rho ≈ 1 by default, but allow custom
+  document.getElementById('lVal').textContent = L.toFixed(1);
+  document.getElementById('rhoVal').textContent = (N / (L * L)).toFixed(2);
 }
 
-// Slider handlers
-document.getElementById('n-slider').addEventListener('input', function() {
+document.getElementById('etaSlider').addEventListener('input', function() {
+  eta = parseFloat(this.value);
+  document.getElementById('etaVal').textContent = eta.toFixed(2);
+  updatePhaseInfo();
+});
+document.getElementById('nSlider').addEventListener('input', function() {
   N = parseInt(this.value);
-  document.getElementById('n-val').textContent = N;
+  document.getElementById('nVal').textContent = N;
+  updateL();
   initParticles();
 });
-document.getElementById('eta-slider').addEventListener('input', function() {
-  eta = parseFloat(this.value);
-  document.getElementById('eta-val').textContent = eta.toFixed(2);
+document.getElementById('v0Slider').addEventListener('input', function() {
+  v0 = parseFloat(this.value);
+  document.getElementById('v0Val').textContent = v0.toFixed(2);
 });
-document.getElementById('r-slider').addEventListener('input', function() {
-  radius = parseFloat(this.value);
-  document.getElementById('r-val').textContent = radius.toFixed(2);
+document.getElementById('rSlider').addEventListener('input', function() {
+  R = parseFloat(this.value);
+  document.getElementById('rVal').textContent = R.toFixed(2);
+});
+document.getElementById('showNeighbors').addEventListener('change', function() {
+  showNeighbors = this.checked;
+});
+document.getElementById('pauseBtn').addEventListener('click', function() {
+  paused = !paused;
+  this.textContent = paused ? '继续' : '暂停';
+  this.classList.toggle('active', paused);
+});
+document.getElementById('resetBtn').addEventListener('click', function() {
+  initParticles();
 });
 
-// Performance: cap at 30fps for large N
-let lastT = 0;
-function loop(ts) {
-  const minInterval = N > 500 ? 40 : 25;
-  if (ts - lastT > minInterval) {
-    lastT = ts;
-    stepVicsek();
-    render();
+function setPreset(e, n_val, v0_val, r_val) {
+  eta = e;
+  document.getElementById('etaSlider').value = e;
+  document.getElementById('etaVal').textContent = e.toFixed(2);
+  v0 = v0_val;
+  document.getElementById('v0Slider').value = v0_val;
+  document.getElementById('v0Val').textContent = v0_val.toFixed(2);
+  R = r_val;
+  document.getElementById('rSlider').value = r_val;
+  document.getElementById('rVal').textContent = r_val.toFixed(2);
+  updatePhaseInfo();
+  initParticles();
+}
+
+document.getElementById('presetOrder').addEventListener('click', () => setPreset(0.05, 0.1, 1.0));
+document.getElementById('presetCritical').addEventListener('click', () => setPreset(0.2, 0.1, 1.0));
+document.getElementById('presetChaos').addEventListener('click', () => setPreset(0.6, 0.1, 1.0));
+
+function updatePhaseInfo() {
+  const el = document.getElementById('phaseInfo');
+  if (eta < 0.1) {
+    el.textContent = '低噪声区（η<0.1）：粒子迅速对齐，形成集体运动，Φ→1';
+    el.style.color = '#3dc87a';
+  } else if (eta < 0.3) {
+    el.textContent = '临界区（η≈0.2）：秩序-无序相变边界，涌现大尺度集体运动';
+    el.style.color = '#f0a040';
+  } else {
+    el.textContent = '高噪声区（η>0.3）：方向随机化，粒子各自乱飞，Φ→0';
+    el.style.color = '#e05050';
+  }
+}
+
+// ─── Main loop ────────────────────────────────────────────────────────────────
+initParticles();
+updateL();
+updatePhaseInfo();
+
+// Substepping for performance
+let lastTime = 0;
+const TARGET_FPS = 30;
+
+function loop(timestamp) {
+  if (!paused) {
+    const stepsPerFrame = N > 500 ? 1 : 2;
+    let lastPhi = 0;
+    for (let s = 0; s < stepsPerFrame; s++) {
+      lastPhi = simulate();
+    }
+
+    drawMain();
+    drawPhiChart(lastPhi);
+    drawRose();
+
+    document.getElementById('phiVal').textContent = lastPhi.toFixed(3);
+    document.getElementById('stepCount').textContent = `step: ${step}`;
+    document.getElementById('rhoVal').textContent = (N / (L * L)).toFixed(2);
+  } else {
+    drawMain();
   }
   requestAnimationFrame(loop);
 }
-
-window.addEventListener('resize', resize);
-resize();
-applyPreset('crit');
 requestAnimationFrame(loop);
 </script>
 </body>

@@ -3,286 +3,701 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Night 12 · 进化博弈：合作的涌现</title>
+<title>空间进化博弈论 — Nowak-May 1992</title>
 <style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { background: #000; color: #fff; font-family: 'Courier New', monospace; overflow: hidden; height: 100vh; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0d0d0d;
+    color: #e0e0e0;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+  header {
+    padding: 8px 16px;
+    background: #161616;
+    border-bottom: 1px solid #2a2a2a;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-shrink: 0;
+  }
+  header h1 {
+    font-size: 15px;
+    font-weight: 600;
+    color: #ffffff;
+    white-space: nowrap;
+  }
+  header .subtitle {
+    font-size: 11px;
+    color: #666;
+    white-space: nowrap;
+  }
+  .main-layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    gap: 0;
+  }
+  .sidebar {
+    width: 240px;
+    background: #111;
+    border-right: 1px solid #222;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    flex-shrink: 0;
+    padding: 12px;
+    gap: 12px;
+  }
+  .section-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #555;
+    margin-bottom: 6px;
+  }
+  .section { display: flex; flex-direction: column; gap: 6px; }
+  label { font-size: 12px; color: #aaa; }
+  input[type=range] {
+    width: 100%;
+    accent-color: #4a90d9;
+    cursor: pointer;
+  }
+  .val-display {
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    text-align: right;
+  }
+  .row { display: flex; align-items: center; gap: 8px; }
+  .flex1 { flex: 1; }
+  button {
+    background: #1e1e1e;
+    border: 1px solid #333;
+    color: #ccc;
+    padding: 5px 10px;
+    font-size: 11px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  button:hover { background: #2a2a2a; border-color: #4a90d9; color: #fff; }
+  button.active { background: #1a3a5c; border-color: #4a90d9; color: #4a90d9; }
+  .btn-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+  }
+  .btn-grid button { font-size: 10px; padding: 4px 6px; }
+  .preset-btn { font-size: 10px; padding: 4px 8px; }
+  .divider { border: none; border-top: 1px solid #222; }
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: #888;
+    padding: 2px 0;
+  }
+  .stat-row .val { color: #fff; font-weight: 600; }
+  .stat-c { color: #4a90d9; }
+  .stat-d { color: #f5a623; }
+  .legend-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: #aaa;
+  }
+  .legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
 
-#label {
-  position: absolute; top: 12px; left: 14px; z-index: 10;
-  font-size: 11px; color: #888; line-height: 1.6; pointer-events: none;
-}
-
-#controls {
-  position: absolute; top: 12px; right: 14px; z-index: 10;
-  display: flex; flex-direction: column; gap: 10px;
-  background: rgba(0,0,0,0.75); padding: 12px; border: 1px solid #333;
-  min-width: 230px;
-}
-.ctrl-row { display: flex; flex-direction: column; gap: 4px; }
-.ctrl-row label { font-size: 11px; color: #aaa; }
-.ctrl-row input[type=range] { width: 100%; accent-color: #3b82f6; }
-.ctrl-marks { display: flex; justify-content: space-between; font-size: 9px; color: #666; }
-.stat { font-size: 12px; color: #60a5fa; }
-.stat span { color: #fff; }
-.btn-row { display: flex; gap: 6px; flex-wrap: wrap; }
-button {
-  font-family: 'Courier New', monospace; font-size: 11px;
-  background: #111; border: 1px solid #444; color: #ccc;
-  padding: 5px 10px; cursor: pointer; border-radius: 2px;
-}
-button:hover { background: #222; border-color: #666; color: #fff; }
-button.active { background: #1e3a5f; border-color: #3b82f6; color: #60a5fa; }
-.sep { border-top: 1px solid #333; margin-top: 4px; padding-top: 4px; }
-
-#caption {
-  position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
-  font-size: 12px; color: #666; text-align: center; max-width: 720px;
-  line-height: 1.7; pointer-events: none; font-family: sans-serif; z-index: 10;
-}
-
-canvas { display: block; }
-#graph-canvas { position: absolute; bottom: 60px; right: 14px; border: 1px solid #333; background: rgba(0,0,0,0.6); }
+  .center-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+  }
+  #mainCanvas {
+    display: block;
+    image-rendering: pixelated;
+    cursor: crosshair;
+    flex-shrink: 0;
+  }
+  .canvas-wrapper {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #000;
+    overflow: hidden;
+  }
+  .chart-area {
+    height: 90px;
+    background: #0a0a0a;
+    border-top: 1px solid #1e1e1e;
+    padding: 6px 12px;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .chart-label {
+    font-size: 10px;
+    color: #555;
+    position: absolute;
+    top: 6px; left: 12px;
+  }
+  #chartCanvas {
+    display: block;
+    width: 100%;
+    height: 70px;
+    margin-top: 14px;
+  }
+  .gen-counter {
+    position: absolute;
+    top: 6px; right: 12px;
+    font-size: 11px;
+    color: #555;
+  }
+  .big-btn {
+    padding: 7px 14px;
+    font-size: 12px;
+  }
+  .brush-info {
+    font-size: 10px;
+    color: #555;
+    line-height: 1.4;
+  }
+  #payoffDisplay {
+    font-size: 10px;
+    color: #666;
+    font-family: monospace;
+    background: #0a0a0a;
+    padding: 6px;
+    border-radius: 4px;
+    border: 1px solid #1e1e1e;
+    line-height: 1.7;
+  }
 </style>
 </head>
 <body>
+<header>
+  <h1>空间进化博弈论</h1>
+  <span class="subtitle">Nowak &amp; May 1992 · 200×200 格点自动机</span>
+  <span style="flex:1"></span>
+  <span id="genLabel" style="font-size:12px;color:#555;">第 0 代</span>
+</header>
 
-<div id="label">
-  Night 12 · 2026-05-09<br>进化博弈 · 合作的涌现
-</div>
+<div class="main-layout">
+  <div class="sidebar">
 
-<div id="controls">
-  <div class="ctrl-row">
-    <label>背叛诱惑 b = <span id="b-val">1.65</span></label>
-    <input type="range" id="b-slider" min="1.0" max="2.0" step="0.01" value="1.65">
-    <div class="ctrl-marks"><span>1.0 低诱惑</span><span>2.0 高诱惑</span></div>
+    <div class="section">
+      <div class="section-label">博弈控制</div>
+      <div class="row">
+        <button id="btnPause" class="big-btn active">▶ 运行</button>
+        <button id="btnStep" class="big-btn">单步</button>
+      </div>
+      <div class="row">
+        <label class="flex1">速度</label>
+        <span class="val-display" id="speedVal">5×</span>
+      </div>
+      <input type="range" id="speedSlider" min="1" max="20" value="5">
+    </div>
+
+    <hr class="divider">
+
+    <div class="section">
+      <div class="section-label">博弈参数</div>
+      <div class="row">
+        <label class="flex1">博弈类型</label>
+      </div>
+      <div class="row" style="gap:4px">
+        <button id="btnPD" class="active" style="flex:1">囚徒困境</button>
+        <button id="btnSD" style="flex:1">雪堆博弈</button>
+      </div>
+      <div class="row">
+        <label class="flex1">背叛诱惑 b</label>
+        <span class="val-display" id="bVal">1.65</span>
+      </div>
+      <input type="range" id="bSlider" min="1.01" max="1.99" step="0.01" value="1.65">
+      <div id="payoffDisplay">
+收益矩阵 (囚徒困境):<br>
+C vs C → 1 | C vs D → 0<br>
+D vs C → b | D vs D → 0
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <div class="section">
+      <div class="section-label">着色方案</div>
+      <div class="row" style="gap:4px">
+        <button id="btnColor4" class="active" style="flex:1">变化率</button>
+        <button id="btnColor2" style="flex:1">经典</button>
+      </div>
+      <div class="legend-row"><div class="legend-dot" style="background:#4a90d9"></div>C→C 保持合作</div>
+      <div class="legend-row"><div class="legend-dot" style="background:#f5a623"></div>C→D 合作变背叛</div>
+      <div class="legend-row"><div class="legend-dot" style="background:#e74c3c"></div>D→C 背叛变合作</div>
+      <div class="legend-row"><div class="legend-dot" style="background:#2a2a2a;border:1px solid #444"></div>D→D 保持背叛</div>
+    </div>
+
+    <hr class="divider">
+
+    <div class="section">
+      <div class="section-label">初始条件</div>
+      <div class="btn-grid">
+        <button onclick="setInit(0)">随机 50%</button>
+        <button onclick="setInit(1)">中心合作</button>
+        <button onclick="setInit(2)">棋盘格</button>
+        <button onclick="setInit(3)">单个背叛</button>
+        <button onclick="setInit(4)">上下分层</button>
+        <button onclick="setInit(5)">随机团簇</button>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <div class="section">
+      <div class="section-label">经典预设</div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <button class="preset-btn" onclick="applyPreset(1.65,0)">Nowak-May 1992 原始</button>
+        <button class="preset-btn" onclick="applyPreset(1.8,0)">临界共存 b=1.8</button>
+        <button class="preset-btn" onclick="applyPreset(1.2,1)">合作主导 b=1.2</button>
+        <button class="preset-btn" onclick="applyPreset(1.95,0)">背叛主导 b=1.95</button>
+        <button class="preset-btn" onclick="applyPreset(1.73,5)">复杂动态 b=1.73</button>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <div class="section">
+      <div class="section-label">画笔工具</div>
+      <div class="row">
+        <label class="flex1">笔刷半径</label>
+        <span class="val-display" id="brushVal">5</span>
+      </div>
+      <input type="range" id="brushSlider" min="1" max="20" value="5">
+      <div class="brush-info">左键拖拽 → 绘制 C（合作）<br>右键拖拽 → 绘制 D（背叛）</div>
+    </div>
+
+    <hr class="divider">
+
+    <div class="section">
+      <div class="section-label">实时统计</div>
+      <div class="stat-row"><span>合作率 C</span><span class="val stat-c" id="statC">—</span></div>
+      <div class="stat-row"><span>背叛率 D</span><span class="val stat-d" id="statD">—</span></div>
+      <div class="stat-row"><span>当前代数</span><span class="val" id="statGen">0</span></div>
+      <div class="stat-row"><span>C→D 数</span><span class="val" id="statCD">—</span></div>
+      <div class="stat-row"><span>D→C 数</span><span class="val" id="statDC">—</span></div>
+    </div>
+
   </div>
-  <div class="ctrl-row sep">
-    <label>博弈类型</label>
-    <div class="btn-row">
-      <button id="btn-pd" class="active" onclick="setGame('pd')">囚徒困境</button>
-      <button id="btn-sd" onclick="setGame('sd')">雪堆博弈</button>
+
+  <div class="center-area">
+    <div class="canvas-wrapper">
+      <canvas id="mainCanvas"></canvas>
+    </div>
+    <div class="chart-area">
+      <span class="chart-label">合作率历史（最近 300 代）</span>
+      <span class="gen-counter" id="chartGen"></span>
+      <canvas id="chartCanvas"></canvas>
     </div>
   </div>
-  <div class="stat">合作率 C% = <span id="coop-val">50.0</span>%</div>
-  <div class="stat">世代 = <span id="gen-val">0</span></div>
-  <div class="btn-row sep">
-    <button onclick="resetGrid()">重置</button>
-    <button onclick="stepOnce()">单步</button>
-    <button id="btn-run" onclick="toggleRun()">运行 ▶</button>
-  </div>
 </div>
 
-<canvas id="main"></canvas>
-<canvas id="graph-canvas" width="230" height="110"></canvas>
-
-<div id="caption">「每个个体只有一条规则：模仿周围最成功的邻居。当背叛的诱惑足够小，合作会在格点上形成稳定的岛屿——这就是合作在自然界中存活的原理之一。」</div>
-
 <script>
-const GRID = 120;
-const canvas = document.getElementById('main');
+// ==================== CONSTANTS & STATE ====================
+const N = 200;
+const CELL = 3;
+const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
-const gCanvas = document.getElementById('graph-canvas');
-const gCtx = gCanvas.getContext('2d');
+canvas.width = N * CELL;
+canvas.height = N * CELL;
 
-let W, H, cellW, cellH;
-let grid = new Uint8Array(GRID * GRID); // 0=Defect, 1=Cooperate
-let nextGrid = new Uint8Array(GRID * GRID);
+const chartCanvas = document.getElementById('chartCanvas');
+const chartCtx = chartCanvas.getContext('2d');
+
+let grid = new Uint8Array(N * N);      // 0=D, 1=C
+let nextGrid = new Uint8Array(N * N);
+let prevGrid = new Uint8Array(N * N);  // grid before last update (for 4-color)
+const imageData = ctx.createImageData(N * CELL, N * CELL);
+const pixels = imageData.data;
+
 let b = 1.65;
-let gameType = 'pd'; // 'pd' or 'sd'
-let generation = 0;
+let gameType = 'PD'; // 'PD' or 'SD'
+let colorMode = '4'; // '4' or '2'
 let running = false;
-let animId = null;
-let coopHistory = [];
+let generation = 0;
+let speed = 5;
+let brushRadius = 5;
+const history = [];
+const HISTORY_LEN = 300;
 
-function resize() {
-  W = window.innerWidth; H = window.innerHeight;
-  canvas.width = W; canvas.height = H;
-  cellW = W / GRID; cellH = H / GRID;
-}
+// Colors as RGBA arrays
+const COL_CC = [74, 144, 217, 255];   // blue  C→C
+const COL_CD = [245, 166, 35, 255];   // gold  C→D
+const COL_DC = [231, 76, 60, 255];    // red   D→C
+const COL_DD = [26, 26, 26, 255];     // black D→D
+const COL_C  = [74, 144, 217, 255];   // classic C
+const COL_D  = [200, 160, 30, 255];   // classic D
 
-function resetGrid() {
-  generation = 0;
-  coopHistory = [];
-  for (let i = 0; i < GRID * GRID; i++) {
-    grid[i] = Math.random() < 0.5 ? 1 : 0;
-  }
-  render();
-}
-
-function payoff(me, neighbor) {
-  if (gameType === 'pd') {
-    // Prisoner's Dilemma: R=1, S=0, T=b, P=0
-    if (me === 1 && neighbor === 1) return 1;   // C vs C: R
-    if (me === 1 && neighbor === 0) return 0;   // C vs D: S
-    if (me === 0 && neighbor === 1) return b;   // D vs C: T
-    return 0;                                    // D vs D: P
+// ==================== PAYOFF ====================
+function payoff(me, opp) {
+  if (gameType === 'PD') {
+    if (me === 1 && opp === 1) return 1;
+    if (me === 1 && opp === 0) return 0;
+    if (me === 0 && opp === 1) return b;
+    return 0;
   } else {
-    // Snowdrift: R=1, S=1-b/2, T=1+b/2, P=0
-    const r = 1, s = 1 - b / 2, t = 1 + b / 2, p = 0;
-    if (me === 1 && neighbor === 1) return r;
-    if (me === 1 && neighbor === 0) return s;
-    if (me === 0 && neighbor === 1) return t;
-    return p;
+    // Snowdrift
+    const c = 0.5;
+    if (me === 1 && opp === 1) return b - 1;
+    if (me === 1 && opp === 0) return b - 1 - c;
+    if (me === 0 && opp === 1) return b;
+    return 0;
   }
 }
 
+function updatePayoffDisplay() {
+  const el = document.getElementById('payoffDisplay');
+  if (gameType === 'PD') {
+    el.innerHTML = `收益矩阵 (囚徒困境):<br>C vs C → 1 &nbsp;| C vs D → 0<br>D vs C → b &nbsp;| D vs D → 0`;
+  } else {
+    el.innerHTML = `收益矩阵 (雪堆博弈):<br>C vs C → b-1 &nbsp;| C vs D → b-1-c<br>D vs C → b &nbsp;&nbsp; | D vs D → 0`;
+  }
+}
+
+// ==================== INIT CONDITIONS ====================
+function setInit(type) {
+  generation = 0;
+  history.length = 0;
+  prevGrid.fill(0);
+  switch(type) {
+    case 0: // random 50%
+      for (let i = 0; i < N*N; i++) grid[i] = Math.random() < 0.5 ? 1 : 0;
+      break;
+    case 1: // center C cluster radius 20, rest D
+      grid.fill(0);
+      for (let y = 0; y < N; y++)
+        for (let x = 0; x < N; x++) {
+          const dx = x - N/2, dy = y - N/2;
+          if (dx*dx + dy*dy < 400) grid[y*N+x] = 1;
+        }
+      break;
+    case 2: // checkerboard
+      for (let i = 0; i < N; i++)
+        for (let j = 0; j < N; j++)
+          grid[i*N+j] = (i+j) % 2;
+      break;
+    case 3: // single D in all C
+      grid.fill(1);
+      grid[Math.floor(N/2)*N + Math.floor(N/2)] = 0;
+      break;
+    case 4: // top half C, bottom half D
+      for (let i = 0; i < N; i++)
+        for (let j = 0; j < N; j++)
+          grid[i*N+j] = i < N/2 ? 1 : 0;
+      break;
+    case 5: // random clusters 10×10
+      for (let bi = 0; bi < N/10; bi++)
+        for (let bj = 0; bj < N/10; bj++) {
+          const val = Math.random() < 0.5 ? 1 : 0;
+          for (let di = 0; di < 10; di++)
+            for (let dj = 0; dj < 10; dj++)
+              grid[(bi*10+di)*N + (bj*10+dj)] = val;
+        }
+      break;
+  }
+  prevGrid.set(grid);
+  render();
+  updateStats();
+}
+
+function applyPreset(newB, initType) {
+  b = newB;
+  document.getElementById('bSlider').value = b;
+  document.getElementById('bVal').textContent = b.toFixed(2);
+  setInit(initType);
+}
+
+// ==================== SIMULATION STEP ====================
 function step() {
-  // Compute payoffs
-  const payoffs = new Float32Array(GRID * GRID);
-  for (let y = 0; y < GRID; y++) {
-    for (let x = 0; x < GRID; x++) {
-      const me = grid[y * GRID + x];
-      let score = 0;
+  prevGrid.set(grid);
+  const scores = new Float32Array(N * N);
+
+  // compute scores
+  for (let y = 0; y < N; y++) {
+    for (let x = 0; x < N; x++) {
+      let s = 0;
+      const me = grid[y*N+x];
       for (let dy = -1; dy <= 1; dy++) {
         for (let dx = -1; dx <= 1; dx++) {
           if (dx === 0 && dy === 0) continue;
-          const ny = (y + dy + GRID) % GRID;
-          const nx = (x + dx + GRID) % GRID;
-          score += payoff(me, grid[ny * GRID + nx]);
+          const ny = (y + dy + N) % N;
+          const nx = (x + dx + N) % N;
+          s += payoff(me, grid[ny*N+nx]);
         }
       }
-      payoffs[y * GRID + x] = score;
+      scores[y*N+x] = s;
     }
   }
-  // Copy best neighbor strategy
-  for (let y = 0; y < GRID; y++) {
-    for (let x = 0; x < GRID; x++) {
-      let bestScore = payoffs[y * GRID + x];
-      let bestStrat = grid[y * GRID + x];
+
+  // update: copy strategy from best neighbor (including self)
+  for (let y = 0; y < N; y++) {
+    for (let x = 0; x < N; x++) {
+      let bestScore = scores[y*N+x];
+      let bestStrat = grid[y*N+x];
       for (let dy = -1; dy <= 1; dy++) {
         for (let dx = -1; dx <= 1; dx++) {
           if (dx === 0 && dy === 0) continue;
-          const ny = (y + dy + GRID) % GRID;
-          const nx = (x + dx + GRID) % GRID;
-          if (payoffs[ny * GRID + nx] > bestScore) {
-            bestScore = payoffs[ny * GRID + nx];
-            bestStrat = grid[ny * GRID + nx];
+          const ny = (y + dy + N) % N;
+          const nx = (x + dx + N) % N;
+          if (scores[ny*N+nx] > bestScore) {
+            bestScore = scores[ny*N+nx];
+            bestStrat = grid[ny*N+nx];
           }
         }
       }
-      nextGrid[y * GRID + x] = bestStrat;
+      nextGrid[y*N+x] = bestStrat;
     }
   }
+
   [grid, nextGrid] = [nextGrid, grid];
   generation++;
-
-  let coop = 0;
-  for (let i = 0; i < GRID * GRID; i++) coop += grid[i];
-  const coopFrac = coop / (GRID * GRID);
-  coopHistory.push(coopFrac);
-  if (coopHistory.length > 300) coopHistory.shift();
-
-  document.getElementById('coop-val').textContent = (coopFrac * 100).toFixed(1);
-  document.getElementById('gen-val').textContent = generation;
 }
 
+// ==================== RENDER ====================
 function render() {
-  // Draw grid
-  const imgData = ctx.createImageData(W, H);
-  const data = imgData.data;
-
-  for (let y = 0; y < GRID; y++) {
-    for (let x = 0; x < GRID; x++) {
-      const strat = grid[y * GRID + x];
-      const px = Math.floor(x * cellW);
-      const py = Math.floor(y * cellH);
-      const pw = Math.ceil(cellW);
-      const ph = Math.ceil(cellH);
-      // C=blue, D=red
-      const r = strat === 1 ? 59 : 239;
-      const g = strat === 1 ? 130 : 68;
-      const bv = strat === 1 ? 246 : 68;
-      for (let ry = py; ry < py + ph && ry < H; ry++) {
-        for (let rx = px; rx < px + pw && rx < W; rx++) {
-          const idx = (ry * W + rx) * 4;
-          data[idx] = r; data[idx+1] = g; data[idx+2] = bv; data[idx+3] = 255;
+  for (let y = 0; y < N; y++) {
+    for (let x = 0; x < N; x++) {
+      const cur = grid[y*N+x];
+      const prev = prevGrid[y*N+x];
+      let col;
+      if (colorMode === '4') {
+        if (prev === 1 && cur === 1) col = COL_CC;
+        else if (prev === 1 && cur === 0) col = COL_CD;
+        else if (prev === 0 && cur === 1) col = COL_DC;
+        else col = COL_DD;
+      } else {
+        col = cur === 1 ? COL_C : COL_D;
+      }
+      // fill CELL×CELL block
+      for (let dy = 0; dy < CELL; dy++) {
+        for (let dx = 0; dx < CELL; dx++) {
+          const pi = ((y*CELL+dy)*N*CELL + (x*CELL+dx)) * 4;
+          pixels[pi]   = col[0];
+          pixels[pi+1] = col[1];
+          pixels[pi+2] = col[2];
+          pixels[pi+3] = 255;
         }
       }
     }
   }
-  ctx.putImageData(imgData, 0, 0);
+  ctx.putImageData(imageData, 0, 0);
+}
 
-  // Draw time series graph
-  const gW = gCanvas.width, gH = gCanvas.height;
-  gCtx.clearRect(0, 0, gW, gH);
-  gCtx.fillStyle = 'rgba(0,0,0,0.0)';
-  gCtx.fillRect(0, 0, gW, gH);
-
-  // Grid lines
-  gCtx.strokeStyle = '#1a2a1a';
-  gCtx.lineWidth = 1;
-  for (let i = 0; i <= 4; i++) {
-    const yy = (i / 4) * gH;
-    gCtx.beginPath(); gCtx.moveTo(0, yy); gCtx.lineTo(gW, yy); gCtx.stroke();
+// ==================== STATS & CHART ====================
+function updateStats() {
+  let cCount = 0, cdCount = 0, dcCount = 0;
+  for (let i = 0; i < N*N; i++) {
+    if (grid[i] === 1) cCount++;
+    if (prevGrid[i] === 1 && grid[i] === 0) cdCount++;
+    if (prevGrid[i] === 0 && grid[i] === 1) dcCount++;
   }
+  const total = N * N;
+  const cRate = cCount / total;
+  document.getElementById('statC').textContent = (cRate*100).toFixed(1) + '%';
+  document.getElementById('statD').textContent = ((1-cRate)*100).toFixed(1) + '%';
+  document.getElementById('statGen').textContent = generation;
+  document.getElementById('statCD').textContent = cdCount.toLocaleString();
+  document.getElementById('statDC').textContent = dcCount.toLocaleString();
+  document.getElementById('genLabel').textContent = '第 ' + generation + ' 代';
+  document.getElementById('chartGen').textContent = '代 ' + generation;
+  history.push(cRate);
+  if (history.length > HISTORY_LEN) history.shift();
+  drawChart();
+}
 
-  // 50% line
-  gCtx.strokeStyle = '#333'; gCtx.lineWidth = 1;
-  gCtx.setLineDash([4, 4]);
-  gCtx.beginPath(); gCtx.moveTo(0, gH * 0.5); gCtx.lineTo(gW, gH * 0.5); gCtx.stroke();
-  gCtx.setLineDash([]);
+function drawChart() {
+  const w = chartCanvas.offsetWidth * devicePixelRatio || 600;
+  const h = chartCanvas.offsetHeight * devicePixelRatio || 60;
+  chartCanvas.width = w;
+  chartCanvas.height = h;
+  const cctx = chartCtx;
+  cctx.clearRect(0, 0, w, h);
 
-  // Labels
-  gCtx.fillStyle = '#666'; gCtx.font = '9px Courier New';
-  gCtx.fillText('C%', 4, 12);
-  gCtx.fillText('100', 4, 14);
-  gCtx.fillText('0', 4, gH - 4);
+  // grid lines
+  cctx.strokeStyle = '#1e1e1e';
+  cctx.lineWidth = 1;
+  [0.25, 0.5, 0.75].forEach(v => {
+    const y = h * (1 - v);
+    cctx.beginPath(); cctx.moveTo(0, y); cctx.lineTo(w, y); cctx.stroke();
+  });
 
-  if (coopHistory.length > 1) {
-    gCtx.beginPath();
-    gCtx.strokeStyle = '#3b82f6'; gCtx.lineWidth = 1.5;
-    for (let i = 0; i < coopHistory.length; i++) {
-      const cx = (i / (coopHistory.length - 1)) * gW;
-      const cy = (1 - coopHistory[i]) * gH;
-      i === 0 ? gCtx.moveTo(cx, cy) : gCtx.lineTo(cx, cy);
+  if (history.length < 2) return;
+
+  // fill area
+  const gradient = cctx.createLinearGradient(0, 0, 0, h);
+  gradient.addColorStop(0, 'rgba(74,144,217,0.4)');
+  gradient.addColorStop(1, 'rgba(74,144,217,0.02)');
+  cctx.beginPath();
+  cctx.moveTo(0, h);
+  history.forEach((v, i) => {
+    const x = (i / (HISTORY_LEN - 1)) * w;
+    const y = h * (1 - v);
+    cctx.lineTo(x, y);
+  });
+  cctx.lineTo((history.length - 1) / (HISTORY_LEN - 1) * w, h);
+  cctx.closePath();
+  cctx.fillStyle = gradient;
+  cctx.fill();
+
+  // line
+  cctx.beginPath();
+  cctx.strokeStyle = '#4a90d9';
+  cctx.lineWidth = 1.5;
+  history.forEach((v, i) => {
+    const x = (i / (HISTORY_LEN - 1)) * w;
+    const y = h * (1 - v);
+    i === 0 ? cctx.moveTo(x, y) : cctx.lineTo(x, y);
+  });
+  cctx.stroke();
+
+  // labels
+  cctx.fillStyle = '#444';
+  cctx.font = `${10 * devicePixelRatio}px sans-serif`;
+  ['100%', '75%', '50%', '25%', '0%'].forEach((label, idx) => {
+    const v = 1 - idx * 0.25;
+    cctx.fillText(label, 2, h * (1 - v) + 3 * devicePixelRatio);
+  });
+}
+
+// ==================== ANIMATION LOOP ====================
+let lastTime = 0;
+let frameCount = 0;
+
+function loop(ts) {
+  if (running) {
+    const interval = 1000 / (speed * 10);
+    if (ts - lastTime > interval) {
+      for (let i = 0; i < Math.max(1, speed >> 1); i++) {
+        step();
+      }
+      render();
+      updateStats();
+      lastTime = ts;
     }
-    gCtx.stroke();
-
-    // Current point
-    const lastC = coopHistory[coopHistory.length - 1];
-    gCtx.fillStyle = '#60a5fa';
-    gCtx.beginPath();
-    gCtx.arc(gW - 3, (1 - lastC) * gH, 3, 0, Math.PI * 2);
-    gCtx.fill();
   }
+  requestAnimationFrame(loop);
 }
+requestAnimationFrame(loop);
 
-function stepOnce() {
-  step();
-  render();
-}
-
-function toggleRun() {
+// ==================== CONTROLS ====================
+document.getElementById('btnPause').addEventListener('click', function() {
   running = !running;
-  document.getElementById('btn-run').textContent = running ? '暂停 ⏸' : '运行 ▶';
-  if (running) loop();
-}
-
-function loop() {
-  if (!running) return;
-  step();
-  render();
-  animId = requestAnimationFrame(loop);
-}
-
-function setGame(type) {
-  gameType = type;
-  document.getElementById('btn-pd').classList.toggle('active', type === 'pd');
-  document.getElementById('btn-sd').classList.toggle('active', type === 'sd');
-  resetGrid();
-}
-
-document.getElementById('b-slider').addEventListener('input', function() {
-  b = parseFloat(this.value);
-  document.getElementById('b-val').textContent = b.toFixed(2);
+  this.textContent = running ? '⏸ 暂停' : '▶ 运行';
+  this.classList.toggle('active', running);
+});
+document.getElementById('btnStep').addEventListener('click', () => {
+  if (!running) { step(); render(); updateStats(); }
 });
 
-window.addEventListener('resize', () => { resize(); render(); });
-resize();
-resetGrid();
-// auto-start
-toggleRun();
+document.getElementById('speedSlider').addEventListener('input', function() {
+  speed = +this.value;
+  document.getElementById('speedVal').textContent = speed + '×';
+});
+document.getElementById('bSlider').addEventListener('input', function() {
+  b = parseFloat(this.value);
+  document.getElementById('bVal').textContent = b.toFixed(2);
+  updatePayoffDisplay();
+});
+document.getElementById('brushSlider').addEventListener('input', function() {
+  brushRadius = +this.value;
+  document.getElementById('brushVal').textContent = brushRadius;
+});
+
+document.getElementById('btnPD').addEventListener('click', function() {
+  gameType = 'PD';
+  this.classList.add('active');
+  document.getElementById('btnSD').classList.remove('active');
+  updatePayoffDisplay();
+});
+document.getElementById('btnSD').addEventListener('click', function() {
+  gameType = 'SD';
+  this.classList.add('active');
+  document.getElementById('btnPD').classList.remove('active');
+  updatePayoffDisplay();
+});
+
+document.getElementById('btnColor4').addEventListener('click', function() {
+  colorMode = '4';
+  this.classList.add('active');
+  document.getElementById('btnColor2').classList.remove('active');
+  render();
+});
+document.getElementById('btnColor2').addEventListener('click', function() {
+  colorMode = '2';
+  this.classList.add('active');
+  document.getElementById('btnColor4').classList.remove('active');
+  render();
+});
+
+// ==================== BRUSH INTERACTION ====================
+let isPainting = false;
+let paintButton = 0;
+
+function getCellCoords(e) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = N / rect.width;
+  const scaleY = N / rect.height;
+  const cx = Math.floor((e.clientX - rect.left) * scaleX);
+  const cy = Math.floor((e.clientY - rect.top) * scaleY);
+  return [cx, cy];
+}
+
+function paint(cx, cy, val) {
+  const r = brushRadius;
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      if (dx*dx + dy*dy <= r*r) {
+        const nx = (cx + dx + N) % N;
+        const ny = (cy + dy + N) % N;
+        grid[ny*N+nx] = val;
+      }
+    }
+  }
+}
+
+canvas.addEventListener('mousedown', e => {
+  e.preventDefault();
+  isPainting = true;
+  paintButton = e.button;
+  const [cx, cy] = getCellCoords(e);
+  paint(cx, cy, paintButton === 2 ? 0 : 1);
+  render(); updateStats();
+});
+canvas.addEventListener('mousemove', e => {
+  if (!isPainting) return;
+  const [cx, cy] = getCellCoords(e);
+  paint(cx, cy, paintButton === 2 ? 0 : 1);
+  render(); updateStats();
+});
+canvas.addEventListener('mouseup', () => isPainting = false);
+canvas.addEventListener('mouseleave', () => isPainting = false);
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+// ==================== INIT ====================
+updatePayoffDisplay();
+setInit(0);
+running = true;
+document.getElementById('btnPause').textContent = '⏸ 暂停';
+document.getElementById('btnPause').classList.add('active');
 </script>
 </body>
 </html>

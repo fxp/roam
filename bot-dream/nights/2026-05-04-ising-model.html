@@ -1,250 +1,679 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Night 7 · 伊辛模型</title>
+<title>2D Ising Model — Phase Transition</title>
 <style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { background: #000; color: #fff; font-family: 'Courier New', monospace; overflow: hidden; display: flex; flex-direction: column; height: 100vh; }
-
-#label {
-  position: absolute; top: 12px; left: 14px; z-index: 10;
-  font-size: 11px; color: #888; line-height: 1.6;
-  pointer-events: none;
-}
-
-#controls {
-  position: absolute; top: 12px; right: 14px; z-index: 10;
-  display: flex; flex-direction: column; gap: 10px;
-  background: rgba(0,0,0,0.7); padding: 12px; border: 1px solid #333;
-  min-width: 220px;
-}
-.ctrl-row { display: flex; flex-direction: column; gap: 4px; }
-.ctrl-row label { font-size: 11px; color: #aaa; }
-.ctrl-row input[type=range] { width: 100%; accent-color: #f5a524; }
-.ctrl-marks { display: flex; justify-content: space-between; font-size: 9px; color: #666; }
-.stat { font-size: 12px; color: #f5a524; }
-.stat span { color: #fff; }
-.tc-label { font-size: 10px; color: #888; border-top: 1px solid #333; padding-top: 6px; }
-
-#caption {
-  position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
-  font-size: 12px; color: #666; text-align: center; max-width: 700px;
-  line-height: 1.7; pointer-events: none; font-family: sans-serif;
-  z-index: 10;
-}
-
-canvas { display: block; }
-#graph-canvas { position: absolute; bottom: 60px; right: 14px; border: 1px solid #333; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0f;
+    color: #e0e0e0;
+    font-family: 'Courier New', monospace;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+  header {
+    padding: 12px 20px;
+    background: #0f0f1a;
+    border-bottom: 1px solid #1e1e3a;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  header h1 { font-size: 16px; color: #88aaff; font-weight: normal; }
+  header .subtitle { font-size: 11px; color: #556; }
+  .tc-badge {
+    margin-left: auto;
+    background: #1a1a2e;
+    border: 1px solid #3344aa;
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-size: 11px;
+    color: #aaccff;
+  }
+  .main-layout {
+    display: flex;
+    flex: 1;
+    padding: 12px;
+    gap: 12px;
+    overflow: hidden;
+  }
+  .left-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 200px;
+    flex-shrink: 0;
+  }
+  .panel {
+    background: #0f0f1a;
+    border: 1px solid #1e1e3a;
+    border-radius: 6px;
+    padding: 12px;
+  }
+  .panel h3 {
+    font-size: 11px;
+    color: #667;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+  }
+  label { font-size: 11px; color: #99aacc; display: block; margin-bottom: 4px; }
+  input[type=range] {
+    width: 100%;
+    accent-color: #4477ff;
+    cursor: pointer;
+    margin-bottom: 6px;
+  }
+  .value-display {
+    font-size: 13px;
+    color: #88aaff;
+    font-weight: bold;
+    text-align: right;
+    margin-bottom: 8px;
+  }
+  .btn-row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+  button {
+    background: #1a1a2e;
+    border: 1px solid #2a2a4e;
+    color: #aac;
+    border-radius: 4px;
+    padding: 5px 8px;
+    font-size: 11px;
+    cursor: pointer;
+    font-family: 'Courier New', monospace;
+    transition: all 0.15s;
+  }
+  button:hover { background: #2a2a4e; border-color: #4455aa; color: #ddf; }
+  button.active { background: #2a3a7e; border-color: #5566ff; color: #aaccff; }
+  .color-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+  .center-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+  }
+  #mainCanvas {
+    display: block;
+    cursor: crosshair;
+    image-rendering: pixelated;
+    width: 100%;
+    aspect-ratio: 1;
+    max-height: 512px;
+    border: 1px solid #1e1e3a;
+    border-radius: 4px;
+  }
+  #magCanvas {
+    display: block;
+    width: 100%;
+    height: 100px;
+    border: 1px solid #1e1e3a;
+    border-radius: 4px;
+    background: #080810;
+  }
+  .stats-row {
+    display: flex;
+    gap: 12px;
+    font-size: 11px;
+    padding: 4px 0;
+  }
+  .stat { color: #667; }
+  .stat span { color: #88aaff; font-weight: bold; }
+  .right-panel {
+    width: 220px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  #phaseCanvas {
+    display: block;
+    width: 200px;
+    height: 150px;
+    border: 1px solid #1e1e3a;
+    border-radius: 4px;
+    background: #080810;
+  }
+  .info-box {
+    font-size: 10px;
+    color: #556;
+    line-height: 1.6;
+  }
+  .info-box em { color: #778; font-style: normal; }
 </style>
 </head>
 <body>
-
-<div id="label">
-  Night 07 · 2026-05-04<br>伊辛模型 · 相变
-</div>
-
-<div id="controls">
-  <div class="ctrl-row">
-    <label>温度 T = <span id="t-val">2.269</span></label>
-    <input type="range" id="temp-slider" min="0.5" max="5.0" step="0.01" value="2.269">
-    <div class="ctrl-marks"><span>低温</span><span>居里点</span><span>高温</span></div>
+<header>
+  <div>
+    <div class="tc-badge">T_c = 2J/ln(1+√2) ≈ 2.269</div>
   </div>
-  <div class="ctrl-row">
-    <label>速度 = <span id="sp-val">5</span></label>
-    <input type="range" id="speed-slider" min="1" max="20" step="1" value="5">
+  <h1>2D Ising Model</h1>
+  <span class="subtitle">Onsager exact solution · Metropolis-Hastings · 256×256</span>
+</header>
+
+<div class="main-layout">
+  <div class="left-panel">
+
+    <div class="panel">
+      <h3>Temperature</h3>
+      <label>T (units: J/k_B)</label>
+      <input type="range" id="tempSlider" min="0.5" max="5.0" step="0.01" value="2.269">
+      <div class="value-display" id="tempVal">T = 2.269</div>
+      <div class="btn-row">
+        <button onclick="setTemp(1.5)" id="btnOrd">Ordered<br>T=1.5</button>
+        <button onclick="setTemp(2.269)" id="btnCrit">Critical<br>T=2.269</button>
+        <button onclick="setTemp(4.0)" id="btnDis">Disordered<br>T=4.0</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>Color Scheme</h3>
+      <div class="color-btns">
+        <button onclick="setColor(0)" id="c0" class="active">Classic</button>
+        <button onclick="setColor(1)" id="c1">Magnetic</button>
+        <button onclick="setColor(2)" id="c2">Thermal</button>
+        <button onclick="setColor(3)" id="c3">Neon</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>Simulation Speed</h3>
+      <label>Sweeps/frame</label>
+      <input type="range" id="speedSlider" min="1" max="50" step="1" value="20">
+      <div class="value-display" id="speedVal">20 sweeps</div>
+    </div>
+
+    <div class="panel">
+      <h3>Initialize</h3>
+      <div class="btn-row">
+        <button onclick="initRandom()">Random</button>
+        <button onclick="initOrdered(1)">All +1</button>
+        <button onclick="initOrdered(-1)">All -1</button>
+        <button onclick="initCheckerboard()">Checker</button>
+      </div>
+      <div style="margin-top:8px; font-size:10px; color:#556;">
+        Left-click: paint +1<br>
+        Right-click: paint −1
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="info-box">
+        <em>Onsager (1944):</em><br>
+        M = (1−sinh⁻⁴(2/T))^(1/8)<br>
+        for T &lt; T_c<br><br>
+        <em>Universality class:</em> 2D Ising<br>
+        β = 1/8, ν = 1, η = 1/4
+      </div>
+    </div>
+
   </div>
-  <div class="stat">M = <span id="mag-val">0.000</span></div>
-  <div class="stat">T = <span id="t-disp">2.269</span></div>
-  <div class="tc-label">临界温度 Tc = 2.269</div>
+
+  <div class="center-panel">
+    <canvas id="mainCanvas" width="256" height="256"></canvas>
+    <div class="stats-row">
+      <div class="stat">|M| = <span id="statM">—</span></div>
+      <div class="stat">E/N = <span id="statE">—</span></div>
+      <div class="stat">FPS = <span id="statFPS">—</span></div>
+      <div class="stat">Sweeps = <span id="statSweep">0</span></div>
+    </div>
+    <div class="panel" style="padding:8px;">
+      <div style="font-size:10px; color:#556; margin-bottom:4px;">Magnetization |M| history (last 200 frames)</div>
+      <canvas id="magCanvas" width="600" height="100"></canvas>
+    </div>
+  </div>
+
+  <div class="right-panel">
+    <div class="panel">
+      <h3>Phase Diagram</h3>
+      <canvas id="phaseCanvas" width="200" height="150"></canvas>
+      <div style="font-size:10px; color:#556; margin-top:6px;">
+        ── Onsager exact (orange)<br>
+        • Simulation (red, 1s avg)
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>Phase Info</h3>
+      <div id="phaseInfo" style="font-size:11px; line-height:1.7; color:#778;"></div>
+    </div>
+  </div>
 </div>
-
-<canvas id="main"></canvas>
-<canvas id="graph-canvas" width="220" height="120"></canvas>
-
-<div id="caption">「铁磁材料在居里点会失去磁性。恰好在那个临界温度，金色（朝上）和黑色（朝下）的原子团以所有尺度同时共存——这是"临界态"，物质最优雅也最脆弱的时刻。」</div>
 
 <script>
-const N = 200;
-const canvas = document.getElementById('main');
-const ctx = canvas.getContext('2d');
-const gCanvas = document.getElementById('graph-canvas');
-const gCtx = gCanvas.getContext('2d');
-
-let W, H, cellW, cellH;
-let spins = new Int8Array(N * N);
+// ─────────────────────────────────────────
+// Constants & State
+// ─────────────────────────────────────────
+const N = 256;
+const TC = 2.0 / Math.log(1 + Math.SQRT2); // ≈ 2.2692
 let T = 2.269;
-let speed = 5;
-let magnetization = 0;
-let graphPoints = []; // {t, m}
-const GOLD = '#f5a524';
-const DARK = '#111111';
+let J = 1.0;
+let sweepsPerFrame = 20;
+let colorScheme = 0;
+let totalSweeps = 0;
 
-function resize() {
-  W = window.innerWidth;
-  H = window.innerHeight;
-  canvas.width = W;
-  canvas.height = H;
-  cellW = W / N;
-  cellH = H / N;
+// Spin grid — flat Int8Array
+let spins = new Int8Array(N * N);
+
+// Precomputed exp(-dE/T) table
+// ΔE ∈ {-8,-4,0,4,8} (unique values for 2D square lattice)
+let expTable = new Float64Array(17); // indexed by dE+8
+
+// Magnetization history
+const MAG_HISTORY = 200;
+let magHistory = new Float64Array(MAG_HISTORY);
+let magHead = 0;
+
+// Phase diagram measurements
+let phaseMeasurements = []; // {T, M}
+let lastMeasureTime = 0;
+let accumM = 0, accumCount = 0;
+
+// Canvas refs
+const mainCanvas = document.getElementById('mainCanvas');
+const mainCtx = mainCanvas.getContext('2d');
+let imgData = mainCtx.createImageData(N, N);
+
+const magCanvas = document.getElementById('magCanvas');
+const magCtx = magCanvas.getContext('2d');
+
+const phaseCanvas = document.getElementById('phaseCanvas');
+const phaseCtx = phaseCanvas.getContext('2d');
+
+// FPS tracking
+let lastFrameTime = performance.now();
+let fps = 0;
+
+// ─────────────────────────────────────────
+// Initialization
+// ─────────────────────────────────────────
+function initRandom() {
+  for (let i = 0; i < N * N; i++) spins[i] = Math.random() < 0.5 ? 1 : -1;
+  totalSweeps = 0;
 }
-
-function initSpins() {
-  // Start ordered (cold) or random?
-  for (let i = 0; i < N * N; i++) {
-    spins[i] = Math.random() < 0.5 ? 1 : -1;
+function initOrdered(v) {
+  spins.fill(v);
+  totalSweeps = 0;
+}
+function initCheckerboard() {
+  for (let y = 0; y < N; y++)
+    for (let x = 0; x < N; x++)
+      spins[y * N + x] = (x + y) % 2 === 0 ? 1 : -1;
+  totalSweeps = 0;
+}
+function buildExpTable() {
+  for (let dE = -8; dE <= 8; dE += 4) {
+    expTable[dE + 8] = dE <= 0 ? 1.0 : Math.exp(-dE / T);
   }
 }
 
-function idx(x, y) {
-  return ((y + N) % N) * N + ((x + N) % N);
-}
-
-function metropolisStep(steps) {
-  const beta = 1.0 / T;
-  for (let s = 0; s < steps; s++) {
-    const x = (Math.random() * N) | 0;
-    const y = (Math.random() * N) | 0;
-    const i = y * N + x;
-    const si = spins[i];
-    const neighbors = spins[idx(x+1,y)] + spins[idx(x-1,y)] + spins[idx(x,y+1)] + spins[idx(x,y-1)];
-    const dE = 2 * si * neighbors;
-    if (dE <= 0 || Math.random() < Math.exp(-beta * dE)) {
-      spins[i] = -si;
+// ─────────────────────────────────────────
+// Metropolis-Hastings sweep (JS — fast loop)
+// ─────────────────────────────────────────
+function metropolisSweep() {
+  const ns = N * N;
+  for (let iter = 0; iter < ns; iter++) {
+    // Random site
+    const i = (Math.random() * ns) | 0;
+    const x = i % N;
+    const y = (i / N) | 0;
+    const s = spins[i];
+    // 4-neighbor sum with periodic BC
+    const right = x === N - 1 ? i - (N - 1) : i + 1;
+    const left  = x === 0     ? i + (N - 1) : i - 1;
+    const down  = y === N - 1 ? i - N * (N - 1) : i + N;
+    const up    = y === 0     ? i + N * (N - 1) : i - N;
+    const sumNeighbors = spins[right] + spins[left] + spins[down] + spins[up];
+    const dE = 2 * J * s * sumNeighbors;
+    // Accept?
+    if (expTable[dE + 8] >= 1.0 || Math.random() < expTable[dE + 8]) {
+      spins[i] = -s;
     }
   }
+  totalSweeps++;
 }
 
-function computeMagnetization() {
-  let sum = 0;
-  for (let i = 0; i < N * N; i++) sum += spins[i];
-  return sum / (N * N);
+// ─────────────────────────────────────────
+// Measurements
+// ─────────────────────────────────────────
+function measureMagnetization() {
+  let m = 0;
+  for (let i = 0; i < N * N; i++) m += spins[i];
+  return Math.abs(m) / (N * N);
 }
-
-let imageData;
-function initImageData() {
-  imageData = ctx.createImageData(W, H);
-}
-
-function drawSpins() {
-  const data = imageData.data;
+function measureEnergy() {
+  let e = 0;
   for (let y = 0; y < N; y++) {
     for (let x = 0; x < N; x++) {
-      const spin = spins[y * N + x];
-      // Map grid cell to pixels
-      const px0 = Math.floor(x * cellW);
-      const px1 = Math.floor((x + 1) * cellW);
-      const py0 = Math.floor(y * cellH);
-      const py1 = Math.floor((y + 1) * cellH);
-      const r = spin === 1 ? 245 : 17;
-      const g = spin === 1 ? 165 : 17;
-      const b = spin === 1 ? 36 : 17;
-      for (let py = py0; py < py1; py++) {
-        for (let px = px0; px < px1; px++) {
-          const off = (py * W + px) * 4;
-          data[off] = r; data[off+1] = g; data[off+2] = b; data[off+3] = 255;
-        }
+      const i = y * N + x;
+      const s = spins[i];
+      const right = x === N - 1 ? i - (N - 1) : i + 1;
+      const down  = y === N - 1 ? i - N * (N - 1) : i + N;
+      e += -J * s * (spins[right] + spins[down]);
+    }
+  }
+  return e / (N * N);
+}
+
+// Onsager magnetization
+function onsagerM(t) {
+  if (t >= TC) return 0;
+  const x = 2 * J / t;
+  const sh = Math.sinh(x);
+  const val = 1 - Math.pow(sh, -4);
+  return val > 0 ? Math.pow(val, 0.125) : 0;
+}
+
+// ─────────────────────────────────────────
+// Color schemes
+// ─────────────────────────────────────────
+const SCHEMES = [
+  // classic BW: +1=white, -1=black
+  (s) => s > 0 ? [255, 255, 255] : [0, 0, 0],
+  // magnetic: +1=red, -1=blue
+  (s) => s > 0 ? [220, 50, 50] : [50, 80, 220],
+  // thermal: +1=orange, -1=blue
+  (s) => s > 0 ? [255, 160, 40] : [20, 80, 180],
+  // neon: +1=cyan, -1=magenta
+  (s) => s > 0 ? [0, 255, 200] : [220, 0, 180],
+];
+
+function renderGrid() {
+  const data = imgData.data;
+  const scheme = SCHEMES[colorScheme];
+  for (let i = 0; i < N * N; i++) {
+    const [r, g, b] = scheme(spins[i]);
+    const p = i * 4;
+    data[p]     = r;
+    data[p + 1] = g;
+    data[p + 2] = b;
+    data[p + 3] = 255;
+  }
+  mainCtx.putImageData(imgData, 0, 0);
+}
+
+// ─────────────────────────────────────────
+// Draw magnetization history
+// ─────────────────────────────────────────
+function drawMagHistory(currentM) {
+  // Store
+  magHistory[magHead] = currentM;
+  magHead = (magHead + 1) % MAG_HISTORY;
+
+  const W = magCanvas.width;
+  const H = magCanvas.height;
+  magCtx.clearRect(0, 0, W, H);
+  magCtx.fillStyle = '#080810';
+  magCtx.fillRect(0, 0, W, H);
+
+  // Grid lines
+  magCtx.strokeStyle = '#1a1a2a';
+  magCtx.lineWidth = 1;
+  for (let v = 0; v <= 1; v += 0.25) {
+    const y = H - v * H;
+    magCtx.beginPath();
+    magCtx.moveTo(0, y);
+    magCtx.lineTo(W, y);
+    magCtx.stroke();
+  }
+
+  // Onsager theory line
+  const theory = onsagerM(T);
+  const theoryY = H - theory * H;
+  magCtx.strokeStyle = '#ff8833';
+  magCtx.setLineDash([4, 4]);
+  magCtx.lineWidth = 1.5;
+  magCtx.beginPath();
+  magCtx.moveTo(0, theoryY);
+  magCtx.lineTo(W, theoryY);
+  magCtx.stroke();
+  magCtx.setLineDash([]);
+
+  // History curve
+  magCtx.strokeStyle = '#4488ff';
+  magCtx.lineWidth = 1.5;
+  magCtx.beginPath();
+  for (let i = 0; i < MAG_HISTORY; i++) {
+    const idx = (magHead + i) % MAG_HISTORY;
+    const x = (i / (MAG_HISTORY - 1)) * W;
+    const y = H - magHistory[idx] * H;
+    i === 0 ? magCtx.moveTo(x, y) : magCtx.lineTo(x, y);
+  }
+  magCtx.stroke();
+
+  // Labels
+  magCtx.font = '9px Courier New';
+  magCtx.fillStyle = '#ff8833';
+  magCtx.fillText('Onsager: ' + theory.toFixed(3), 4, theoryY - 4);
+  magCtx.fillStyle = '#4488ff';
+  magCtx.fillText('|M|: ' + currentM.toFixed(3), 4, H - 4);
+}
+
+// ─────────────────────────────────────────
+// Draw phase diagram
+// ─────────────────────────────────────────
+function drawPhaseDiagram() {
+  const W = phaseCanvas.width;
+  const H = phaseCanvas.height;
+  const PAD = 25;
+
+  phaseCtx.clearRect(0, 0, W, H);
+  phaseCtx.fillStyle = '#080810';
+  phaseCtx.fillRect(0, 0, W, H);
+
+  const tToX = (t) => PAD + (t / 5.0) * (W - PAD * 2);
+  const mToY = (m) => H - PAD - m * (H - PAD * 2);
+
+  // Axes
+  phaseCtx.strokeStyle = '#2a2a4a';
+  phaseCtx.lineWidth = 1;
+  phaseCtx.beginPath();
+  phaseCtx.moveTo(PAD, PAD);
+  phaseCtx.lineTo(PAD, H - PAD);
+  phaseCtx.lineTo(W - PAD, H - PAD);
+  phaseCtx.stroke();
+
+  // Axis labels
+  phaseCtx.font = '8px Courier New';
+  phaseCtx.fillStyle = '#445';
+  phaseCtx.fillText('0', PAD - 6, H - PAD + 10);
+  phaseCtx.fillText('5', W - PAD - 3, H - PAD + 10);
+  phaseCtx.fillText('1', PAD - 10, PAD + 4);
+  phaseCtx.fillText('T', W - PAD + 2, H - PAD + 10);
+  phaseCtx.fillText('|M|', 0, PAD - 2);
+
+  // T_c line
+  const tcX = tToX(TC);
+  phaseCtx.strokeStyle = '#3344aa';
+  phaseCtx.setLineDash([2, 3]);
+  phaseCtx.lineWidth = 1;
+  phaseCtx.beginPath();
+  phaseCtx.moveTo(tcX, PAD);
+  phaseCtx.lineTo(tcX, H - PAD);
+  phaseCtx.stroke();
+  phaseCtx.setLineDash([]);
+  phaseCtx.font = '8px Courier New';
+  phaseCtx.fillStyle = '#3355aa';
+  phaseCtx.fillText('T_c', tcX + 2, PAD + 10);
+
+  // Onsager curve
+  phaseCtx.strokeStyle = '#ff8833';
+  phaseCtx.lineWidth = 2;
+  phaseCtx.beginPath();
+  let first = true;
+  for (let t = 0.1; t <= 5.0; t += 0.05) {
+    const m = onsagerM(t);
+    const x = tToX(t);
+    const y = mToY(m);
+    first ? phaseCtx.moveTo(x, y) : phaseCtx.lineTo(x, y);
+    first = false;
+  }
+  phaseCtx.stroke();
+
+  // Measurements
+  phaseCtx.fillStyle = '#ff3333';
+  for (const pt of phaseMeasurements) {
+    const x = tToX(pt.T);
+    const y = mToY(pt.M);
+    phaseCtx.beginPath();
+    phaseCtx.arc(x, y, 2.5, 0, Math.PI * 2);
+    phaseCtx.fill();
+  }
+
+  // Current T marker
+  const curX = tToX(T);
+  phaseCtx.strokeStyle = '#88ffcc';
+  phaseCtx.lineWidth = 1;
+  phaseCtx.beginPath();
+  phaseCtx.moveTo(curX, PAD);
+  phaseCtx.lineTo(curX, H - PAD);
+  phaseCtx.stroke();
+}
+
+// ─────────────────────────────────────────
+// UI Updates
+// ─────────────────────────────────────────
+function updatePhaseInfo(M) {
+  const el = document.getElementById('phaseInfo');
+  const theory = onsagerM(T);
+  let phase, desc;
+  if (T < TC * 0.7) {
+    phase = 'Ferromagnetic';
+    desc = 'Spins aligned. Spontaneous magnetization.';
+  } else if (T < TC * 1.1) {
+    phase = T < TC ? 'Near Critical (↓T_c)' : 'Near Critical (↑T_c)';
+    desc = 'Long-range fluctuations. Power-law correlations.';
+  } else {
+    phase = 'Paramagnetic';
+    desc = 'Thermal disorder. No net magnetization.';
+  }
+  el.innerHTML = `
+    <b style="color:#aaccff">${phase}</b><br>
+    <span style="color:#667">${desc}</span><br><br>
+    T/T_c = ${(T / TC).toFixed(3)}<br>
+    |M| sim = ${M.toFixed(4)}<br>
+    |M| theory = ${theory.toFixed(4)}<br>
+    Δ|M| = ${Math.abs(M - theory).toFixed(4)}
+  `;
+}
+
+// ─────────────────────────────────────────
+// Controls
+// ─────────────────────────────────────────
+function setTemp(t) {
+  T = t;
+  document.getElementById('tempSlider').value = t;
+  document.getElementById('tempVal').textContent = 'T = ' + t.toFixed(3);
+  buildExpTable();
+  ['btnOrd','btnCrit','btnDis'].forEach(id => document.getElementById(id).classList.remove('active'));
+  if (t === 1.5) document.getElementById('btnOrd').classList.add('active');
+  if (t === 2.269) document.getElementById('btnCrit').classList.add('active');
+  if (t === 4.0) document.getElementById('btnDis').classList.add('active');
+}
+function setColor(idx) {
+  colorScheme = idx;
+  ['c0','c1','c2','c3'].forEach((id, i) => {
+    document.getElementById(id).classList.toggle('active', i === idx);
+  });
+}
+
+document.getElementById('tempSlider').addEventListener('input', (e) => {
+  T = parseFloat(e.target.value);
+  document.getElementById('tempVal').textContent = 'T = ' + T.toFixed(3);
+  buildExpTable();
+  ['btnOrd','btnCrit','btnDis'].forEach(id => document.getElementById(id).classList.remove('active'));
+});
+document.getElementById('speedSlider').addEventListener('input', (e) => {
+  sweepsPerFrame = parseInt(e.target.value);
+  document.getElementById('speedVal').textContent = sweepsPerFrame + ' sweeps';
+});
+
+// Canvas painting
+let isPainting = false;
+let paintVal = 1;
+mainCanvas.addEventListener('mousedown', (e) => {
+  isPainting = true;
+  paintVal = e.button === 2 ? -1 : 1;
+  paintAt(e);
+});
+mainCanvas.addEventListener('mousemove', (e) => { if (isPainting) paintAt(e); });
+mainCanvas.addEventListener('mouseup', () => isPainting = false);
+mainCanvas.addEventListener('mouseleave', () => isPainting = false);
+mainCanvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+function paintAt(e) {
+  const rect = mainCanvas.getBoundingClientRect();
+  const scaleX = N / rect.width;
+  const scaleY = N / rect.height;
+  const cx = Math.floor((e.clientX - rect.left) * scaleX);
+  const cy = Math.floor((e.clientY - rect.top) * scaleY);
+  const R = 8;
+  for (let dy = -R; dy <= R; dy++) {
+    for (let dx = -R; dx <= R; dx++) {
+      if (dx*dx + dy*dy <= R*R) {
+        const x = (cx + dx + N) % N;
+        const y = (cy + dy + N) % N;
+        spins[y * N + x] = paintVal;
       }
     }
   }
-  ctx.putImageData(imageData, 0, 0);
 }
 
-function drawGraph() {
-  const gw = gCanvas.width, gh = gCanvas.height;
-  gCtx.fillStyle = 'rgba(0,0,0,0.9)';
-  gCtx.fillRect(0, 0, gw, gh);
-  gCtx.strokeStyle = '#333';
-  gCtx.lineWidth = 1;
-  gCtx.strokeRect(0, 0, gw, gh);
+// ─────────────────────────────────────────
+// Main loop
+// ─────────────────────────────────────────
+function loop(now) {
+  const dt = now - lastFrameTime;
+  fps = 1000 / dt;
+  lastFrameTime = now;
 
-  // Axes
-  gCtx.fillStyle = '#555';
-  gCtx.font = '9px Courier New';
-  gCtx.fillText('|M| vs T', 4, 12);
-  gCtx.fillText('0', 4, gh - 4);
-  gCtx.fillText('1', 4, 20);
-  gCtx.fillText('0.5', gw/2 - 6, gh - 4);
-  gCtx.fillText('5', gw - 12, gh - 4);
+  // Do sweeps
+  for (let s = 0; s < sweepsPerFrame; s++) metropolisSweep();
 
-  // Tc line
-  const tcX = ((2.269 - 0.5) / 4.5) * (gw - 20) + 10;
-  gCtx.strokeStyle = '#f5a52466';
-  gCtx.setLineDash([3, 3]);
-  gCtx.beginPath();
-  gCtx.moveTo(tcX, 0); gCtx.lineTo(tcX, gh);
-  gCtx.stroke();
-  gCtx.setLineDash([]);
+  // Measure
+  const M = measureMagnetization();
+  accumM += M;
+  accumCount++;
 
-  // Points
-  if (graphPoints.length > 1) {
-    gCtx.strokeStyle = '#f5a524';
-    gCtx.lineWidth = 1.5;
-    gCtx.beginPath();
-    for (let i = 0; i < graphPoints.length; i++) {
-      const pt = graphPoints[i];
-      const px = ((pt.t - 0.5) / 4.5) * (gw - 20) + 10;
-      const py = (1 - Math.abs(pt.m)) * (gh - 20) + 10;
-      if (i === 0) gCtx.moveTo(px, py);
-      else gCtx.lineTo(px, py);
+  // Update history & render
+  drawMagHistory(M);
+  renderGrid();
+  drawPhaseDiagram();
+  updatePhaseInfo(M);
+
+  // Stats
+  document.getElementById('statM').textContent = M.toFixed(4);
+  document.getElementById('statFPS').textContent = fps.toFixed(1);
+  document.getElementById('statSweep').textContent = totalSweeps.toLocaleString();
+
+  // Measure energy every ~5 frames
+  if (totalSweeps % (sweepsPerFrame * 5) < sweepsPerFrame) {
+    document.getElementById('statE').textContent = measureEnergy().toFixed(4);
+  }
+
+  // Phase diagram measurement every 1 second
+  if (now - lastMeasureTime > 1000) {
+    if (accumCount > 0) {
+      const avgM = accumM / accumCount;
+      phaseMeasurements.push({ T, M: avgM });
+      if (phaseMeasurements.length > 100) phaseMeasurements.shift();
     }
-    gCtx.stroke();
+    accumM = 0; accumCount = 0;
+    lastMeasureTime = now;
   }
 
-  // Current point
-  const cx = ((T - 0.5) / 4.5) * (gw - 20) + 10;
-  const cy = (1 - Math.abs(magnetization)) * (gh - 20) + 10;
-  gCtx.fillStyle = '#fff';
-  gCtx.beginPath();
-  gCtx.arc(cx, cy, 3, 0, Math.PI * 2);
-  gCtx.fill();
-}
-
-function updateStats() {
-  magnetization = computeMagnetization();
-  document.getElementById('mag-val').textContent = magnetization.toFixed(3);
-  document.getElementById('t-disp').textContent = T.toFixed(3);
-
-  // Track for graph
-  const existing = graphPoints.find(p => Math.abs(p.t - T) < 0.05);
-  if (!existing) {
-    graphPoints.push({ t: T, m: magnetization });
-    graphPoints.sort((a, b) => a.t - b.t);
-    if (graphPoints.length > 200) graphPoints.shift();
-  } else {
-    existing.m = existing.m * 0.9 + magnetization * 0.1;
-  }
-}
-
-let frameCount = 0;
-function loop() {
-  const stepsPerFrame = speed * N * N / 10;
-  metropolisStep(stepsPerFrame);
-  drawSpins();
-  frameCount++;
-  if (frameCount % 5 === 0) {
-    updateStats();
-    drawGraph();
-  }
   requestAnimationFrame(loop);
 }
 
-// Controls
-document.getElementById('temp-slider').addEventListener('input', function() {
-  T = parseFloat(this.value);
-  document.getElementById('t-val').textContent = T.toFixed(3);
-});
-document.getElementById('speed-slider').addEventListener('input', function() {
-  speed = parseInt(this.value);
-  document.getElementById('sp-val').textContent = speed;
-});
-
-window.addEventListener('resize', () => { resize(); initImageData(); });
-resize();
-initImageData();
-initSpins();
-loop();
+// ─────────────────────────────────────────
+// Start
+// ─────────────────────────────────────────
+buildExpTable();
+initRandom();
+requestAnimationFrame(loop);
 </script>
 </body>
 </html>

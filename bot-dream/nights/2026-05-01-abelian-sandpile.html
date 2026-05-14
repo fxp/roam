@@ -3,200 +3,576 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Night 4 · 阿贝尔沙堆</title>
+<title>阿贝尔沙堆模型 — 自组织临界性</title>
 <style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { background: #080c10; overflow: hidden; font-family: monospace; color: #ccc; }
-canvas { display: block; }
-#ui {
-  position: fixed; top: 12px; left: 12px;
-  font-size: 11px; line-height: 1.6; color: #4df;
-  text-shadow: 0 0 8px #4df;
-  pointer-events: none;
-}
-#stats {
-  position: fixed; top: 12px; right: 12px;
-  font-size: 11px; line-height: 1.8; color: #4df;
-  text-align: right; text-shadow: 0 0 6px #4df;
-  pointer-events: none;
-}
-#controls {
-  position: fixed; top: 80px; right: 12px;
-  display: flex; flex-direction: column; gap: 6px; align-items: flex-end;
-}
-.ctrl-btn {
-  background: rgba(0,60,90,0.3); border: 1px solid #4df;
-  color: #4df; padding: 4px 10px; font-family: monospace;
-  font-size: 11px; cursor: pointer; border-radius: 3px;
-  transition: all 0.2s;
-}
-.ctrl-btn:hover { background: rgba(0,120,180,0.4); color: #fff; }
-#caption {
-  position: fixed; bottom: 0; left: 0; right: 0;
-  text-align: center; padding: 10px 20px 14px;
-  font-family: 'PingFang SC', 'Noto Sans SC', sans-serif;
-  font-size: 12px; line-height: 1.7; color: #aaa;
-  background: linear-gradient(transparent, rgba(0,0,0,0.85));
-  pointer-events: none;
-}
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0a;
+    color: #e0e0e0;
+    font-family: 'Courier New', monospace;
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+  }
+  #left-panel {
+    width: 260px;
+    min-width: 260px;
+    background: #111318;
+    border-right: 1px solid #222;
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+    gap: 14px;
+    overflow-y: auto;
+  }
+  #canvas-area {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #0a0a0a;
+    position: relative;
+  }
+  canvas { image-rendering: pixelated; cursor: crosshair; }
+  h1 {
+    font-size: 13px;
+    color: #f5d020;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    border-bottom: 1px solid #f5d02033;
+    padding-bottom: 8px;
+  }
+  .section-title {
+    font-size: 10px;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 4px;
+  }
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    padding: 3px 0;
+  }
+  .stat-label { color: #888; }
+  .stat-value { color: #f5d020; font-weight: bold; }
+  .stat-value.active { color: #ff4444; animation: pulse 0.5s infinite alternate; }
+  @keyframes pulse { from { opacity: 1; } to { opacity: 0.5; } }
+  button {
+    background: #1a1a2e;
+    border: 1px solid #f5d02055;
+    color: #f5d020;
+    padding: 8px 12px;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.15s;
+    text-align: center;
+    width: 100%;
+  }
+  button:hover { background: #f5d02022; border-color: #f5d020; }
+  button:active { background: #f5d02044; }
+  button.running { background: #c84b1e33; border-color: #c84b1e; color: #ff8866; }
+  input[type=range] {
+    width: 100%;
+    accent-color: #f5d020;
+    cursor: pointer;
+  }
+  select {
+    width: 100%;
+    background: #1a1a2e;
+    border: 1px solid #333;
+    color: #e0e0e0;
+    padding: 6px;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  #chart-canvas {
+    width: 100%;
+    height: 80px;
+    background: #0d0d14;
+    border: 1px solid #222;
+    border-radius: 4px;
+  }
+  .legend {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    font-size: 10px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+  #status-bar {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #111318cc;
+    border: 1px solid #333;
+    padding: 5px 14px;
+    font-size: 11px;
+    border-radius: 20px;
+    color: #888;
+    white-space: nowrap;
+    backdrop-filter: blur(4px);
+  }
+  #zoom-info {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: #111318cc;
+    border: 1px solid #333;
+    padding: 4px 10px;
+    font-size: 10px;
+    border-radius: 12px;
+    color: #555;
+  }
+  .add-group { display: flex; gap: 6px; }
+  .add-group button { flex: 1; font-size: 10px; padding: 6px 4px; }
+  .range-row { display: flex; justify-content: space-between; font-size: 10px; color: #555; margin-top: 2px; }
 </style>
 </head>
 <body>
-<canvas id="c"></canvas>
-<div id="ui">
-  <div>▓ NIGHT LAB · N04</div>
-  <div>2026-05-01</div>
-  <div style="color:#888">阿贝尔沙堆模型</div>
+
+<div id="left-panel">
+  <h1>沙堆模型</h1>
+  <div style="font-size:10px;color:#555;line-height:1.5">
+    自组织临界性 (SOC)<br>
+    规则：h≥4 时崩塌，邻格各+1
+  </div>
+
+  <div>
+    <div class="section-title">加沙量</div>
+    <select id="sand-amount">
+      <option value="100">100 粒</option>
+      <option value="1000" selected>1,000 粒</option>
+      <option value="10000">10,000 粒</option>
+      <option value="100000">100,000 粒</option>
+    </select>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:6px">
+    <button id="btn-add">向中心倒沙 ▶</button>
+    <div class="add-group">
+      <button id="btn-add-x10" style="font-size:9px">×10 连投</button>
+      <button id="btn-reset" style="border-color:#c84b1e55;color:#c84b1e">重置</button>
+    </div>
+  </div>
+
+  <div>
+    <div class="section-title">渲染速度</div>
+    <input type="range" id="speed-slider" min="1" max="4" step="1" value="2">
+    <div class="range-row">
+      <span>慢</span><span id="speed-label">中速</span><span>极速</span>
+    </div>
+  </div>
+
+  <div>
+    <div class="section-title">统计</div>
+    <div class="stat-row"><span class="stat-label">总沙粒</span><span class="stat-value" id="stat-total">0</span></div>
+    <div class="stat-row"><span class="stat-label">活跃格点</span><span class="stat-value" id="stat-active">0</span></div>
+    <div class="stat-row"><span class="stat-label">稳定格点</span><span class="stat-value" id="stat-stable">0</span></div>
+    <div class="stat-row"><span class="stat-label">本轮崩塌</span><span class="stat-value" id="stat-topples">0</span></div>
+    <div class="stat-row"><span class="stat-label">最大崩塌</span><span class="stat-value" id="stat-max-avalanche">0</span></div>
+    <div class="stat-row"><span class="stat-label">总轮次</span><span class="stat-value" id="stat-rounds">0</span></div>
+  </div>
+
+  <div>
+    <div class="section-title">崩塌大小分布（对数坐标）</div>
+    <canvas id="chart-canvas"></canvas>
+    <div style="font-size:9px;color:#444;margin-top:3px;text-align:center">幂律分布 P(s) ~ s^(-τ)</div>
+  </div>
+
+  <div>
+    <div class="section-title">颜色图例</div>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#0a0a0a;border:1px solid #333"></div><span>0 粒</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#2d1b4e"></div><span>1 粒</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#1a3a6b"></div><span>2 粒</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#c84b1e"></div><span>3 粒</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f5d020"></div><span>崩塌中</span></div>
+    </div>
+  </div>
 </div>
-<div id="stats">
-  <div>粒子: <span id="grains">0</span></div>
-  <div>崩塌: <span id="avalanches">0</span></div>
+
+<div id="canvas-area">
+  <canvas id="main-canvas"></canvas>
+  <div id="status-bar">就绪 — 点击"倒沙"开始</div>
+  <div id="zoom-info">301×301</div>
 </div>
-<div id="controls">
-  <button class="ctrl-btn" onclick="resetSandpile()">重置</button>
-  <button class="ctrl-btn" onclick="toggleSpeed()" id="speed-btn">快速模式</button>
-</div>
-<div id="caption">「规则只有一条：超过四粒就崩向四个邻居。数百万次崩塌之后，这个完美的圆和圆里繁复的分形图案自己长了出来。这就是"自组织"。」</div>
 
 <script>
-const canvas = document.getElementById('c');
-const ctx = canvas.getContext('2d');
+const N = 301;
+const CX = 150, CY = 150;
 
-const N = 400;
-let grid = new Int32Array(N * N);
-let totalGrains = 0;
-let totalAvalanches = 0;
-let fastMode = false;
-let imageData;
-let imgArr;
-let dirty = true;
-
-// Colors: 0=black, 1=navy, 2=royal blue, 3=cyan
+// Colors as Uint32 (ABGR in little-endian)
 const COLORS = [
-  [8, 12, 16],      // 0 - near black
-  [10, 30, 90],     // 1 - navy
-  [30, 80, 200],    // 2 - royal blue
-  [0, 210, 255],    // 3 - cyan
+  0xff0a0a0a, // 0: black
+  0xff4e1b2d, // 1: dark purple (ABGR)
+  0xff6b3a1a, // 2: dark blue
+  0xff1e4bc8, // 3: orange-red
+  0xff20d0f5, // 4+: bright yellow (active)
 ];
 
-function idx(x, y) { return y * N + x; }
+// Grid
+let grid = new Int32Array(N * N);
+let renderBuf = new Uint8ClampedArray(N * N * 4);
+let imageData;
 
-function resetSandpile() {
-  grid = new Int32Array(N * N);
-  totalGrains = 0;
-  totalAvalanches = 0;
-  dirty = true;
-  updateStats();
+// Stats
+let totalSand = 0;
+let rounds = 0;
+let maxAvalanche = 0;
+let avalancheSizes = [];
+let avalancheHist = new Map();
+let isRunning = false;
+let animFrameId = null;
+let pendingBatch = 0;
+let currentTopples = 0;
+
+const speedLevels = [
+  { label: '慢速', batchSize: 500 },
+  { label: '中速', batchSize: 5000 },
+  { label: '快速', batchSize: 50000 },
+  { label: '极速', batchSize: 500000 },
+];
+
+const mainCanvas = document.getElementById('main-canvas');
+const ctx = mainCanvas.getContext('2d');
+const chartCanvas = document.getElementById('chart-canvas');
+const chartCtx = chartCanvas.getContext('2d');
+
+function initCanvas() {
+  const area = document.getElementById('canvas-area');
+  const size = Math.min(area.clientWidth - 20, area.clientHeight - 60);
+  const displaySize = Math.floor(size / N) * N;
+  const pixelSize = Math.max(1, Math.floor(size / N));
+  mainCanvas.width = N;
+  mainCanvas.height = N;
+  mainCanvas.style.width = (N * pixelSize) + 'px';
+  mainCanvas.style.height = (N * pixelSize) + 'px';
+  imageData = ctx.createImageData(N, N);
+  document.getElementById('zoom-info').textContent = `${N}×${N} | ${pixelSize}px/格`;
 }
 
-function toggleSpeed() {
-  fastMode = !fastMode;
-  document.getElementById('speed-btn').textContent = fastMode ? '普通模式' : '快速模式';
+function colorToRGBA(c) {
+  // c is 0xAARRGGBB
+  return [
+    (c >> 16) & 0xff,
+    (c >> 8) & 0xff,
+    c & 0xff,
+    (c >> 24) & 0xff,
+  ];
 }
 
-function dropGrain(cx, cy, n) {
-  for (let i = 0; i < n; i++) {
-    grid[idx(cx, cy)]++;
-    totalGrains++;
-  }
-}
+const COLOR_TABLE = [
+  [10, 10, 10, 255],    // 0
+  [45, 27, 78, 255],    // 1
+  [26, 58, 107, 255],   // 2
+  [200, 75, 30, 255],   // 3
+  [245, 208, 32, 255],  // 4+ active
+];
 
-function topple() {
-  let avalanche = false;
-  const toProcess = [];
-  // find all unstable
-  for (let y = 1; y < N-1; y++) {
-    for (let x = 1; x < N-1; x++) {
-      if (grid[idx(x,y)] >= 4) toProcess.push([x,y]);
-    }
-  }
-  if (toProcess.length === 0) return false;
-
-  for (const [x, y] of toProcess) {
-    if (grid[idx(x,y)] >= 4) {
-      const n = Math.floor(grid[idx(x,y)] / 4);
-      grid[idx(x,y)] -= 4 * n;
-      grid[idx(x+1,y)] += n;
-      grid[idx(x-1,y)] += n;
-      grid[idx(x,y+1)] += n;
-      grid[idx(x,y-1)] += n;
-      // boundary: lose grains at edges
-      if (x+1 >= N-1) grid[idx(x+1,y)] = Math.min(grid[idx(x+1,y)], 3);
-      if (x-1 <= 0)   grid[idx(x-1,y)] = Math.min(grid[idx(x-1,y)], 3);
-      if (y+1 >= N-1) grid[idx(x,y+1)] = Math.min(grid[idx(x,y+1)], 3);
-      if (y-1 <= 0)   grid[idx(x,y-1)] = Math.min(grid[idx(x,y-1)], 3);
-      totalAvalanches++;
-      avalanche = true;
-    }
-  }
-  dirty = true;
-  return avalanche;
-}
-
-function updateStats() {
-  document.getElementById('grains').textContent = totalGrains.toLocaleString();
-  document.getElementById('avalanches').textContent = totalAvalanches.toLocaleString();
-}
-
-function renderGrid() {
-  if (!dirty) return;
-  dirty = false;
-  const W = canvas.width, H = canvas.height;
-  const scaleX = N / W, scaleY = N / H;
-  const data = imgArr;
-
-  for (let py = 0; py < H; py++) {
-    for (let px = 0; px < W; px++) {
-      const gx = Math.min(N-1, Math.floor(px * scaleX));
-      const gy = Math.min(N-1, Math.floor(py * scaleY));
-      const v = Math.min(3, grid[gy * N + gx]);
-      const c = COLORS[v];
-      const pi = (py * W + px) * 4;
-      data[pi] = c[0]; data[pi+1] = c[1]; data[pi+2] = c[2]; data[pi+3] = 255;
-    }
+function renderFull() {
+  const d = imageData.data;
+  for (let i = 0; i < N * N; i++) {
+    const h = grid[i];
+    const ci = Math.min(h, 4);
+    const c = COLOR_TABLE[ci];
+    const p = i * 4;
+    d[p]   = c[0];
+    d[p+1] = c[1];
+    d[p+2] = c[2];
+    d[p+3] = 255;
   }
   ctx.putImageData(imageData, 0, 0);
 }
 
-const cx = Math.floor(N / 2), cy = Math.floor(N / 2);
-let frameCount = 0;
-let stabilized = false;
+function renderPartial(changedCells) {
+  const d = imageData.data;
+  for (const i of changedCells) {
+    const h = grid[i];
+    const ci = Math.min(h, 4);
+    const c = COLOR_TABLE[ci];
+    const p = i * 4;
+    d[p]   = c[0];
+    d[p+1] = c[1];
+    d[p+2] = c[2];
+    d[p+3] = 255;
+  }
+  ctx.putImageData(imageData, 0, 0);
+}
 
-function loop() {
-  const iters = fastMode ? 200 : 10;
-
-  // drop a batch of grains
-  dropGrain(cx, cy, iters);
-
-  // topple until stable
-  let maxTopples = fastMode ? 2000 : 200;
-  for (let i = 0; i < maxTopples; i++) {
-    if (!topple()) { stabilized = true; break; }
-    stabilized = false;
+function stabilize(maxTopples) {
+  // Returns [topplesDone, stable]
+  // Use queue-based BFS toppling
+  const unstable = [];
+  // Find all unstable
+  for (let i = 0; i < N * N; i++) {
+    if (grid[i] >= 4) unstable.push(i);
   }
 
-  if (frameCount % 3 === 0) {
-    renderGrid();
+  let done = 0;
+  const changed = new Set();
+  const queue = unstable;
+  let head = 0;
+  const inQueue = new Uint8Array(N * N);
+  for (const i of queue) inQueue[i] = 1;
+
+  while (head < queue.length && done < maxTopples) {
+    const idx = queue[head++];
+    inQueue[idx] = 0;
+    const h = grid[idx];
+    if (h < 4) continue;
+    const k = (h / 4) | 0;
+    const fires = k * 4;
+    grid[idx] -= fires;
+    done += k;
+    changed.add(idx);
+
+    const row = (idx / N) | 0;
+    const col = idx % N;
+
+    const neighbors = [
+      row > 0     ? idx - N : -1,
+      row < N - 1 ? idx + N : -1,
+      col > 0     ? idx - 1 : -1,
+      col < N - 1 ? idx + 1 : -1,
+    ];
+
+    for (const nb of neighbors) {
+      if (nb === -1) continue; // sand falls off edge
+      grid[nb] += k;
+      changed.add(nb);
+      if (grid[nb] >= 4 && !inQueue[nb]) {
+        inQueue[nb] = 1;
+        queue.push(nb);
+      }
+    }
+  }
+
+  const stable = head >= queue.length;
+  return { done, stable, changed };
+}
+
+function updateStats() {
+  let total = 0, active = 0;
+  for (let i = 0; i < N * N; i++) {
+    total += grid[i];
+    if (grid[i] >= 4) active++;
+  }
+  totalSand = total;
+  document.getElementById('stat-total').textContent = total.toLocaleString();
+  document.getElementById('stat-active').textContent = active.toLocaleString();
+  document.getElementById('stat-stable').textContent = (N*N - active).toLocaleString();
+  document.getElementById('stat-topples').textContent = currentTopples.toLocaleString();
+  document.getElementById('stat-max-avalanche').textContent = maxAvalanche.toLocaleString();
+  document.getElementById('stat-rounds').textContent = rounds.toLocaleString();
+}
+
+function drawChart() {
+  const W = chartCanvas.offsetWidth;
+  const H = chartCanvas.offsetHeight;
+  chartCanvas.width = W;
+  chartCanvas.height = H;
+  const c = chartCtx;
+  c.fillStyle = '#0d0d14';
+  c.fillRect(0, 0, W, H);
+
+  if (avalancheHist.size < 3) return;
+
+  // Log-log plot
+  const keys = Array.from(avalancheHist.keys()).sort((a, b) => a - b);
+  const maxKey = Math.max(...keys);
+  const maxVal = Math.max(...avalancheHist.values());
+  const minKey = Math.max(1, Math.min(...keys));
+
+  const lx = v => (Math.log(v) - Math.log(minKey)) / (Math.log(maxKey) - Math.log(minKey)) * (W - 20) + 10;
+  const ly = v => H - 10 - (Math.log(v) / Math.log(maxVal)) * (H - 20);
+
+  c.strokeStyle = '#f5d02055';
+  c.lineWidth = 1;
+  c.beginPath();
+  c.moveTo(10, H - 10);
+  c.lineTo(W - 10, H - 10);
+  c.moveTo(10, H - 10);
+  c.lineTo(10, 10);
+  c.stroke();
+
+  c.strokeStyle = '#f5d020';
+  c.lineWidth = 1.5;
+  c.beginPath();
+  let first = true;
+  for (const k of keys) {
+    const x = lx(k);
+    const y = ly(avalancheHist.get(k));
+    if (first) { c.moveTo(x, y); first = false; }
+    else c.lineTo(x, y);
+  }
+  c.stroke();
+
+  // Draw dots
+  c.fillStyle = '#f5d020';
+  for (const k of keys) {
+    c.beginPath();
+    c.arc(lx(k), ly(avalancheHist.get(k)), 2, 0, Math.PI * 2);
+    c.fill();
+  }
+
+  c.fillStyle = '#444';
+  c.font = '9px Courier New';
+  c.fillText('崩塌大小 →', W - 60, H - 2);
+  c.save();
+  c.translate(4, H / 2);
+  c.rotate(-Math.PI / 2);
+  c.fillText('频次', -15, 0);
+  c.restore();
+}
+
+let animQueue = [];
+let animRunning = false;
+
+function addSand(amount) {
+  grid[CY * N + CX] += amount;
+  totalSand += amount;
+}
+
+function runAnimation(amount) {
+  if (isRunning) return;
+  isRunning = true;
+  addSand(amount);
+  currentTopples = 0;
+  const startTopples = 0;
+  document.getElementById('btn-add').classList.add('running');
+  document.getElementById('btn-add').textContent = '稳定中...';
+  document.getElementById('status-bar').textContent = '崩塌中...';
+
+  const speedIdx = parseInt(document.getElementById('speed-slider').value) - 1;
+  const batchSize = speedLevels[speedIdx].batchSize;
+
+  let avalancheSize = 0;
+
+  function step() {
+    const { done, stable, changed } = stabilize(batchSize);
+    avalancheSize += done;
+    currentTopples += done;
+
+    renderPartial(changed);
     updateStats();
+
+    if (stable) {
+      // Record avalanche
+      if (avalancheSize > 0) {
+        if (avalancheSize > maxAvalanche) maxAvalanche = avalancheSize;
+        // Bucket into powers of 2
+        const bucket = Math.pow(2, Math.round(Math.log2(avalancheSize)));
+        avalancheHist.set(bucket, (avalancheHist.get(bucket) || 0) + 1);
+        avalancheSizes.push(avalancheSize);
+      }
+      rounds++;
+      isRunning = false;
+      document.getElementById('btn-add').classList.remove('running');
+      document.getElementById('btn-add').textContent = '向中心倒沙 ▶';
+      document.getElementById('status-bar').textContent = `第 ${rounds} 轮稳定，崩塌 ${avalancheSize.toLocaleString()} 次`;
+      updateStats();
+      drawChart();
+    } else {
+      animFrameId = requestAnimationFrame(step);
+    }
   }
-  frameCount++;
-  requestAnimationFrame(loop);
+  animFrameId = requestAnimationFrame(step);
 }
 
-function resize() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-  imageData = ctx.createImageData(canvas.width, canvas.height);
-  imgArr = imageData.data;
-  dirty = true;
+function resetAll() {
+  if (animFrameId) cancelAnimationFrame(animFrameId);
+  isRunning = false;
+  grid = new Int32Array(N * N);
+  totalSand = 0;
+  rounds = 0;
+  maxAvalanche = 0;
+  currentTopples = 0;
+  avalancheSizes = [];
+  avalancheHist = new Map();
+  renderFull();
+  updateStats();
+  drawChart();
+  document.getElementById('btn-add').classList.remove('running');
+  document.getElementById('btn-add').textContent = '向中心倒沙 ▶';
+  document.getElementById('status-bar').textContent = '已重置';
 }
 
-resize();
-window.addEventListener('resize', () => { resize(); });
+document.getElementById('btn-add').addEventListener('click', () => {
+  if (isRunning) return;
+  const amt = parseInt(document.getElementById('sand-amount').value);
+  runAnimation(amt);
+});
 
-// seed initial pile
-dropGrain(cx, cy, 65536);
-loop();
+document.getElementById('btn-add-x10').addEventListener('click', async () => {
+  if (isRunning) return;
+  const amt = parseInt(document.getElementById('sand-amount').value);
+  for (let i = 0; i < 10; i++) {
+    if (isRunning) {
+      await new Promise(r => {
+        const check = () => { if (!isRunning) r(); else setTimeout(check, 50); };
+        check();
+      });
+    }
+    runAnimation(amt);
+  }
+});
+
+document.getElementById('btn-reset').addEventListener('click', resetAll);
+
+document.getElementById('speed-slider').addEventListener('input', function() {
+  const idx = parseInt(this.value) - 1;
+  document.getElementById('speed-label').textContent = speedLevels[idx].label;
+});
+
+// Canvas click to add sand at click position
+mainCanvas.addEventListener('click', (e) => {
+  if (isRunning) return;
+  const rect = mainCanvas.getBoundingClientRect();
+  const scaleX = N / rect.width;
+  const scaleY = N / rect.height;
+  const x = Math.floor((e.clientX - rect.left) * scaleX);
+  const y = Math.floor((e.clientY - rect.top) * scaleY);
+  if (x >= 0 && x < N && y >= 0 && y < N) {
+    const amt = parseInt(document.getElementById('sand-amount').value);
+    grid[y * N + x] += amt;
+    totalSand += amt;
+    runAnimation(0); // run stabilization with 0 new (already added)
+  }
+});
+
+// Wait for layout then init
+window.addEventListener('load', () => {
+  initCanvas();
+  renderFull();
+  updateStats();
+  drawChart();
+  // Resize handling
+  window.addEventListener('resize', () => {
+    initCanvas();
+    renderFull();
+  });
+  // Initial chart canvas size
+  const cc = document.getElementById('chart-canvas');
+  cc.width = cc.offsetWidth;
+  cc.height = cc.offsetHeight;
+});
 </script>
 </body>
 </html>

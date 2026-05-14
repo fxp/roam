@@ -1,252 +1,496 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Night 2 · 元胞自动机</title>
+<title>Wolfram 256 初等元胞自动机</title>
 <style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { background: #080c10; overflow: hidden; font-family: monospace; color: #ccc; }
-canvas { display: block; }
-#ui {
-  position: fixed; top: 12px; left: 12px;
-  font-size: 11px; line-height: 1.6; color: #a8f;
-  text-shadow: 0 0 8px #a8f;
-  pointer-events: none;
-}
-#grid-canvas {
-  position: fixed; top: 0; left: 0;
-  cursor: pointer;
-}
-#fullscreen-overlay {
-  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-  background: #080c10;
-  display: none; flex-direction: column; align-items: center;
-}
-#full-canvas { display: block; }
-#full-label {
-  position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
-  font-size: 13px; color: #a8f; text-shadow: 0 0 10px #a8f;
-  font-family: monospace;
-}
-#close-btn {
-  position: fixed; top: 12px; right: 16px;
-  background: rgba(100,60,180,0.3); border: 1px solid #a8f;
-  color: #a8f; padding: 4px 12px; font-family: monospace;
-  font-size: 12px; cursor: pointer; border-radius: 3px;
-}
-#close-btn:hover { background: rgba(140,80,220,0.5); }
-#caption {
-  position: fixed; bottom: 0; left: 0; right: 0;
-  text-align: center; padding: 10px 20px 14px;
-  font-family: 'PingFang SC', 'Noto Sans SC', sans-serif;
-  font-size: 12px; line-height: 1.7; color: #aaa;
-  background: linear-gradient(transparent, rgba(0,0,0,0.85));
-  pointer-events: none; z-index: 10;
-}
-#hint {
-  position: fixed; bottom: 64px; left: 0; right: 0;
-  text-align: center; font-size: 11px; color: #555;
-  pointer-events: none;
-}
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #08080f;
+    --surface: #0e0e1a;
+    --surface2: #131320;
+    --border: #1a1a2e;
+    --text: #b8c0d8;
+    --text-dim: #5a6070;
+    --accent: #5566cc;
+    --c1: #2244aa; /* Class I - blue */
+    --c2: #228844; /* Class II - green */
+    --c3: #aa2222; /* Class III - red */
+    --c4: #aa8800; /* Class IV - gold */
+  }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+  }
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 24px;
+  }
+  header h1 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #c0c8e8;
+    margin-bottom: 6px;
+  }
+  .intro {
+    font-size: 12.5px;
+    color: var(--text-dim);
+    line-height: 1.7;
+    max-width: 800px;
+  }
+  .class-legend {
+    display: flex;
+    gap: 16px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+  }
+  .class-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11.5px;
+    color: var(--text-dim);
+  }
+  .class-dot {
+    width: 10px; height: 10px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+  #gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, 80px);
+    gap: 6px;
+    padding: 16px;
+    justify-content: start;
+  }
+  .rule-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer;
+    transition: transform 0.12s;
+  }
+  .rule-card:hover { transform: scale(1.08); }
+  .rule-canvas {
+    border: 2px solid #222;
+    border-radius: 3px;
+    image-rendering: pixelated;
+    display: block;
+  }
+  .rule-label {
+    font-size: 9.5px;
+    color: var(--text-dim);
+    margin-top: 3px;
+    text-align: center;
+    font-family: monospace;
+  }
+
+  /* Modal */
+  #modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+  #modal-overlay.open {
+    opacity: 1;
+    pointer-events: all;
+  }
+  #modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 22px;
+    max-width: 520px;
+    width: 90vw;
+    max-height: 90vh;
+    overflow-y: auto;
+    position: relative;
+  }
+  #modal-close {
+    position: absolute;
+    top: 14px; right: 14px;
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 20px;
+    cursor: pointer;
+    line-height: 1;
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+  #modal-close:hover { background: #1e1e30; color: var(--text); }
+  #modal h2 {
+    font-size: 20px;
+    color: #c8d0f0;
+    margin-bottom: 4px;
+  }
+  #modal .class-badge {
+    display: inline-block;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 3px;
+    margin-bottom: 14px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+  }
+  #modal-truth-table {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 4px;
+    margin-bottom: 14px;
+  }
+  .tt-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+  }
+  .tt-pattern {
+    display: flex;
+    gap: 1px;
+  }
+  .tt-cell {
+    width: 10px; height: 10px;
+    border-radius: 1px;
+  }
+  .tt-cell.on { background: #c0c8ff; }
+  .tt-cell.off { background: #1e1e2e; border: 1px solid #2a2a3a; }
+  .tt-arrow {
+    font-size: 9px;
+    color: #445;
+  }
+  .tt-result {
+    width: 14px; height: 14px;
+    border-radius: 2px;
+  }
+  .tt-result.on { background: #c0c8ff; }
+  .tt-result.off { background: #1e1e2e; border: 1px solid #2a2a3a; }
+  .tt-bit {
+    font-size: 8px;
+    color: #445;
+    font-family: monospace;
+  }
+
+  #modal-init-btns {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .init-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+  .init-btn:hover { border-color: var(--accent); color: var(--text); }
+  .init-btn.active { background: #1a1a3a; border-color: var(--accent); color: #aab0ff; }
+
+  #modal-big-canvas {
+    display: block;
+    image-rendering: pixelated;
+    width: 100%;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: #000;
+  }
+
+  .binary-display {
+    font-family: monospace;
+    font-size: 12px;
+    color: #7788aa;
+    margin-bottom: 12px;
+  }
+  .binary-display .bit-1 { color: #aab0ff; }
+  .binary-display .bit-0 { color: #334; }
 </style>
 </head>
 <body>
-<canvas id="grid-canvas"></canvas>
-<div id="ui">
-  <div>▓ NIGHT LAB · N02</div>
-  <div>2026-04-28</div>
-  <div style="color:#888">元胞自动机 · 256规则</div>
-</div>
-<div id="hint">点击任意规则查看全屏演化</div>
 
-<div id="fullscreen-overlay">
-  <canvas id="full-canvas"></canvas>
-  <div id="full-label">Rule 0</div>
-  <button id="close-btn" onclick="closeFullscreen()">✕ 关闭</button>
-</div>
+<header>
+  <h1>Wolfram 256 初等元胞自动机 (Elementary Cellular Automata)</h1>
+  <p class="intro">
+    每条规则定义一个一维二进制自动机：当前格的新状态由 <em>左邻、自身、右邻</em> 三格的 8 种组合决定。
+    256 条规则（0–255）涵盖了所有可能的本地更新函数。Wolfram 将其分为四类：
+    均匀稳定（I）、周期重复（II）、混沌随机（III）、复杂边缘（IV）。
+    规则 110 已被证明是图灵完备的。
+  </p>
+  <div class="class-legend">
+    <div class="class-item"><div class="class-dot" style="background:#2244aa;border:2px solid #4466cc"></div>Class I &nbsp;均匀/稳定</div>
+    <div class="class-item"><div class="class-dot" style="background:#228844;border:2px solid #44aa66"></div>Class II 周期/规则</div>
+    <div class="class-item"><div class="class-dot" style="background:#aa2222;border:2px solid #cc4444"></div>Class III 混沌/随机</div>
+    <div class="class-item"><div class="class-dot" style="background:#aa8800;border:2px solid #ccaa00"></div>Class IV 复杂/边缘（含图灵完备）</div>
+  </div>
+</header>
 
-<div id="caption">「Wolfram 用 256 条规则证明了：极简的规则可以产生极复杂的行为。Rule 110 是图灵完备的——理论上可以运行任意程序。」</div>
+<div id="gallery"></div>
+
+<!-- Modal -->
+<div id="modal-overlay">
+  <div id="modal">
+    <button id="modal-close">×</button>
+    <h2 id="modal-title">Rule 30</h2>
+    <div id="modal-badge" class="class-badge"></div>
+    <div id="modal-binary" class="binary-display"></div>
+    <div id="modal-truth-table"></div>
+    <div id="modal-init-btns">
+      <button class="init-btn active" data-ic="center">单点中心</button>
+      <button class="init-btn" data-ic="random">随机</button>
+      <button class="init-btn" data-ic="alt">交替</button>
+    </div>
+    <canvas id="modal-big-canvas" width="400" height="200"></canvas>
+  </div>
+</div>
 
 <script>
-const gridCanvas = document.getElementById('grid-canvas');
-const gridCtx = gridCanvas.getContext('2d');
-const fullCanvas = document.getElementById('full-canvas');
-const fullCtx = fullCanvas.getContext('2d');
-const overlay = document.getElementById('fullscreen-overlay');
-const fullLabel = document.getElementById('full-label');
+(function() {
+  const THUMB_W = 60, THUMB_H = 40;
+  const GRID_W = 60, GRID_H = 40;
+  const BIG_W = 200, BIG_H = 150;
 
-const THUMB = 40;
-const COLS = 16;
-const ROWS = 16;
-const MINI = 32;
-let currentRule = -1;
-let fullAnim = null;
-let fullRows = [];
+  // Class assignments
+  const CLASS_I_RULES = new Set([0,8,32,40,128,136,160,168,255,4,2,10,34,42,130,138,162,170,
+    64,72,96,104,192,200,224,232,16,24,48,56,144,152,176,184]);
+  const CLASS_III_RULES = new Set([18,22,30,45,54,60,73,75,82,83,86,89,90,91,94,
+    105,109,110,120,121,124,126,146,150,153,154,166,167,169,
+    180,181,182,183,210,218,225]);
+  const CLASS_IV_RULES = new Set([54,110,137,193]);
 
-// Colors per rule - map to hue based on rule number
-function ruleColor(rule) {
-  const hue = (rule * 1.4) % 360;
-  return `hsl(${hue}, 80%, 65%)`;
-}
+  function classifyRule(ruleNum) {
+    if (CLASS_IV_RULES.has(ruleNum)) return 4;
+    if (CLASS_III_RULES.has(ruleNum)) return 3;
+    if (CLASS_I_RULES.has(ruleNum)) return 1;
 
-function applyRule(rule, left, center, right) {
-  const pattern = (left << 2) | (center << 1) | right;
-  return (rule >> pattern) & 1;
-}
-
-function computeRow(rule, prev) {
-  const n = prev.length;
-  const next = new Uint8Array(n);
-  for (let i = 0; i < n; i++) {
-    const l = prev[(i - 1 + n) % n];
-    const c = prev[i];
-    const r = prev[(i + 1) % n];
-    next[i] = applyRule(rule, l, c, r);
-  }
-  return next;
-}
-
-function drawThumbnail(rule) {
-  const col = rule % COLS;
-  const row = Math.floor(rule / COLS);
-  const ox = col * (THUMB + 2) + 2;
-  const oy = row * (THUMB + 2) + 40;
-
-  const cells = MINI;
-  const rows = MINI;
-  let state = new Uint8Array(cells);
-  state[Math.floor(cells / 2)] = 1;
-
-  const color = ruleColor(rule);
-  gridCtx.fillStyle = '#080c10';
-  gridCtx.fillRect(ox, oy, THUMB, THUMB);
-
-  const cellW = THUMB / cells;
-  const cellH = THUMB / rows;
-
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cells; c++) {
-      if (state[c]) {
-        gridCtx.fillStyle = color;
-        gridCtx.fillRect(ox + c * cellW, oy + r * cellH, Math.max(1, cellW), Math.max(1, cellH));
+    // Dynamic classification: run 200 steps, check final row density & entropy
+    const W = 60;
+    let row = new Uint8Array(W);
+    row[Math.floor(W/2)] = 1;
+    for (let step = 0; step < 200; step++) {
+      const next = new Uint8Array(W);
+      for (let x = 0; x < W; x++) {
+        const l = row[(x - 1 + W) % W];
+        const c = row[x];
+        const r = row[(x + 1) % W];
+        const pattern = (l << 2) | (c << 1) | r;
+        next[x] = (ruleNum >> pattern) & 1;
       }
+      row = next;
     }
-    state = computeRow(rule, state);
+    const density = row.reduce((s, v) => s + v, 0) / W;
+    // Shannon entropy of runs
+    let entropy = 0;
+    const p = density;
+    if (p > 0 && p < 1) {
+      entropy = -(p * Math.log2(p) + (1-p) * Math.log2(1-p));
+    }
+    if (density === 0 || density === 1) return 1;
+    if (entropy < 0.3) return 2;
+    if (entropy > 0.9) return 3;
+    return 2;
   }
 
-  // rule number label
-  gridCtx.fillStyle = 'rgba(0,0,0,0.5)';
-  gridCtx.fillRect(ox, oy + THUMB - 12, THUMB, 12);
-  gridCtx.fillStyle = color;
-  gridCtx.font = '8px monospace';
-  gridCtx.textAlign = 'center';
-  gridCtx.fillText(rule, ox + THUMB / 2, oy + THUMB - 3);
-}
+  const classColors = {
+    1: { border: '#2244aa', glow: '#4466cc', label: 'Class I — 均匀/稳定', bg: 'rgba(34,68,170,0.15)' },
+    2: { border: '#228844', glow: '#44aa66', label: 'Class II — 周期/规则', bg: 'rgba(34,136,68,0.15)' },
+    3: { border: '#aa2222', glow: '#cc4444', label: 'Class III — 混沌', bg: 'rgba(170,34,34,0.15)' },
+    4: { border: '#aa8800', glow: '#ccaa00', label: 'Class IV — 复杂/图灵完备', bg: 'rgba(170,136,0,0.2)' },
+  };
 
-function drawGrid() {
-  gridCtx.fillStyle = '#080c10';
-  gridCtx.fillRect(0, 0, gridCanvas.width, gridCanvas.height);
-
-  // header
-  gridCtx.fillStyle = '#a8f';
-  gridCtx.font = '11px monospace';
-  gridCtx.textAlign = 'left';
-  gridCtx.fillText('256 ELEMENTARY CELLULAR AUTOMATA — click to expand', 12, 28);
-
-  for (let r = 0; r < 256; r++) {
-    drawThumbnail(r);
-  }
-}
-
-function openFullscreen(rule) {
-  currentRule = rule;
-  fullLabel.textContent = `Rule ${rule}  ·  点击空白处关闭`;
-  overlay.style.display = 'flex';
-
-  fullCanvas.width = window.innerWidth;
-  fullCanvas.height = window.innerHeight;
-  fullCtx.fillStyle = '#080c10';
-  fullCtx.fillRect(0, 0, fullCanvas.width, fullCanvas.height);
-
-  const cols = Math.floor(fullCanvas.width / 3);
-  const cellW = fullCanvas.width / cols;
-  const cellH = 3;
-  const color = ruleColor(rule);
-
-  fullRows = [];
-  let state = new Uint8Array(cols);
-  // random start for more interesting patterns
-  if (rule === 110 || rule === 30 || rule === 90 || rule === 45) {
-    state[Math.floor(cols / 2)] = 1;
-  } else {
-    for (let i = 0; i < cols; i++) state[i] = Math.random() > 0.5 ? 1 : 0;
-  }
-  fullRows.push(state);
-
-  let rowIdx = 0;
-  if (fullAnim) cancelAnimationFrame(fullAnim);
-
-  function draw() {
-    if (currentRule !== rule) return;
-    const batchSize = 8;
-    for (let b = 0; b < batchSize; b++) {
-      const y = rowIdx * cellH;
-      if (y > fullCanvas.height) {
-        rowIdx = 0;
-        fullCtx.fillStyle = '#080c10';
-        fullCtx.fillRect(0, 0, fullCanvas.width, fullCanvas.height);
+  function evolveRule(ruleNum, W, steps, initType) {
+    const grid = [];
+    const row0 = new Uint8Array(W);
+    if (initType === 'center') {
+      row0[Math.floor(W/2)] = 1;
+    } else if (initType === 'random') {
+      for (let x = 0; x < W; x++) row0[x] = Math.random() > 0.5 ? 1 : 0;
+    } else if (initType === 'alt') {
+      for (let x = 0; x < W; x++) row0[x] = x % 2;
+    }
+    grid.push(row0);
+    for (let step = 1; step < steps; step++) {
+      const prev = grid[step-1];
+      const next = new Uint8Array(W);
+      for (let x = 0; x < W; x++) {
+        const l = prev[(x - 1 + W) % W];
+        const c = prev[x];
+        const r = prev[(x + 1) % W];
+        const pattern = (l << 2) | (c << 1) | r;
+        next[x] = (ruleNum >> pattern) & 1;
       }
-      const s = fullRows[fullRows.length - 1];
-      const ns = computeRow(rule, s);
-      fullRows.push(ns);
-      if (fullRows.length > 200) fullRows.shift();
-      for (let c = 0; c < cols; c++) {
-        if (ns[c]) {
-          fullCtx.fillStyle = color;
-          fullCtx.fillRect(c * cellW, y, Math.max(1, cellW - 0.3), cellH);
+      grid.push(next);
+    }
+    return grid;
+  }
+
+  function drawToCanvas(canvas, grid, W, H) {
+    const ctx = canvas.getContext('2d');
+    const cellW = canvas.width / W;
+    const cellH = canvas.height / H;
+    ctx.fillStyle = '#050510';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#c0c8ff';
+    for (let y = 0; y < H && y < grid.length; y++) {
+      for (let x = 0; x < W; x++) {
+        if (grid[y][x]) {
+          ctx.fillRect(Math.round(x * cellW), Math.round(y * cellH),
+                       Math.max(1, Math.floor(cellW)), Math.max(1, Math.floor(cellH)));
         }
       }
-      rowIdx++;
     }
-    fullAnim = requestAnimationFrame(draw);
   }
-  draw();
-}
 
-function closeFullscreen() {
-  currentRule = -1;
-  overlay.style.display = 'none';
-  if (fullAnim) { cancelAnimationFrame(fullAnim); fullAnim = null; }
-}
+  // Build gallery
+  const gallery = document.getElementById('gallery');
+  const ruleClasses = new Array(256);
 
-gridCanvas.addEventListener('click', (e) => {
-  const rect = gridCanvas.getBoundingClientRect();
-  const mx = e.clientX - rect.left;
-  const my = e.clientY - rect.top;
-  const col = Math.floor((mx - 2) / (THUMB + 2));
-  const row = Math.floor((my - 40) / (THUMB + 2));
-  if (col >= 0 && col < COLS && row >= 0 && row < ROWS) {
-    const rule = row * COLS + col;
-    openFullscreen(rule);
+  for (let ruleNum = 0; ruleNum < 256; ruleNum++) {
+    ruleClasses[ruleNum] = classifyRule(ruleNum);
   }
-});
 
-overlay.addEventListener('click', (e) => {
-  if (e.target === overlay || e.target === fullCanvas) closeFullscreen();
-});
+  for (let ruleNum = 0; ruleNum < 256; ruleNum++) {
+    const cls = ruleClasses[ruleNum];
+    const cc = classColors[cls];
 
-function resize() {
-  gridCanvas.width = window.innerWidth;
-  gridCanvas.height = window.innerHeight;
-  drawGrid();
-  if (overlay.style.display === 'flex' && currentRule >= 0) {
-    openFullscreen(currentRule);
+    const card = document.createElement('div');
+    card.className = 'rule-card';
+
+    const cv = document.createElement('canvas');
+    cv.className = 'rule-canvas';
+    cv.width = THUMB_W;
+    cv.height = THUMB_H;
+    cv.style.border = `2px solid ${cc.border}`;
+    cv.style.boxShadow = `0 0 6px ${cc.border}44`;
+
+    const grid = evolveRule(ruleNum, GRID_W, GRID_H, 'center');
+    drawToCanvas(cv, grid, GRID_W, GRID_H);
+
+    const label = document.createElement('div');
+    label.className = 'rule-label';
+    label.textContent = ruleNum;
+
+    card.appendChild(cv);
+    card.appendChild(label);
+    card.addEventListener('click', () => openModal(ruleNum));
+    gallery.appendChild(card);
   }
-}
 
-resize();
-window.addEventListener('resize', resize);
+  // Modal
+  const overlay = document.getElementById('modal-overlay');
+  const modalTitle = document.getElementById('modal-title');
+  const modalBadge = document.getElementById('modal-badge');
+  const modalBinary = document.getElementById('modal-binary');
+  const modalTT = document.getElementById('modal-truth-table');
+  const modalBigCanvas = document.getElementById('modal-big-canvas');
+  let currentRule = 30;
+  let currentIC = 'center';
+
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) closeModal();
+  });
+
+  document.getElementById('modal-init-btns').querySelectorAll('.init-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.init-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentIC = btn.dataset.ic;
+      renderBigCanvas(currentRule, currentIC);
+    });
+  });
+
+  function closeModal() {
+    overlay.classList.remove('open');
+  }
+
+  function openModal(ruleNum) {
+    currentRule = ruleNum;
+    currentIC = 'center';
+    document.querySelectorAll('.init-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.ic === 'center');
+    });
+
+    const cls = ruleClasses[ruleNum];
+    const cc = classColors[cls];
+
+    modalTitle.textContent = `规则 ${ruleNum}`;
+    modalBadge.textContent = cc.label;
+    modalBadge.style.background = cc.bg;
+    modalBadge.style.border = `1px solid ${cc.border}`;
+    modalBadge.style.color = cc.glow;
+
+    // Binary display
+    const bin = ruleNum.toString(2).padStart(8, '0');
+    modalBinary.innerHTML = '二进制 ' +
+      bin.split('').map(b => `<span class="bit-${b}">${b}</span>`).join('') +
+      ` &nbsp;= ${ruleNum}`;
+
+    // Truth table
+    modalTT.innerHTML = '';
+    // Display from pattern 7 down to 0 (111 to 000)
+    for (let p = 7; p >= 0; p--) {
+      const col = document.createElement('div');
+      col.className = 'tt-col';
+
+      const patt = document.createElement('div');
+      patt.className = 'tt-pattern';
+      for (let b = 2; b >= 0; b--) {
+        const cell = document.createElement('div');
+        cell.className = 'tt-cell ' + (((p >> b) & 1) ? 'on' : 'off');
+        patt.appendChild(cell);
+      }
+
+      const arrow = document.createElement('div');
+      arrow.className = 'tt-arrow';
+      arrow.textContent = '↓';
+
+      const result = document.createElement('div');
+      const outBit = (ruleNum >> p) & 1;
+      result.className = 'tt-result ' + (outBit ? 'on' : 'off');
+
+      const bitLabel = document.createElement('div');
+      bitLabel.className = 'tt-bit';
+      bitLabel.textContent = p;
+
+      col.appendChild(patt);
+      col.appendChild(arrow);
+      col.appendChild(result);
+      col.appendChild(bitLabel);
+      modalTT.appendChild(col);
+    }
+
+    renderBigCanvas(ruleNum, 'center');
+    overlay.classList.add('open');
+  }
+
+  function renderBigCanvas(ruleNum, ic) {
+    const W = BIG_W, H = BIG_H;
+    modalBigCanvas.width = W * 2; // 2x for retina
+    modalBigCanvas.height = H * 2;
+    modalBigCanvas.style.width = '100%';
+    const grid = evolveRule(ruleNum, W, H, ic);
+    drawToCanvas(modalBigCanvas, grid, W, H);
+  }
+
+  // Keyboard close
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeModal();
+  });
+
+})();
 </script>
 </body>
 </html>

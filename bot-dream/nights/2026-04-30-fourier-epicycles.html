@@ -1,418 +1,633 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Night 6 · 傅里叶本轮</title>
+<title>Fourier Epicycles — Arbitrary Curve Decomposition</title>
 <style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { background: #0a0a0a; overflow: hidden; font-family: monospace; color: #ccc; }
-canvas { display: block; cursor: crosshair; }
-#ui {
-  position: fixed; top: 12px; left: 12px;
-  font-size: 11px; line-height: 1.6; color: #fc8;
-  text-shadow: 0 0 8px #fc8;
-  pointer-events: none;
-}
-#controls {
-  position: fixed; top: 12px; right: 12px;
-  display: flex; flex-direction: column; gap: 6px; align-items: flex-end;
-}
-.mode-btn {
-  background: rgba(80,50,0,0.3); border: 1px solid #fc8;
-  color: #fc8; padding: 4px 10px; font-family: monospace;
-  font-size: 11px; cursor: pointer; border-radius: 3px;
-  transition: all 0.2s;
-}
-.mode-btn:hover, .mode-btn.active { background: rgba(160,100,0,0.45); color: #fff; }
-.shape-btn {
-  background: rgba(60,40,0,0.25); border: 1px solid #a86;
-  color: #c9a; padding: 3px 8px; font-family: monospace;
-  font-size: 10px; cursor: pointer; border-radius: 3px;
-  transition: all 0.2s;
-}
-.shape-btn:hover, .shape-btn.active { background: rgba(120,80,0,0.4); color: #fff; border-color: #fc8; }
-.slider-row {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 10px; color: #888;
-}
-input[type=range] {
-  width: 90px; accent-color: #fc8;
-}
-#draw-hint {
-  position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
-  font-size: 14px; color: #444; pointer-events: none; text-align: center;
-  line-height: 2;
-}
-#caption {
-  position: fixed; bottom: 0; left: 0; right: 0;
-  text-align: center; padding: 10px 20px 14px;
-  font-family: 'PingFang SC', 'Noto Sans SC', sans-serif;
-  font-size: 12px; line-height: 1.7; color: #aaa;
-  background: linear-gradient(transparent, rgba(0,0,0,0.85));
-  pointer-events: none;
-}
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #08080f;
+    color: #c0d0e0;
+    font-family: 'Courier New', monospace;
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+    user-select: none;
+  }
+  #sidebar {
+    width: 170px;
+    background: #0c0c18;
+    border-right: 1px solid #1a2030;
+    padding: 12px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    overflow-y: auto;
+    flex-shrink: 0;
+  }
+  #sidebar h3 {
+    font-size: 10px;
+    color: #3a5070;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 2px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #1a2030;
+  }
+  .shape-btn {
+    background: #111220;
+    border: 1px solid #1e2a38;
+    color: #8aabb8;
+    padding: 7px 10px;
+    cursor: pointer;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    text-align: left;
+    transition: all 0.15s;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .shape-btn:hover {
+    background: #182030;
+    border-color: #2a507a;
+    color: #aaccdd;
+  }
+  .shape-btn.active {
+    background: #0d2035;
+    border-color: #2a7aaa;
+    color: #4af;
+    box-shadow: 0 0 8px #0a4a7a44;
+  }
+  #drawBtn {
+    background: #180d25;
+    border: 1px solid #3a1a5a;
+    color: #aa7add;
+  }
+  #drawBtn:hover {
+    background: #240f35;
+    border-color: #6a3a9a;
+    color: #cc99ff;
+  }
+  #drawBtn.active {
+    background: #1a0830;
+    border-color: #8a3acc;
+    color: #cc77ff;
+    box-shadow: 0 0 10px #5a1aaa44;
+  }
+  #right-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  #top-bar {
+    background: #0c0c18;
+    border-bottom: 1px solid #1a2030;
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-shrink: 0;
+  }
+  #shape-title {
+    font-size: 16px;
+    font-weight: bold;
+    color: #4af;
+    min-width: 180px;
+  }
+  #epi-info {
+    font-size: 11px;
+    color: #4a6a7a;
+    flex: 1;
+  }
+  #canvas-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #080810;
+    position: relative;
+  }
+  #mainCanvas {
+    display: block;
+    cursor: default;
+  }
+  #mainCanvas.draw-mode {
+    cursor: crosshair;
+  }
+  #draw-hint {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1a0830cc;
+    border: 1px solid #6a3a9a;
+    color: #cc99ff;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    display: none;
+    pointer-events: none;
+  }
+  #controls {
+    background: #0c0c18;
+    border-top: 1px solid #1a2030;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+  .ctrl-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .ctrl-label {
+    font-size: 11px;
+    color: #5a7a8a;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    white-space: nowrap;
+  }
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 120px;
+    height: 4px;
+    background: #1a2a3a;
+    border-radius: 2px;
+    outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #2a7aaa;
+    cursor: pointer;
+  }
+  .ctrl-val {
+    font-size: 12px;
+    color: #4af;
+    min-width: 36px;
+    text-align: left;
+  }
+  #toggleCircles {
+    background: #121a2a;
+    border: 1px solid #2a4a6a;
+    color: #7abacc;
+    padding: 5px 12px;
+    cursor: pointer;
+    border-radius: 3px;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    transition: all 0.15s;
+  }
+  #toggleCircles:hover {
+    background: #1a2a3a;
+    border-color: #3a7aaa;
+    color: #4af;
+  }
 </style>
 </head>
 <body>
-<canvas id="c"></canvas>
-<div id="ui">
-  <div>▓ NIGHT LAB · N06</div>
-  <div>2026-04-30</div>
-  <div style="color:#888" id="mode-label">傅里叶本轮</div>
+<div id="sidebar">
+  <h3>Shapes</h3>
+  <button class="shape-btn active" data-shape="heart">❤ Heart</button>
+  <button class="shape-btn" data-shape="pi">π Letter Pi</button>
+  <button class="shape-btn" data-shape="star">★ Star (5-point)</button>
+  <button class="shape-btn" data-shape="butterfly">⋈ Butterfly</button>
+  <button class="shape-btn" data-shape="lissajous">∞ Lissajous 3:2</button>
+  <button class="shape-btn" data-shape="rose">✿ Rose (k=3)</button>
+  <button class="shape-btn" data-shape="smiley">☺ Smiley</button>
+  <button class="shape-btn" data-shape="spiral">@ Archimedean</button>
+  <div style="margin-top:8px; border-top:1px solid #1a2030; padding-top:8px;">
+    <h3>Custom</h3>
+  </div>
+  <button class="shape-btn" id="drawBtn" data-shape="draw">✏ Freehand</button>
 </div>
-<div id="controls">
-  <button class="mode-btn active" onclick="setMode('preset',this)">预设形状</button>
-  <button class="mode-btn" onclick="setMode('draw',this)">手绘模式</button>
-  <button class="mode-btn" onclick="setMode('auto',this)">自动循环</button>
-  <div id="shape-btns" style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
-    <button class="shape-btn active" onclick="setShape('square',this)">正方形</button>
-    <button class="shape-btn" onclick="setShape('heart',this)">心形</button>
-    <button class="shape-btn" onclick="setShape('star',this)">星形</button>
-    <button class="shape-btn" onclick="setShape('pi',this)">Pi 符号</button>
+<div id="right-panel">
+  <div id="top-bar">
+    <div id="shape-title">Heart Curve</div>
+    <div id="epi-info">DFT decomposed into <span id="epiTotal">256</span> epicycles · showing <span id="epiShown">128</span></div>
   </div>
-  <div class="slider-row">
-    <span>圆环数</span>
-    <input type="range" id="n-slider" min="5" max="200" value="60" oninput="updateN(this.value)">
-    <span id="n-val">60</span>
+  <div id="canvas-wrap">
+    <canvas id="mainCanvas" width="700" height="540"></canvas>
+    <div id="draw-hint">Draw your shape! Release to transform.</div>
   </div>
-  <div class="slider-row">
-    <span>速度</span>
-    <input type="range" id="speed-slider" min="1" max="10" value="3" oninput="updateSpeed(this.value)">
-    <span id="speed-val">3</span>
+  <div id="controls">
+    <div class="ctrl-group">
+      <span class="ctrl-label">Epicycles</span>
+      <input type="range" id="epicycleSlider" min="1" max="256" value="128" step="1">
+      <span class="ctrl-val" id="epiVal">128</span>
+    </div>
+    <div class="ctrl-group">
+      <span class="ctrl-label">Speed</span>
+      <input type="range" id="speedSlider" min="1" max="60" value="10" step="1">
+      <span class="ctrl-val" id="speedVal">1.0x</span>
+    </div>
+    <button id="toggleCircles">Hide Circles</button>
   </div>
 </div>
-<div id="draw-hint" style="display:none">在画布上绘制任意曲线<br><span style="font-size:11px;color:#333">松开鼠标后开始重建</span></div>
-<div id="caption">「古希腊人用"本轮叠本轮"来解释行星轨迹；傅里叶说任何曲线都可以被旋转圆的叠加精确描述。在交互版里你可以手绘一条线，然后看着旋转圆组合把它重新画出来。」</div>
 
 <script>
-const canvas = document.getElementById('c');
+const CW = 700, CH = 540;
+const N = 256;
+const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
 
-let mode = 'preset';
-let currentShape = 'square';
-let numCircles = 60;
-let speed = 3;
-let fourier = [];
-let path = [];
-let time = 0;
+let showCircles = true;
+let t = 0;
+let speed = 10;
+let numEpicycles = 128;
 let animId = null;
+let drawMode = false;
 let isDrawing = false;
 let drawPoints = [];
-let autoShapes = ['square','heart','star','pi'];
-let autoIdx = 0;
-let autoTimer = 0;
+let currentShape = 'heart';
+
+// Precomputed shape points and DFT coefficients
+let shapePts = [];
+let dftCoeffs = [];
+let trailPts = [];
 
 // ---- Shape generators ----
-function makeSquare(n) {
+function sampleShape(name) {
   const pts = [];
-  for (let i = 0; i < n; i++) {
-    const t = i / n;
-    const angle = t * Math.PI * 2;
-    // parametric square
-    const a = Math.cos(angle), b = Math.sin(angle);
-    const r = 1 / Math.max(Math.abs(a), Math.abs(b));
-    pts.push({ x: r * a * 160, y: r * b * 160 });
-  }
-  return pts;
-}
-
-function makeHeart(n) {
-  const pts = [];
-  for (let i = 0; i < n; i++) {
-    const t = i / n * Math.PI * 2;
-    const x = 160 * (16 * Math.pow(Math.sin(t), 3)) / 16;
-    const y = -160 * (13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t)) / 13;
-    pts.push({ x, y });
-  }
-  return pts;
-}
-
-function makeStar(n) {
-  const pts = [];
-  const spikes = 5;
-  for (let i = 0; i < n; i++) {
-    const t = i / n * Math.PI * 2;
-    const angle = t;
-    const frac = (t % (Math.PI * 2 / spikes)) / (Math.PI * 2 / spikes);
-    const r = frac < 0.5
-      ? 80 + 80 * (frac * 2)
-      : 160 - 80 * ((frac - 0.5) * 2);
-    pts.push({ x: r * Math.cos(angle - Math.PI/2), y: r * Math.sin(angle - Math.PI/2) });
-  }
-  return pts;
-}
-
-function makePi(n) {
-  // approximate π symbol as a polyline
-  const segs = [
-    // top bar
-    ...Array.from({length:20},(_,i)=>({x:-90+i*9, y:-80})),
-    // left leg
-    ...Array.from({length:20},(_,i)=>({x:-60, y:-80+i*8})),
-    // right leg - curved
-    ...Array.from({length:20},(_,i)=>{
-      const t = i/19; const a = t*Math.PI;
-      return {x: 30+Math.sin(a)*30, y: -80+t*160};
-    }),
-    // small arch right leg bottom
-    ...Array.from({length:10},(_,i)=>{
-      const t = i/9; const a = Math.PI+t*Math.PI;
-      return {x: 50+Math.cos(a)*20, y: 80+Math.sin(a)*15};
-    }),
-  ];
-  // resample to n points
-  const total = segs.length;
-  const pts = [];
-  for (let i = 0; i < n; i++) {
-    const idx = Math.floor(i / n * total);
-    pts.push(segs[idx] || segs[total-1]);
-  }
-  return pts;
-}
-
-function getShapePoints(shape) {
-  const n = 512;
-  switch(shape) {
-    case 'square': return makeSquare(n);
-    case 'heart':  return makeHeart(n);
-    case 'star':   return makeStar(n);
-    case 'pi':     return makePi(n);
-    default:       return makeSquare(n);
-  }
-}
-
-// ---- DFT ----
-function dft(points) {
-  const N = points.length;
-  const result = [];
-  for (let k = 0; k < N; k++) {
-    let re = 0, im = 0;
-    for (let n = 0; n < N; n++) {
-      const phi = (2 * Math.PI * k * n) / N;
-      re += points[n].x * Math.cos(phi) + points[n].y * Math.sin(phi);
-      im += -points[n].x * Math.sin(phi) + points[n].y * Math.cos(phi);
+  if (name === 'heart') {
+    for (let i = 0; i < N; i++) {
+      const t = 2*Math.PI*i/N;
+      const x = 16*Math.pow(Math.sin(t),3);
+      const y = -(13*Math.cos(t) - 5*Math.cos(2*t) - 2*Math.cos(3*t) - Math.cos(4*t));
+      pts.push([x*12, y*12]);
     }
-    re /= N; im /= N;
-    const amp = Math.sqrt(re*re + im*im);
-    const phase = Math.atan2(im, re);
-    result.push({ re, im, amp, phase, freq: k });
-  }
-  result.sort((a, b) => b.amp - a.amp);
-  return result;
-}
-
-function computeFourier(pts) {
-  // downsample for speed
-  const MAX = 512;
-  let sampled = pts;
-  if (pts.length > MAX) {
-    sampled = [];
-    for (let i = 0; i < MAX; i++) {
-      sampled.push(pts[Math.floor(i * pts.length / MAX)]);
-    }
-  }
-  fourier = dft(sampled);
-  path = [];
-  time = 0;
-}
-
-function setShape(shape, btn) {
-  currentShape = shape;
-  document.querySelectorAll('.shape-btn').forEach(b => b.classList.remove('active'));
-  if (btn) btn.classList.add('active');
-  const pts = getShapePoints(shape);
-  computeFourier(pts);
-}
-
-function setMode(m, btn) {
-  mode = m;
-  document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  document.getElementById('shape-btns').style.display = m === 'preset' ? 'flex' : 'none';
-  document.getElementById('draw-hint').style.display = m === 'draw' ? 'block' : 'none';
-  document.getElementById('mode-label').textContent = m === 'draw' ? '手绘重建' : m === 'auto' ? '自动循环' : '傅里叶本轮';
-  if (m === 'preset') setShape(currentShape, null);
-  if (m === 'auto') { autoIdx = 0; setShape(autoShapes[0], null); }
-  path = []; time = 0;
-}
-
-function updateN(v) {
-  numCircles = parseInt(v);
-  document.getElementById('n-val').textContent = v;
-}
-function updateSpeed(v) {
-  speed = parseInt(v);
-  document.getElementById('speed-val').textContent = v;
-}
-
-// ---- Drawing ----
-function startUserDraw(e) {
-  if (mode !== 'draw') return;
-  isDrawing = true;
-  drawPoints = [];
-  path = [];
-  fourier = [];
-  document.getElementById('draw-hint').style.display = 'none';
-  const r = canvas.getBoundingClientRect();
-  const x = (e.touches ? e.touches[0].clientX : e.clientX) - r.left - canvas.width/2;
-  const y = (e.touches ? e.touches[0].clientY : e.clientY) - r.top - canvas.height/2;
-  drawPoints.push({x, y});
-}
-function continueUserDraw(e) {
-  if (!isDrawing || mode !== 'draw') return;
-  const r = canvas.getBoundingClientRect();
-  const x = (e.touches ? e.touches[0].clientX : e.clientX) - r.left - canvas.width/2;
-  const y = (e.touches ? e.touches[0].clientY : e.clientY) - r.top - canvas.height/2;
-  drawPoints.push({x, y});
-}
-function endUserDraw() {
-  if (!isDrawing) return;
-  isDrawing = false;
-  if (drawPoints.length > 10) computeFourier(drawPoints);
-}
-
-canvas.addEventListener('mousedown', startUserDraw);
-canvas.addEventListener('mousemove', continueUserDraw);
-canvas.addEventListener('mouseup', endUserDraw);
-canvas.addEventListener('touchstart', e => { e.preventDefault(); startUserDraw(e); }, {passive:false});
-canvas.addEventListener('touchmove', e => { e.preventDefault(); continueUserDraw(e); }, {passive:false});
-canvas.addEventListener('touchend', endUserDraw);
-
-// ---- Rendering ----
-function drawEpicycles(cx, cy, t, circles) {
-  let x = cx, y = cy;
-  const N = Math.min(numCircles, circles.length);
-  for (let i = 0; i < N; i++) {
-    const { amp, freq, phase } = circles[i];
-    const angle = freq * t + phase;
-    const nx = x + amp * Math.cos(angle);
-    const ny = y + amp * Math.sin(angle);
-
-    // draw circle
-    ctx.beginPath();
-    ctx.arc(x, y, amp, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(180,130,40,0.18)';
-    ctx.lineWidth = 0.7;
-    ctx.stroke();
-
-    // draw arm
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineTo(nx, ny);
-    ctx.strokeStyle = 'rgba(220,160,50,0.55)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-
-    x = nx; y = ny;
-  }
-  return { x, y };
-}
-
-let autoCounter = 0;
-function loop() {
-  const W = canvas.width, H = canvas.height;
-  ctx.fillStyle = 'rgba(10,10,10,0.25)';
-  ctx.fillRect(0, 0, W, H);
-
-  if (isDrawing && drawPoints.length > 1) {
-    // show live drawing
-    ctx.strokeStyle = 'rgba(255,200,80,0.6)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(W/2 + drawPoints[0].x, H/2 + drawPoints[0].y);
-    for (const p of drawPoints) ctx.lineTo(W/2 + p.x, H/2 + p.y);
-    ctx.stroke();
-    animId = requestAnimationFrame(loop);
-    return;
-  }
-
-  if (fourier.length === 0) {
-    animId = requestAnimationFrame(loop);
-    return;
-  }
-
-  // auto mode cycling
-  if (mode === 'auto') {
-    autoCounter++;
-    const period = Math.floor(fourier.length / Math.max(1, numCircles)) * 300 / speed;
-    if (autoCounter > period) {
-      autoCounter = 0;
-      autoIdx = (autoIdx + 1) % autoShapes.length;
-      setShape(autoShapes[autoIdx], null);
-    }
-  }
-
-  const cx = W / 2, cy = H / 2;
-  const dt = (2 * Math.PI) / fourier.length * speed * 0.5;
-
-  // draw faint target path
-  if (fourier.length > 0) {
-    // reconstruct full target path for ghost
-    ctx.beginPath();
-    ctx.strokeStyle = 'rgba(255,255,255,0.04)';
-    ctx.lineWidth = 1;
-    const steps = fourier.length;
-    for (let s = 0; s <= steps; s++) {
-      const t2 = (s / steps) * Math.PI * 2;
-      let px = 0, py = 0;
-      const N = Math.min(numCircles, fourier.length);
-      for (let i = 0; i < N; i++) {
-        const { amp, freq, phase } = fourier[i];
-        px += amp * Math.cos(freq * t2 + phase);
-        py += amp * Math.sin(freq * t2 + phase);
+  } else if (name === 'pi') {
+    // Draw a rough π shape using parametric segments
+    // Top bar: left to right, then two legs down
+    for (let i = 0; i < N; i++) {
+      const t = i / N;
+      let x, y;
+      if (t < 0.15) {
+        // top bar
+        x = -130 + (t/0.15)*260;
+        y = -80;
+      } else if (t < 0.30) {
+        // right leg going down
+        const s = (t-0.15)/0.15;
+        x = 80;
+        y = -80 + s*150;
+      } else if (t < 0.38) {
+        // right foot curve
+        const s = (t-0.30)/0.08;
+        x = 80 + s*25;
+        y = 70 + s*15;
+      } else if (t < 0.55) {
+        // back up right leg inner
+        const s = (t-0.38)/0.17;
+        x = 105 - s*60;
+        y = 85 - s*165;
+      } else if (t < 0.65) {
+        // middle gap
+        const s = (t-0.55)/0.10;
+        x = 45 - s*90;
+        y = -80;
+      } else if (t < 0.80) {
+        // left leg down
+        const s = (t-0.65)/0.15;
+        x = -45;
+        y = -80 + s*155;
+      } else if (t < 0.88) {
+        // left foot curve
+        const s = (t-0.80)/0.08;
+        x = -45 - s*25;
+        y = 75 + s*15;
+      } else if (t < 1.0) {
+        // back up left leg inner
+        const s = (t-0.88)/0.12;
+        x = -70 + s*(-60);
+        y = 90 - s*170;
       }
-      if (s === 0) ctx.moveTo(cx + px, cy + py);
-      else ctx.lineTo(cx + px, cy + py);
+      pts.push([x, y]);
     }
-    ctx.stroke();
+  } else if (name === 'star') {
+    const outerR = 160, innerR = 65;
+    for (let i = 0; i < N; i++) {
+      const angle = 2*Math.PI*i/N;
+      const spikes = 5;
+      const ratio = i / N * spikes;
+      const frac = ratio - Math.floor(ratio);
+      let r;
+      if (frac < 0.5) r = outerR + (innerR - outerR) * (frac*2);
+      else r = innerR + (outerR - innerR) * ((frac-0.5)*2);
+      pts.push([r*Math.cos(angle - Math.PI/2), r*Math.sin(angle - Math.PI/2)]);
+    }
+  } else if (name === 'butterfly') {
+    for (let i = 0; i < N; i++) {
+      const t = 2*Math.PI*i/N;
+      // butterfly curve: r = e^sin(θ) - 2cos(4θ) + sin^5((2θ-π)/24)
+      const r = Math.exp(Math.sin(t)) - 2*Math.cos(4*t) + Math.pow(Math.sin((2*t-Math.PI)/24), 5);
+      pts.push([r*Math.cos(t)*70, -r*Math.sin(t)*70]);
+    }
+  } else if (name === 'lissajous') {
+    for (let i = 0; i < N; i++) {
+      const t = 2*Math.PI*i/N;
+      const x = 180 * Math.sin(3*t + Math.PI/4);
+      const y = 180 * Math.sin(2*t);
+      pts.push([x, y]);
+    }
+  } else if (name === 'rose') {
+    for (let i = 0; i < N; i++) {
+      const t = 2*Math.PI*i/N;
+      const r = 180 * Math.cos(3*t);
+      pts.push([r*Math.cos(t), r*Math.sin(t)]);
+    }
+  } else if (name === 'smiley') {
+    // Big circle outline + eyes + smile composed in sequence
+    for (let i = 0; i < N; i++) {
+      const s = i / N;
+      let x, y;
+      if (s < 0.40) {
+        // Main face circle
+        const a = 2*Math.PI*(s/0.40);
+        x = 160*Math.cos(a - Math.PI/2);
+        y = 160*Math.sin(a - Math.PI/2);
+      } else if (s < 0.52) {
+        // Left eye
+        const a = 2*Math.PI*((s-0.40)/0.12);
+        x = -65 + 28*Math.cos(a);
+        y = -55 + 22*Math.sin(a);
+      } else if (s < 0.64) {
+        // Right eye
+        const a = 2*Math.PI*((s-0.52)/0.12);
+        x = 65 + 28*Math.cos(a);
+        y = -55 + 22*Math.sin(a);
+      } else {
+        // Smile arc
+        const a = Math.PI*0.15 + Math.PI*0.70*((s-0.64)/0.36);
+        x = 115*Math.cos(a);
+        y = 60 + 90*Math.sin(a);
+      }
+      pts.push([x, y]);
+    }
+  } else if (name === 'spiral') {
+    // Archimedean spiral r = a*θ, 3 full turns
+    const turns = 3;
+    for (let i = 0; i < N; i++) {
+      const t = 2*Math.PI*turns*i/N;
+      const r = (t/(2*Math.PI*turns))*200;
+      pts.push([r*Math.cos(t), r*Math.sin(t)]);
+    }
+  } else if (name === 'draw') {
+    return drawPoints.slice(0, N);
+  }
+  return pts;
+}
+
+function computeDFT(pts) {
+  const n = pts.length;
+  const coeffs = [];
+  for (let k = 0; k < n; k++) {
+    let re = 0, im = 0;
+    for (let j = 0; j < n; j++) {
+      const angle = -2*Math.PI*k*j/n;
+      re += pts[j][0]*Math.cos(angle) - pts[j][1]*Math.sin(angle);
+      im += pts[j][0]*Math.sin(angle) + pts[j][1]*Math.cos(angle);
+    }
+    re /= n; im /= n;
+    coeffs.push({
+      freq: k,
+      amp:  Math.sqrt(re*re + im*im),
+      phase: Math.atan2(im, re),
+      re, im
+    });
+  }
+  // Sort by amplitude descending
+  coeffs.sort((a, b) => b.amp - a.amp);
+  return coeffs;
+}
+
+// Fast DFT using direct computation (N=256 is fine)
+function loadShape(name) {
+  const raw = sampleShape(name);
+  if (!raw || raw.length < 4) return;
+  shapePts = raw;
+  // Center
+  let cx = 0, cy = 0;
+  for (const [x,y] of shapePts) { cx += x; cy += y; }
+  cx /= shapePts.length; cy /= shapePts.length;
+  shapePts = shapePts.map(([x,y]) => [x-cx, y-cy]);
+  dftCoeffs = computeDFT(shapePts);
+  trailPts = [];
+  t = 0;
+  numEpicycles = Math.min(numEpicycles, dftCoeffs.length);
+  document.getElementById('epiTotal').textContent = dftCoeffs.length;
+  document.getElementById('epiShown').textContent = numEpicycles;
+  document.getElementById('epicycleSlider').max = dftCoeffs.length;
+}
+
+function draw() {
+  ctx.clearRect(0, 0, CW, CH);
+
+  // Background
+  ctx.fillStyle = '#080810';
+  ctx.fillRect(0, 0, CW, CH);
+
+  // Center
+  const cx = CW/2, cy = CH/2;
+
+  if (dftCoeffs.length === 0) {
+    ctx.fillStyle = '#2a3a4a';
+    ctx.font = '14px Courier New';
+    ctx.textAlign = 'center';
+    ctx.fillText('Select a shape or draw one!', cx, cy);
+    return;
   }
 
-  const tip = drawEpicycles(cx, cy, time, fourier);
-  path.push({ x: tip.x, y: tip.y });
+  // Draw epicycles
+  let px = cx, py = cy;
+  const active = dftCoeffs.slice(0, numEpicycles);
 
-  // keep path to one full cycle
-  const maxLen = Math.floor(fourier.length / Math.max(0.1, speed) * 0.5);
-  if (path.length > maxLen) path.shift();
-
-  // draw traced path
-  if (path.length > 1) {
-    ctx.beginPath();
-    ctx.moveTo(path[0].x, path[0].y);
-    for (let i = 1; i < path.length; i++) {
-      const alpha = i / path.length;
-      ctx.lineTo(path[i].x, path[i].y);
+  if (showCircles) {
+    for (const c of active) {
+      const nx = px + c.amp * Math.cos(c.phase + 2*Math.PI*c.freq*t/N + Math.PI/2);
+      const ny = py + c.amp * Math.sin(c.phase + 2*Math.PI*c.freq*t/N + Math.PI/2);
+      // Draw circle
+      ctx.beginPath();
+      ctx.arc(px, py, c.amp, 0, 2*Math.PI);
+      ctx.strokeStyle = 'rgba(40,90,130,0.3)';
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+      // Draw arm
+      ctx.beginPath();
+      ctx.moveTo(px, py);
+      ctx.lineTo(nx, ny);
+      ctx.strokeStyle = 'rgba(60,130,180,0.5)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      px = nx; py = ny;
     }
-    ctx.strokeStyle = 'rgba(180,240,255,0.9)';
-    ctx.lineWidth = 1.5;
-    ctx.shadowColor = '#80dfff';
-    ctx.shadowBlur = 4;
+  } else {
+    // Just compute position without drawing
+    for (const c of active) {
+      px += c.amp * Math.cos(c.phase + 2*Math.PI*c.freq*t/N + Math.PI/2);
+      py += c.amp * Math.sin(c.phase + 2*Math.PI*c.freq*t/N + Math.PI/2);
+    }
+  }
+
+  // Trail point
+  trailPts.push([px, py]);
+  if (trailPts.length > N + 5) trailPts.shift();
+
+  // Draw trail
+  if (trailPts.length > 1) {
+    ctx.beginPath();
+    ctx.moveTo(trailPts[0][0], trailPts[0][1]);
+    for (let i = 1; i < trailPts.length; i++) {
+      ctx.lineTo(trailPts[i][0], trailPts[i][1]);
+    }
+    ctx.strokeStyle = '#22ffcc';
+    ctx.lineWidth = 1.8;
+    ctx.shadowColor = '#00ffaa';
+    ctx.shadowBlur = 6;
     ctx.stroke();
     ctx.shadowBlur = 0;
   }
 
-  // dot at tip
+  // Draw endpoint dot
   ctx.beginPath();
-  ctx.arc(tip.x, tip.y, 3, 0, Math.PI * 2);
-  ctx.fillStyle = '#fff';
+  ctx.arc(px, py, 2.5, 0, 2*Math.PI);
+  ctx.fillStyle = '#ffffff';
   ctx.fill();
+}
 
-  time += dt;
-  if (time > Math.PI * 2) { time -= Math.PI * 2; path = []; }
-
+function loop() {
+  t = (t + speed/10) % N;
+  draw();
   animId = requestAnimationFrame(loop);
 }
 
-function resize() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
+// ---- Draw mode ----
+function startDrawMode() {
+  drawMode = true;
+  canvas.classList.add('draw-mode');
+  document.getElementById('draw-hint').style.display = 'block';
+  drawPoints = [];
+  trailPts = [];
+  dftCoeffs = [];
+  ctx.clearRect(0, 0, CW, CH);
+  ctx.fillStyle = '#080810';
+  ctx.fillRect(0, 0, CW, CH);
 }
 
-resize();
-window.addEventListener('resize', () => { resize(); path = []; });
+function stopDrawMode() {
+  drawMode = false;
+  canvas.classList.remove('draw-mode');
+  document.getElementById('draw-hint').style.display = 'none';
+}
 
-// Initial
-setShape('square', document.querySelector('.shape-btn.active'));
+canvas.addEventListener('mousedown', e => {
+  if (!drawMode) return;
+  isDrawing = true;
+  drawPoints = [];
+  const r = canvas.getBoundingClientRect();
+  const x = (e.clientX - r.left) * (CW/r.width) - CW/2;
+  const y = (e.clientY - r.top)  * (CH/r.height) - CH/2;
+  drawPoints.push([x, y]);
+});
+
+canvas.addEventListener('mousemove', e => {
+  if (!drawMode || !isDrawing) return;
+  const r = canvas.getBoundingClientRect();
+  const x = (e.clientX - r.left) * (CW/r.width) - CW/2;
+  const y = (e.clientY - r.top)  * (CH/r.height) - CH/2;
+  drawPoints.push([x, y]);
+  // Preview drawing
+  ctx.clearRect(0, 0, CW, CH);
+  ctx.fillStyle = '#080810';
+  ctx.fillRect(0, 0, CW, CH);
+  if (drawPoints.length > 1) {
+    ctx.beginPath();
+    ctx.moveTo(drawPoints[0][0]+CW/2, drawPoints[0][1]+CH/2);
+    for (let i = 1; i < drawPoints.length; i++) {
+      ctx.lineTo(drawPoints[i][0]+CW/2, drawPoints[i][1]+CH/2);
+    }
+    ctx.strokeStyle = '#cc88ff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+});
+
+canvas.addEventListener('mouseup', e => {
+  if (!drawMode || !isDrawing) return;
+  isDrawing = false;
+  if (drawPoints.length < 8) return;
+  // Resample to N points
+  const total = drawPoints.length;
+  const resampled = [];
+  for (let i = 0; i < N; i++) {
+    const idx = Math.floor(i * total / N);
+    resampled.push(drawPoints[idx]);
+  }
+  drawPoints = resampled;
+  stopDrawMode();
+  currentShape = 'draw';
+  loadShape('draw');
+  document.getElementById('shape-title').textContent = 'Freehand Drawing';
+  document.getElementById('epi-info').querySelector('span:last-child').textContent = numEpicycles;
+});
+
+// Shape buttons
+document.querySelectorAll('.shape-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const shape = btn.dataset.shape;
+    document.querySelectorAll('.shape-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    if (shape === 'draw') {
+      startDrawMode();
+      return;
+    }
+    if (drawMode) stopDrawMode();
+    currentShape = shape;
+    const names = {
+      heart: 'Heart Curve',
+      pi: 'Letter π',
+      star: '5-Point Star',
+      butterfly: 'Butterfly Curve',
+      lissajous: 'Lissajous (3:2)',
+      rose: 'Rose Curve (k=3)',
+      smiley: 'Smiley Face',
+      spiral: 'Archimedean Spiral'
+    };
+    document.getElementById('shape-title').textContent = names[shape] || shape;
+    loadShape(shape);
+    document.getElementById('epiShown').textContent = numEpicycles;
+  });
+});
+
+document.getElementById('epicycleSlider').addEventListener('input', e => {
+  numEpicycles = parseInt(e.target.value);
+  document.getElementById('epiVal').textContent = numEpicycles;
+  document.getElementById('epiShown').textContent = numEpicycles;
+  trailPts = [];
+});
+
+document.getElementById('speedSlider').addEventListener('input', e => {
+  speed = parseInt(e.target.value);
+  document.getElementById('speedVal').textContent = (speed/10).toFixed(1) + 'x';
+});
+
+document.getElementById('toggleCircles').addEventListener('click', () => {
+  showCircles = !showCircles;
+  document.getElementById('toggleCircles').textContent = showCircles ? 'Hide Circles' : 'Show Circles';
+});
+
+// Init
+loadShape('heart');
 loop();
 </script>
 </body>

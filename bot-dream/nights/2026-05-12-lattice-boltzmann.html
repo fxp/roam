@@ -3,435 +3,685 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Night 15 · 格子玻尔兹曼：流体从碰撞中涌现</title>
+<title>D2Q9 格子玻尔兹曼流体模拟</title>
 <style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { background: #000; color: #fff; font-family: 'Courier New', monospace; overflow: hidden; height: 100vh; }
-
-#label {
-  position: absolute; top: 12px; left: 14px; z-index: 10;
-  font-size: 11px; color: #888; line-height: 1.6; pointer-events: none;
-}
-
-#controls {
-  position: absolute; top: 12px; right: 14px; z-index: 10;
-  display: flex; flex-direction: column; gap: 8px;
-  background: rgba(0,0,0,0.75); padding: 12px; border: 1px solid #333;
-  min-width: 230px;
-}
-.ctrl-row { display: flex; flex-direction: column; gap: 4px; }
-.ctrl-row label { font-size: 11px; color: #aaa; }
-.ctrl-row input[type=range] { width: 100%; accent-color: #06b6d4; }
-.ctrl-marks { display: flex; justify-content: space-between; font-size: 9px; color: #666; }
-.stat { font-size: 12px; color: #06b6d4; }
-.stat span { color: #fff; }
-.btn-row { display: flex; gap: 5px; flex-wrap: wrap; }
-button {
-  font-family: 'Courier New', monospace; font-size: 10px;
-  background: #111; border: 1px solid #444; color: #ccc;
-  padding: 5px 8px; cursor: pointer; border-radius: 2px;
-}
-button:hover { background: #222; border-color: #666; color: #fff; }
-button.active { background: #0c2830; border-color: #06b6d4; color: #22d3ee; }
-.sep { border-top: 1px solid #333; margin-top: 4px; padding-top: 4px; }
-#karman-label {
-  position: absolute; bottom: 90px; left: 50%; transform: translateX(-50%);
-  font-size: 11px; color: #f59e0b; pointer-events: none; z-index: 10;
-  opacity: 0; transition: opacity 0.5s;
-  font-family: 'Courier New', monospace;
-}
-#caption {
-  position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
-  font-size: 12px; color: #666; text-align: center; max-width: 720px;
-  line-height: 1.7; pointer-events: none; font-family: sans-serif; z-index: 10;
-}
-canvas { display: block; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #080810;
+    color: #c0c8d8;
+    font-family: 'Courier New', monospace;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+  #header {
+    background: #0c0c18;
+    border-bottom: 1px solid #1e2030;
+    padding: 7px 14px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+  #header h1 { font-size: 13px; color: #6090c0; font-weight: normal; letter-spacing: 0.04em; }
+  #header .sub { font-size: 11px; color: #394455; }
+  #re-display { margin-left: auto; font-size: 12px; color: #60a080; }
+  #fps-disp { font-size: 11px; color: #447055; }
+  #main { display: flex; flex: 1; overflow: hidden; }
+  #canvas-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #040408;
+    position: relative;
+    overflow: hidden;
+  }
+  #lbCanvas {
+    display: block;
+    image-rendering: pixelated;
+    cursor: crosshair;
+  }
+  #draw-mode-indicator {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 3px;
+    background: rgba(20,30,50,0.85);
+    border: 1px solid #2a3a5a;
+    color: #6090c0;
+    pointer-events: none;
+  }
+  #controls {
+    width: 220px;
+    background: #0c0c18;
+    border-left: 1px solid #1a1a28;
+    overflow-y: auto;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .ctrl-sec {
+    border: 1px solid #1a2030;
+    border-radius: 3px;
+    padding: 9px;
+  }
+  .ctrl-sec h3 {
+    font-size: 10px;
+    color: #406080;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 7px;
+    border-bottom: 1px solid #1a2030;
+    padding-bottom: 5px;
+  }
+  .btn-grp { display: flex; flex-wrap: wrap; gap: 4px; }
+  .btn {
+    background: #141424;
+    border: 1px solid #222235;
+    color: #7888a0;
+    padding: 4px 7px;
+    font-size: 10px;
+    cursor: pointer;
+    border-radius: 3px;
+    font-family: 'Courier New', monospace;
+    transition: all 0.12s;
+    white-space: nowrap;
+  }
+  .btn:hover { background: #1e2030; border-color: #3a5070; color: #9ab0c8; }
+  .btn.active { background: #162840; border-color: #4080b0; color: #70a8d8; }
+  .btn.danger { border-color: #503030; color: #907070; }
+  .btn.danger:hover { background: #1e1414; border-color: #703030; color: #c09090; }
+  .srow { display: flex; flex-direction: column; gap: 2px; margin-bottom: 7px; }
+  .srow label { font-size: 10px; color: #507080; display: flex; justify-content: space-between; }
+  .srow label span { color: #80a8c8; font-weight: bold; }
+  input[type=range] {
+    width: 100%; height: 4px; -webkit-appearance: none;
+    background: #14202c; border-radius: 2px; outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 11px; height: 11px;
+    border-radius: 50%; background: #4080a0; cursor: pointer;
+  }
+  .info-box {
+    font-size: 10px; color: #3a5060; line-height: 1.5;
+    border: 1px solid #14202c; border-radius: 3px;
+    padding: 7px; background: #060610;
+  }
+  .info-box strong { color: #5080a0; }
 </style>
 </head>
 <body>
-
-<div id="label">
-  Night 15 · 2026-05-12<br>格子玻尔兹曼 · 流体涌现
+<div id="header">
+  <h1>D2Q9 格子玻尔兹曼流体模拟</h1>
+  <span class="sub">BGK 碰撞 | 反弹边界 | Zou-He 入口</span>
+  <span id="re-display">Re = --</span>
+  <span id="fps-disp">0 fps</span>
 </div>
-
-<div id="controls">
-  <div class="ctrl-row">
-    <label>雷诺数 Re = <span id="re-val">100</span></label>
-    <input type="range" id="re-slider" min="20" max="220" step="5" value="100">
-    <div class="ctrl-marks"><span>20 层流</span><span>220 湍流</span></div>
+<div id="main">
+  <div id="canvas-wrap">
+    <canvas id="lbCanvas"></canvas>
+    <div id="draw-mode-indicator">模式: 流动</div>
   </div>
-  <div class="stat">时间步 = <span id="step-val">0</span></div>
-  <div class="btn-row sep">
-    <label style="font-size:11px;color:#888;width:100%">可视化模式</label>
-    <button id="btn-vort" class="active" onclick="setViz('vort')">涡量</button>
-    <button id="btn-speed" onclick="setViz('speed')">速度</button>
-    <button id="btn-press" onclick="setViz('press')">压力</button>
-  </div>
-  <div class="btn-row sep">
-    <button onclick="resetLBM()">重置流场</button>
-  </div>
-  <div class="stat sep" style="color:#555;font-size:10px;">
-    D2Q9 · 200×100 格点<br>Bhatnagar-Gross-Krook
+  <div id="controls">
+    <div class="ctrl-sec">
+      <h3>可视化</h3>
+      <div class="btn-grp">
+        <button class="btn active" id="vis-vort" onclick="setVis('vorticity')">涡量场</button>
+        <button class="btn" id="vis-vel" onclick="setVis('velocity')">速度</button>
+        <button class="btn" id="vis-pres" onclick="setVis('pressure')">压力</button>
+      </div>
+    </div>
+    <div class="ctrl-sec">
+      <h3>叠加层</h3>
+      <div class="btn-grp">
+        <button class="btn" id="tog-streamlines" onclick="toggleStreamlines()">流线</button>
+        <button class="btn" id="tog-particles" onclick="toggleParticles()">粒子追踪</button>
+      </div>
+    </div>
+    <div class="ctrl-sec">
+      <h3>流场参数</h3>
+      <div class="srow">
+        <label>入口速度 U <span id="val-u">0.10</span></label>
+        <input type="range" id="sl-u" min="0.04" max="0.20" step="0.01" value="0.10" oninput="setU(this)">
+      </div>
+      <div class="srow">
+        <label>弛豫时间 τ <span id="val-tau">0.60</span></label>
+        <input type="range" id="sl-tau" min="0.51" max="1.00" step="0.01" value="0.60" oninput="setTau(this)">
+      </div>
+      <div class="btn-grp">
+        <button class="btn" onclick="resetFlow()">重置流场</button>
+      </div>
+    </div>
+    <div class="ctrl-sec">
+      <h3>障碍物</h3>
+      <div class="btn-grp">
+        <button class="btn active" id="obs-single" onclick="setObstacle('single')">单圆柱</button>
+        <button class="btn" id="obs-double" onclick="setObstacle('double')">双圆柱</button>
+        <button class="btn" id="obs-channel" onclick="setObstacle('channel')">缩放管道</button>
+        <button class="btn" id="obs-naca" onclick="setObstacle('naca')">NACA0012</button>
+      </div>
+      <div style="margin-top:6px; display:flex; gap:4px; flex-wrap:wrap">
+        <button class="btn active" id="draw-flow" onclick="setDrawMode('flow')">流动模式</button>
+        <button class="btn" id="draw-add" onclick="setDrawMode('add')">绘制障碍</button>
+        <button class="btn" id="draw-erase" onclick="setDrawMode('erase')">擦除障碍</button>
+        <button class="btn danger" onclick="clearCustomObs()">清除自定义</button>
+      </div>
+    </div>
+    <div class="info-box">
+      <strong>卡门涡街</strong><br>
+      D2Q9 LBM 用 9 个离散速度方向近似 Navier-Stokes 方程。BGK 碰撞算子将分布函数驰豫到麦克斯韦-玻尔兹曼平衡态，弛豫时间 τ 决定粘度。<br><br>
+      Re≈60 时圆柱后方出现周期性交替脱落的涡旋——卡门涡街。τ↓→Re↑→湍流。<br><br>
+      <strong>τ↓</strong>: 粘度减小, Re↑<br>
+      <strong>U↑</strong>: 入口流速增加, Re↑<br>
+      <strong>涡量</strong>: 蓝=顺时针, 红=逆时针
+    </div>
   </div>
 </div>
-
-<div id="karman-label">卡门涡街 Kármán Vortex Street</div>
-<canvas id="main"></canvas>
-
-<div id="caption">「流体的宏观行为——漩涡、湍流、压力——从数以亿计的分子碰撞中涌现。格子玻尔兹曼不直接解流体方程；它让分子按规则碰撞，然后等流体自己出现。」</div>
 
 <script>
-// D2Q9 Lattice Boltzmann
-const NX = 200, NY = 100;
-const canvas = document.getElementById('main');
+// Grid: 280×140, canvas 560×280 (2px per cell)
+const NX = 280, NY = 140;
+const SCALE = 2;
+const canvas = document.getElementById('lbCanvas');
 const ctx = canvas.getContext('2d');
-let W, H;
+canvas.width = NX * SCALE;
+canvas.height = NY * SCALE;
 
-// D2Q9 weights and velocities
+function resizeCanvas() {
+  const wrap = document.getElementById('canvas-wrap');
+  const aw = wrap.clientWidth - 10, ah = wrap.clientHeight - 10;
+  const s = Math.max(1, Math.min(Math.floor(aw / (NX * SCALE)), Math.floor(ah / (NY * SCALE))));
+  canvas.style.width = (NX * SCALE * s) + 'px';
+  canvas.style.height = (NY * SCALE * s) + 'px';
+  displayScale = s;
+}
+let displayScale = 1;
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// D2Q9 constants
+const Q = 9;
+const CX = [0, 1, 0,-1, 0, 1,-1,-1, 1];
+const CY = [0, 0, 1, 0,-1, 1, 1,-1,-1];
 const W9 = [4/9, 1/9, 1/9, 1/9, 1/9, 1/36, 1/36, 1/36, 1/36];
-const CX = [0,  1,  0, -1,  0,  1, -1, -1,  1];
-const CY = [0,  0,  1,  0, -1,  1,  1, -1, -1];
-const OPP = [0, 3, 4, 1, 2, 7, 8, 5, 6]; // opposite direction indices
+// Opposite direction indices
+const OPP = [0, 3, 4, 1, 2, 7, 8, 5, 6];
 
-let Re = 100;
-let vizMode = 'vort';
-let stepCount = 0;
+let tau = 0.60;
+let u0 = 0.10;
+const rho0 = 1.0;
 
 // Distribution functions
-let f  = new Float32Array(NX * NY * 9);
-let fTmp = new Float32Array(NX * NY * 9);
+const f = new Float64Array(NX * NY * Q);
+const fTmp = new Float64Array(NX * NY * Q);
+const obstacle = new Uint8Array(NX * NY);
 
-// Macroscopic fields
-let rho = new Float32Array(NX * NY);
-let ux  = new Float32Array(NX * NY);
-let uy  = new Float32Array(NX * NY);
-let obstacle = new Uint8Array(NX * NY);
+// Velocity and density arrays
+const ux = new Float64Array(NX * NY);
+const uy = new Float64Array(NX * NY);
+const rho = new Float64Array(NX * NY);
 
-// Tracer particles
-const NUM_TRACERS = 500;
-let tracerX = new Float32Array(NUM_TRACERS);
-let tracerY = new Float32Array(NUM_TRACERS);
-const TRAIL_LEN = 18;
-let trailX = [];
-let trailY = [];
-for (let i = 0; i < NUM_TRACERS; i++) {
-  trailX.push(new Float32Array(TRAIL_LEN));
-  trailY.push(new Float32Array(TRAIL_LEN));
+function fi(x, y, q) { return (y * NX + x) * Q + q; }
+function ci(x, y) { return y * NX + x; }
+
+function feq(w, rhoV, uix, uiy, ux_v, uy_v) {
+  const cu = CX[w] * ux_v + CY[w] * uy_v;
+  const u2 = ux_v * ux_v + uy_v * uy_v;
+  return W9[w] * rhoV * (1 + 3 * cu + 4.5 * cu * cu - 1.5 * u2);
 }
-let trailHead = 0;
 
-// Obstacle: cylinder at ~1/3 from left, centered vertically
-const CYL_X = Math.floor(NX * 0.28);
-const CYL_Y = Math.floor(NY * 0.5);
-const CYL_R = Math.floor(NY * 0.12);
-
-function setupObstacle() {
-  obstacle.fill(0);
+function initDistributions() {
   for (let y = 0; y < NY; y++) {
     for (let x = 0; x < NX; x++) {
-      const dx2 = x - CYL_X, dy2 = y - CYL_Y;
-      if (dx2 * dx2 + dy2 * dy2 <= CYL_R * CYL_R) {
-        obstacle[y * NX + x] = 1;
+      const uu = obstacle[ci(x, y)] ? 0 : u0;
+      for (let q = 0; q < Q; q++) {
+        f[fi(x, y, q)] = feq(q, rho0, uu, 0, uu, 0);
+      }
+      ux[ci(x, y)] = uu;
+      uy[ci(x, y)] = 0;
+      rho[ci(x, y)] = rho0;
+    }
+  }
+}
+
+// Obstacle presets
+function clearObstacles() { obstacle.fill(0); }
+
+function addCircle(cx, cy, r) {
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      if (dx*dx + dy*dy <= r*r) {
+        const x = cx + dx, y = cy + dy;
+        if (x >= 0 && x < NX && y >= 0 && y < NY) obstacle[ci(x, y)] = 1;
       }
     }
   }
 }
 
-function feq(k, rhoVal, uxVal, uyVal) {
-  const uc = CX[k] * uxVal + CY[k] * uyVal;
-  const u2 = uxVal * uxVal + uyVal * uyVal;
-  return W9[k] * rhoVal * (1 + 3 * uc + 4.5 * uc * uc - 1.5 * u2);
+function addRect(x0, y0, x1, y1) {
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    if (x >= 0 && x < NX && y >= 0 && y < NY) obstacle[ci(x, y)] = 1;
+  }
 }
 
-function resetLBM() {
-  stepCount = 0;
-  const u0 = 0.1;
-  for (let y = 0; y < NY; y++) {
-    for (let x = 0; x < NX; x++) {
-      const i = y * NX + x;
-      const noiseX = (Math.random() - 0.5) * 0.002;
-      const noiseY = (Math.random() - 0.5) * 0.002;
-      rho[i] = 1.0;
-      ux[i] = u0 + noiseX;
-      uy[i] = noiseY;
-      for (let k = 0; k < 9; k++) {
-        f[i * 9 + k] = feq(k, 1.0, u0 + noiseX, noiseY);
-      }
-    }
-  }
-  // Scatter tracers on the right 2/3 of grid, avoiding obstacle
-  for (let i = 0; i < NUM_TRACERS; i++) {
-    resetTracer(i);
-    // stagger initial positions
-    tracerX[i] = Math.random() * NX;
-    tracerY[i] = Math.random() * NY;
-    for (let t2 = 0; t2 < TRAIL_LEN; t2++) {
-      trailX[i][t2] = tracerX[i];
-      trailY[i][t2] = tracerY[i];
+// NACA 0012 simplified polygon
+function addNACA() {
+  // Chord along x, centered around (100, NY/2)
+  const chord = 60;
+  const xc = 80, yc = NY / 2;
+  const t = 0.12; // max thickness ratio
+  for (let xi = 0; xi <= chord; xi++) {
+    const xn = xi / chord;
+    const yt = 5 * t * chord * (0.2969*Math.sqrt(xn) - 0.1260*xn - 0.3516*xn*xn + 0.2843*xn*xn*xn - 0.1015*xn*xn*xn*xn);
+    const ytInt = Math.ceil(yt);
+    for (let dy = -ytInt; dy <= ytInt; dy++) {
+      const x = Math.floor(xc + xi);
+      const y = Math.floor(yc + dy);
+      if (x >= 0 && x < NX && y >= 0 && y < NY) obstacle[ci(x, y)] = 1;
     }
   }
 }
 
-function resetTracer(i) {
-  // Re-inject at left edge
-  tracerX[i] = Math.random() * NX * 0.05;
-  tracerY[i] = 2 + Math.random() * (NY - 4);
+let customObsBackup = null;
+
+function setObstacle(name) {
+  // Clear only preset obstacles, preserve custom
+  clearObstacles();
+  if (name === 'single') {
+    addCircle(70, Math.floor(NY/2), 10);
+  } else if (name === 'double') {
+    addCircle(70, Math.floor(NY/2) - 20, 8);
+    addCircle(70, Math.floor(NY/2) + 20, 8);
+  } else if (name === 'channel') {
+    // Converging-diverging channel
+    const yc = NY/2;
+    for (let x = 40; x < 130; x++) {
+      const t = (x - 40) / 90.0;
+      const gap = Math.floor(20 + 30 * Math.sin(Math.PI * t));
+      const top = Math.floor(yc - gap/2);
+      const bot = Math.floor(yc + gap/2);
+      for (let y = 0; y < top; y++) obstacle[ci(x, y)] = 1;
+      for (let y = bot; y < NY; y++) obstacle[ci(x, y)] = 1;
+    }
+  } else if (name === 'naca') {
+    addNACA();
+  }
+  ['single','double','channel','naca'].forEach(o => {
+    const btn = document.getElementById('obs-' + o);
+    if (btn) btn.classList.toggle('active', o === name);
+  });
+  initDistributions();
 }
 
-function stepLBM() {
-  const tau = getOmegaFromRe();
-  const omega = 1.0 / tau;
-  const u0 = 0.1;
+function clearCustomObs() {
+  clearObstacles();
+  setObstacle('single');
+}
 
-  // Collision
+// Streaming + collision
+function step() {
+  // Streaming (pull scheme)
   for (let y = 0; y < NY; y++) {
     for (let x = 0; x < NX; x++) {
-      const i = y * NX + x;
-      if (obstacle[i]) continue;
-      // Compute macroscopic
-      let r = 0, vx = 0, vy = 0;
-      for (let k = 0; k < 9; k++) {
-        const fk = f[i * 9 + k];
-        r += fk;
-        vx += CX[k] * fk;
-        vy += CY[k] * fk;
-      }
-      rho[i] = r;
-      ux[i] = vx / r;
-      uy[i] = vy / r;
-      // BGK collision
-      for (let k = 0; k < 9; k++) {
-        f[i * 9 + k] += omega * (feq(k, r, vx / r, vy / r) - f[i * 9 + k]);
+      for (let q = 0; q < Q; q++) {
+        const xs = ((x - CX[q] + NX) % NX);
+        let ys = y - CY[q];
+        ys = Math.max(0, Math.min(NY - 1, ys));
+        fTmp[fi(x, y, q)] = f[fi(xs, ys, q)];
       }
     }
   }
 
-  // Streaming
-  fTmp.fill(0);
+  // Boundary conditions and collision
   for (let y = 0; y < NY; y++) {
     for (let x = 0; x < NX; x++) {
-      const i = y * NX + x;
-      if (obstacle[i]) continue;
-      for (let k = 0; k < 9; k++) {
-        let nx2 = x + CX[k], ny2 = y + CY[k];
-        // Periodic left/right boundaries only for y
-        if (ny2 < 0) ny2 = NY - 1;
-        if (ny2 >= NY) ny2 = 0;
-        // Inlet at left (x=0): inject flow
-        if (nx2 < 0) {
-          // Inlet: set equilibrium
-          fTmp[i * 9 + k] = feq(k, 1.0, u0, 0);
-          continue;
+      const c = ci(x, y);
+
+      // Bounce-back for obstacles
+      if (obstacle[c]) {
+        for (let q = 0; q < Q; q++) f[fi(x, y, q)] = fTmp[fi(x, y, OPP[q])];
+        ux[c] = 0; uy[c] = 0; rho[c] = rho0;
+        continue;
+      }
+
+      // Top/bottom walls: bounce-back
+      if (y === 0 || y === NY - 1) {
+        for (let q = 0; q < Q; q++) f[fi(x, y, q)] = fTmp[fi(x, y, OPP[q])];
+        ux[c] = 0; uy[c] = 0; rho[c] = rho0;
+        continue;
+      }
+
+      // Right outlet: zero-gradient copy from x=NX-2
+      if (x === NX - 1) {
+        for (let q = 0; q < Q; q++) f[fi(x, y, q)] = f[fi(NX - 2, y, q)];
+      }
+
+      // Left inlet: Zou-He with fixed u=(u0,0), rho computed
+      if (x === 0) {
+        // Known: f0, f2, f4, f6, f7 (coming from interior)
+        // Unknown: f1, f5, f8 (moving right)
+        const fL0 = fTmp[fi(0, y, 0)];
+        const fL2 = fTmp[fi(0, y, 2)];
+        const fL4 = fTmp[fi(0, y, 4)];
+        const fL3 = fTmp[fi(0, y, 3)];
+        const fL6 = fTmp[fi(0, y, 6)];
+        const fL7 = fTmp[fi(0, y, 7)];
+        const rhoIn = (fL0 + fL2 + fL4 + 2*(fL3 + fL6 + fL7)) / (1 - u0);
+        const eq1 = feq(1, rhoIn, CX[1], CY[1], u0, 0);
+        const eq3 = feq(3, rhoIn, CX[3], CY[3], u0, 0);
+        const eq5 = feq(5, rhoIn, CX[5], CY[5], u0, 0);
+        const eq6 = feq(6, rhoIn, CX[6], CY[6], u0, 0);
+        const eq7 = feq(7, rhoIn, CX[7], CY[7], u0, 0);
+        const eq8 = feq(8, rhoIn, CX[8], CY[8], u0, 0);
+        f[fi(0, y, 1)] = eq1 + (fL3 - eq3);
+        f[fi(0, y, 5)] = eq5 + (fL7 - eq7);
+        f[fi(0, y, 8)] = eq8 + (fL6 - eq6);
+        // Recompute all from these
+        for (let q = 0; q < Q; q++) {
+          if (q !== 1 && q !== 5 && q !== 8) f[fi(0, y, q)] = fTmp[fi(0, y, q)];
         }
-        // Outlet at right (absorb): copy last column
-        if (nx2 >= NX) nx2 = NX - 1;
-        const ni = ny2 * NX + nx2;
-        if (obstacle[ni]) {
-          // Bounce-back
-          fTmp[i * 9 + OPP[k]] += f[i * 9 + k];
-        } else {
-          fTmp[ni * 9 + k] += f[i * 9 + k];
-        }
+        ux[c] = u0; uy[c] = 0; rho[c] = rhoIn;
+        continue;
+      }
+
+      // Collision (BGK)
+      let r = 0, uxV = 0, uyV = 0;
+      for (let q = 0; q < Q; q++) {
+        const fq = fTmp[fi(x, y, q)];
+        r += fq;
+        uxV += CX[q] * fq;
+        uyV += CY[q] * fq;
+      }
+      uxV /= r; uyV /= r;
+      ux[c] = uxV; uy[c] = uyV; rho[c] = r;
+
+      const inv_tau = 1.0 / tau;
+      for (let q = 0; q < Q; q++) {
+        const feqV = feq(q, r, CX[q], CY[q], uxV, uyV);
+        f[fi(x, y, q)] = fTmp[fi(x, y, q)] + (feqV - fTmp[fi(x, y, q)]) * inv_tau;
       }
     }
   }
-
-  // Apply inlet BC on x=0
-  for (let y = 0; y < NY; y++) {
-    const i = y * NX + 0;
-    for (let k = 0; k < 9; k++) {
-      fTmp[i * 9 + k] = feq(k, 1.0, u0, 0);
-    }
-    rho[i] = 1.0; ux[i] = u0; uy[i] = 0;
-  }
-
-  // Copy tmp to f
-  f.set(fTmp);
-
-  stepCount++;
 }
 
-function getOmegaFromRe() {
-  // tau = 3 * nu + 0.5, nu = u0 * L / Re
-  const u0 = 0.1, L = CYL_R * 2;
-  const nu = u0 * L / Re;
-  return 3 * nu + 0.5;
-}
+// Visualization
+let visMode = 'vorticity';
+const imgData = ctx.createImageData(NX * SCALE, NY * SCALE);
+const px = imgData.data;
 
-function computeVorticity(x, y) {
-  // ∂uy/∂x - ∂ux/∂y (finite difference)
-  const xm = Math.max(0, x - 1), xp = Math.min(NX - 1, x + 1);
-  const ym = Math.max(0, y - 1), yp = Math.min(NY - 1, y + 1);
-  const dvx = (uy[y * NX + xp] - uy[y * NX + xm]) / (xp - xm);
-  const duy = (ux[yp * NX + x] - ux[ym * NX + x]) / (yp - ym);
-  return dvx - duy;
-}
-
-function updateTracers() {
-  trailHead = (trailHead + 1) % TRAIL_LEN;
-  for (let i = 0; i < NUM_TRACERS; i++) {
-    const xi = Math.floor(tracerX[i]), yi = Math.floor(tracerY[i]);
-    if (xi < 0 || xi >= NX || yi < 0 || yi >= NY || obstacle[yi * NX + xi]) {
-      resetTracer(i);
-    }
-    const ci = yi * NX + xi;
-    tracerX[i] += ux[ci] * 2.5;
-    tracerY[i] += uy[ci] * 2.5;
-    if (tracerX[i] >= NX) resetTracer(i);
-    if (tracerY[i] < 0) tracerY[i] += NY;
-    if (tracerY[i] >= NY) tracerY[i] -= NY;
-    trailX[i][trailHead] = tracerX[i];
-    trailY[i][trailHead] = tracerY[i];
+function colorRdBu(t) {
+  // Diverging RdBu: blue(-1)→white(0)→red(+1)
+  const tc = Math.max(-1, Math.min(1, t));
+  if (tc < 0) {
+    const s = -tc;
+    return [Math.round((1 - s) * 255), Math.round((1 - s) * 255), 255];
+  } else {
+    const s = tc;
+    return [255, Math.round((1 - s) * 255), Math.round((1 - s) * 255)];
   }
 }
 
-let imgData = null;
+function colorVel(t) {
+  const tc = Math.max(0, Math.min(1, t));
+  // black→blue→cyan→yellow
+  if (tc < 0.33) {
+    const s = tc / 0.33;
+    return [0, Math.round(s * 80), Math.round(s * 200)];
+  } else if (tc < 0.66) {
+    const s = (tc - 0.33) / 0.33;
+    return [Math.round(s * 80), Math.round(80 + s * 160), Math.round(200 - s * 100)];
+  } else {
+    const s = (tc - 0.66) / 0.34;
+    return [Math.round(80 + s * 175), Math.round(240 - s * 60), Math.round(100 - s * 100)];
+  }
+}
 
 function render() {
-  if (!imgData || imgData.width !== W || imgData.height !== H) {
-    imgData = ctx.createImageData(W, H);
-  }
-  const data = imgData.data;
-  const scaleX = W / NX, scaleY = H / NY;
-
-  // Compute range for normalization
-  let minV = Infinity, maxV = -Infinity;
-  for (let y = 1; y < NY - 1; y++) {
-    for (let x = 1; x < NX - 1; x++) {
-      const i = y * NX + x;
-      if (obstacle[i]) continue;
-      let val;
-      if (vizMode === 'vort') val = computeVorticity(x, y);
-      else if (vizMode === 'speed') val = Math.sqrt(ux[i] * ux[i] + uy[i] * uy[i]);
-      else val = rho[i];
-      if (val < minV) minV = val;
-      if (val > maxV) maxV = val;
+  // Compute vorticity if needed
+  let vort = null;
+  if (visMode === 'vorticity') {
+    vort = new Float32Array(NX * NY);
+    for (let y = 1; y < NY - 1; y++) {
+      for (let x = 1; x < NX - 1; x++) {
+        const duy_dx = (uy[ci(x+1, y)] - uy[ci(x-1, y)]) * 0.5;
+        const dux_dy = (ux[ci(x, y+1)] - ux[ci(x, y-1)]) * 0.5;
+        vort[ci(x, y)] = duy_dx - dux_dy;
+      }
     }
   }
-  const range = maxV - minV || 1;
+
+  // Find ranges for normalization
+  let vMax = 0, vMin = 0, rMin = rho0, rMax = rho0;
+  if (visMode === 'vorticity') {
+    for (let i = 0; i < NX * NY; i++) { if (!obstacle[i]) { vMax = Math.max(vMax, Math.abs(vort[i])); } }
+    vMax = vMax || 0.01;
+  } else if (visMode === 'velocity') {
+    for (let i = 0; i < NX * NY; i++) { if (!obstacle[i]) vMax = Math.max(vMax, Math.sqrt(ux[i]*ux[i] + uy[i]*uy[i])); }
+    vMax = vMax || u0;
+  } else {
+    for (let i = 0; i < NX * NY; i++) { if (!obstacle[i]) { rMin = Math.min(rMin, rho[i]); rMax = Math.max(rMax, rho[i]); } }
+    const dr = Math.max(rMax - rMin, 1e-6);
+    rMin -= dr * 0.1; rMax += dr * 0.1;
+  }
 
   for (let y = 0; y < NY; y++) {
     for (let x = 0; x < NX; x++) {
-      const i = y * NX + x;
-      const px = Math.floor(x * scaleX);
-      const py = Math.floor(y * scaleY);
-      const pw2 = Math.ceil(scaleX) + 1;
-      const ph2 = Math.ceil(scaleY) + 1;
-
-      let r, g, bv;
-      if (obstacle[i]) {
-        r = 40; g = 40; bv = 50;
+      const c = ci(x, y);
+      let r, g, b;
+      if (obstacle[c]) {
+        r = 80; g = 80; b = 80;
       } else {
-        let val;
-        if (vizMode === 'vort') {
-          const vort = computeVorticity(x, y);
-          const t2 = (vort - minV) / range;
-          // Negative vorticity=blue, zero=black, positive=red
-          if (t2 < 0.5) {
-            const s = t2 / 0.5;
-            r = 0; g = 0; bv = Math.floor(s * 220);
-          } else {
-            const s = (t2 - 0.5) / 0.5;
-            r = Math.floor(s * 220); g = 0; bv = 0;
-          }
-        } else if (vizMode === 'speed') {
-          const speed = Math.sqrt(ux[i] * ux[i] + uy[i] * uy[i]);
-          const t2 = Math.min(1, (speed - minV) / range);
-          // dark → cyan gradient
-          r = 0; g = Math.floor(t2 * 200); bv = Math.floor(t2 * 220);
+        if (visMode === 'vorticity') {
+          const t = vort[c] / vMax;
+          [r, g, b] = colorRdBu(t * 3);
+        } else if (visMode === 'velocity') {
+          const spd = Math.sqrt(ux[c]*ux[c] + uy[c]*uy[c]);
+          [r, g, b] = colorVel(spd / vMax);
         } else {
-          // pressure / density
-          const t2 = (rho[i] - minV) / range;
-          r = Math.floor(t2 * 200); g = Math.floor(t2 * 100); bv = Math.floor(t2 * 50);
+          const t = (rho[c] - rMin) / (rMax - rMin) * 2 - 1;
+          [r, g, b] = colorRdBu(t * 1.5);
         }
       }
-
-      for (let ry = py; ry < py + ph2 && ry < H; ry++) {
-        for (let rx = px; rx < px + pw2 && rx < W; rx++) {
-          const idx = (ry * W + rx) * 4;
-          data[idx] = r; data[idx+1] = g; data[idx+2] = bv; data[idx+3] = 255;
+      // Fill SCALE×SCALE block
+      for (let sy = 0; sy < SCALE; sy++) {
+        for (let sx = 0; sx < SCALE; sx++) {
+          const pi = ((y * SCALE + sy) * NX * SCALE + (x * SCALE + sx)) * 4;
+          px[pi] = r; px[pi+1] = g; px[pi+2] = b; px[pi+3] = 255;
         }
       }
     }
   }
   ctx.putImageData(imgData, 0, 0);
+}
 
-  // Draw tracers
-  for (let i = 0; i < NUM_TRACERS; i++) {
-    ctx.beginPath();
-    for (let t2 = 0; t2 < TRAIL_LEN; t2++) {
-      const ti = (trailHead - t2 + TRAIL_LEN) % TRAIL_LEN;
-      const tx2 = trailX[i][ti] * scaleX;
-      const ty2 = trailY[i][ti] * scaleY;
-      const alpha = (1 - t2 / TRAIL_LEN) * 0.7;
-      if (t2 === 0) {
-        ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
-        ctx.lineWidth = 0.7;
-        ctx.beginPath();
-        ctx.moveTo(tx2, ty2);
-      } else {
-        const ti2 = (trailHead - t2 + 1 + TRAIL_LEN) % TRAIL_LEN;
-        ctx.lineTo(trailX[i][ti] * scaleX, trailY[i][ti] * scaleY);
-      }
+// Streamlines
+let showStreamlines = false;
+let showParticles = false;
+const NUM_PARTICLES = 50;
+let particles = [];
+const TRAIL_LEN = 60;
+
+function initParticles() {
+  particles = [];
+  for (let i = 0; i < NUM_PARTICLES; i++) {
+    particles.push({
+      x: Math.random() * NX * 0.3,
+      y: 5 + Math.random() * (NY - 10),
+      trail: []
+    });
+  }
+}
+initParticles();
+
+function updateParticles() {
+  for (const p of particles) {
+    const xi = Math.floor(p.x), yi = Math.floor(p.y);
+    if (xi < 0 || xi >= NX || yi < 0 || yi >= NY || obstacle[ci(xi, yi)]) {
+      p.x = Math.random() * NX * 0.2;
+      p.y = 5 + Math.random() * (NY - 10);
+      p.trail = [];
+      continue;
     }
-    ctx.strokeStyle = 'rgba(200,230,255,0.35)';
-    ctx.lineWidth = 0.6;
+    p.trail.push({ x: p.x * SCALE, y: p.y * SCALE });
+    if (p.trail.length > TRAIL_LEN) p.trail.shift();
+    p.x += ux[ci(xi, yi)] * 8;
+    p.y += uy[ci(xi, yi)] * 8;
+    if (p.x >= NX) { p.x = Math.random() * 5; p.y = 5 + Math.random() * (NY - 10); p.trail = []; }
+  }
+}
+
+function drawParticles() {
+  ctx.lineWidth = 1;
+  for (const p of particles) {
+    if (p.trail.length < 2) continue;
+    for (let i = 1; i < p.trail.length; i++) {
+      const alpha = i / p.trail.length;
+      ctx.strokeStyle = `rgba(180, 220, 100, ${alpha * 0.7})`;
+      ctx.beginPath();
+      ctx.moveTo(p.trail[i-1].x, p.trail[i-1].y);
+      ctx.lineTo(p.trail[i].x, p.trail[i].y);
+      ctx.stroke();
+    }
+  }
+}
+
+function drawStreamlines() {
+  const NL = 20, NS = 25;
+  ctx.strokeStyle = 'rgba(120, 180, 220, 0.35)';
+  ctx.lineWidth = 0.8;
+  for (let sy = 0; sy < NS; sy++) {
+    let px_s = 5;
+    let py_s = ((sy + 0.5) / NS) * (NY - 2) + 1;
+    ctx.beginPath();
+    ctx.moveTo(px_s * SCALE, py_s * SCALE);
+    for (let step = 0; step < 300; step++) {
+      const xi = Math.floor(px_s), yi = Math.floor(py_s);
+      if (xi < 0 || xi >= NX || yi < 0 || yi >= NY) break;
+      if (obstacle[ci(xi, yi)]) break;
+      const uxi = ux[ci(xi, yi)], uyi = uy[ci(xi, yi)];
+      const spd = Math.sqrt(uxi*uxi + uyi*uyi);
+      if (spd < 1e-6) break;
+      const ds = 1.5 / spd;
+      px_s += uxi * ds;
+      py_s += uyi * ds;
+      ctx.lineTo(px_s * SCALE, py_s * SCALE);
+    }
     ctx.stroke();
   }
-
-  // Draw cylinder outline
-  const cylX = CYL_X * scaleX, cylY = CYL_Y * scaleY;
-  const cylR = CYL_R * Math.min(scaleX, scaleY);
-  ctx.beginPath();
-  ctx.arc(cylX, cylY, cylR, 0, Math.PI * 2);
-  ctx.strokeStyle = '#555'; ctx.lineWidth = 1.5;
-  ctx.stroke();
-  ctx.fillStyle = 'rgba(30,30,40,0.8)';
-  ctx.fill();
-
-  // Stats
-  document.getElementById('step-val').textContent = stepCount;
-
-  // Kármán vortex street label
-  const karman = document.getElementById('karman-label');
-  karman.style.opacity = (Re >= 80 && stepCount > 200) ? '1' : '0';
 }
 
-function setViz(mode) {
-  vizMode = mode;
-  ['vort','speed','press'].forEach(m => {
-    document.getElementById('btn-' + m).classList.toggle('active', m === mode);
+// Re display
+function updateRe() {
+  const nu = (tau - 0.5) / 3.0;
+  const D = 20;
+  const Re = (u0 * D / nu).toFixed(0);
+  document.getElementById('re-display').textContent = `Re = ${Re} | ν = ${nu.toFixed(4)}`;
+}
+
+function setVis(mode) {
+  visMode = mode;
+  ['vort','vel','pres'].forEach(v => document.getElementById('vis-' + v)?.classList.remove('active'));
+  const map = { vorticity: 'vort', velocity: 'vel', pressure: 'pres' };
+  document.getElementById('vis-' + map[mode])?.classList.add('active');
+}
+
+function toggleStreamlines() {
+  showStreamlines = !showStreamlines;
+  document.getElementById('tog-streamlines').classList.toggle('active', showStreamlines);
+}
+
+function toggleParticles() {
+  showParticles = !showParticles;
+  if (showParticles) initParticles();
+  document.getElementById('tog-particles').classList.toggle('active', showParticles);
+}
+
+function setU(el) {
+  u0 = parseFloat(el.value);
+  document.getElementById('val-u').textContent = u0.toFixed(2);
+  updateRe();
+}
+
+function setTau(el) {
+  tau = parseFloat(el.value);
+  document.getElementById('val-tau').textContent = tau.toFixed(2);
+  updateRe();
+}
+
+function resetFlow() {
+  initDistributions();
+  if (showParticles) initParticles();
+}
+
+// Drawing modes
+let drawMode = 'flow';
+let mouseIsDown = false;
+
+function setDrawMode(mode) {
+  drawMode = mode;
+  ['flow','add','erase'].forEach(m => {
+    const btn = document.getElementById('draw-' + m);
+    if (btn) btn.classList.toggle('active', m === mode);
   });
+  const labels = { flow: '模式: 流动', add: '模式: 绘制障碍 (左键)', erase: '模式: 擦除障碍 (左键)' };
+  document.getElementById('draw-mode-indicator').textContent = labels[mode];
+  canvas.style.cursor = mode === 'flow' ? 'default' : 'crosshair';
 }
 
-function resize() {
-  W = window.innerWidth; H = window.innerHeight;
-  canvas.width = W; canvas.height = H;
-  imgData = null;
+function getGridCoords(e) {
+  const rect = canvas.getBoundingClientRect();
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+  const sx = (clientX - rect.left) / rect.width * (NX * SCALE);
+  const sy = (clientY - rect.top) / rect.height * (NY * SCALE);
+  return { x: Math.floor(sx / SCALE), y: Math.floor(sy / SCALE) };
 }
 
-document.getElementById('re-slider').addEventListener('input', function() {
-  Re = parseInt(this.value);
-  document.getElementById('re-val').textContent = Re;
-});
-
-let lastTime = 0;
-function loop(ts) {
-  const elapsed = ts - lastTime;
-  if (elapsed > 16) { // ~60fps cap
-    lastTime = ts;
-    for (let s = 0; s < 3; s++) stepLBM();
-    updateTracers();
-    render();
+function applyDraw(e) {
+  if (drawMode === 'flow') return;
+  const { x, y } = getGridCoords(e);
+  const r = 3;
+  for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+    const nx = x + dx, ny = y + dy;
+    if (nx < 1 || nx >= NX-1 || ny < 1 || ny >= NY-1) continue;
+    if (dx*dx+dy*dy <= r*r) obstacle[ci(nx, ny)] = drawMode === 'add' ? 1 : 0;
   }
-  requestAnimationFrame(loop);
 }
 
-window.addEventListener('resize', resize);
-resize();
-setupObstacle();
-resetLBM();
-requestAnimationFrame(loop);
+canvas.addEventListener('mousedown', e => { mouseIsDown = true; applyDraw(e); });
+canvas.addEventListener('mousemove', e => { if (mouseIsDown) applyDraw(e); });
+canvas.addEventListener('mouseup', () => mouseIsDown = false);
+canvas.addEventListener('mouseleave', () => mouseIsDown = false);
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+// Main loop
+let lastT = performance.now(), frmCnt = 0;
+
+function animate() {
+  requestAnimationFrame(animate);
+  for (let i = 0; i < 3; i++) step();
+  render();
+  if (showStreamlines) drawStreamlines();
+  if (showParticles) { updateParticles(); drawParticles(); }
+  frmCnt++;
+  const now = performance.now();
+  if (now - lastT > 600) {
+    document.getElementById('fps-disp').textContent = (frmCnt / ((now - lastT) / 1000)).toFixed(0) + ' fps';
+    frmCnt = 0; lastT = now;
+  }
+}
+
+// Init
+setObstacle('single');
+updateRe();
+animate();
 </script>
 </body>
 </html>

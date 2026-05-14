@@ -3,387 +3,849 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Night 13 · 随机共振：噪声竟然是信息的载体</title>
+<title>随机共振 — 噪声如何帮助信号传输</title>
 <style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { background: #000; color: #fff; font-family: 'Courier New', monospace; overflow: hidden; height: 100vh; }
-
-#label {
-  position: absolute; top: 12px; left: 14px; z-index: 10;
-  font-size: 11px; color: #888; line-height: 1.6; pointer-events: none;
-}
-
-#controls {
-  position: absolute; top: 12px; right: 14px; z-index: 10;
-  display: flex; flex-direction: column; gap: 10px;
-  background: rgba(0,0,0,0.75); padding: 12px; border: 1px solid #333;
-  min-width: 230px;
-}
-.ctrl-row { display: flex; flex-direction: column; gap: 4px; }
-.ctrl-row label { font-size: 11px; color: #aaa; }
-.ctrl-row input[type=range] { width: 100%; accent-color: #a78bfa; }
-.ctrl-marks { display: flex; justify-content: space-between; font-size: 9px; color: #666; }
-.stat { font-size: 12px; color: #a78bfa; }
-.stat span { color: #fff; }
-.sep { border-top: 1px solid #333; margin-top: 4px; padding-top: 4px; }
-
-#caption {
-  position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
-  font-size: 12px; color: #666; text-align: center; max-width: 720px;
-  line-height: 1.7; pointer-events: none; font-family: sans-serif; z-index: 10;
-}
-canvas { display: block; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0d0d0d;
+    color: #e0e0e0;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+  header {
+    padding: 8px 16px;
+    background: #161616;
+    border-bottom: 1px solid #2a2a2a;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+  header h1 { font-size: 15px; font-weight: 600; color: #fff; }
+  header .subtitle { font-size: 11px; color: #555; }
+  .main-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 8px;
+    gap: 8px;
+  }
+  .panels-row {
+    display: flex;
+    gap: 8px;
+    flex: 0 0 auto;
+    height: 220px;
+  }
+  .panel {
+    flex: 1;
+    background: #111;
+    border: 1px solid #222;
+    border-radius: 6px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+  .panel-header {
+    padding: 5px 10px;
+    background: #161616;
+    border-bottom: 1px solid #1e1e1e;
+    font-size: 11px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+  }
+  .panel-title { font-weight: 600; }
+  .panel-sigma { font-size: 10px; color: #888; }
+  .panel-sigma .val { font-weight: 700; }
+  .panel-sigma.optimal .val { color: #2ecc71; }
+  .panel-sigma.too-small .val { color: #e74c3c; }
+  .panel-sigma.too-large .val { color: #f39c12; }
+  .panel-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  canvas.potential-canvas {
+    flex: 0 0 85px;
+    display: block;
+    width: 100%;
+  }
+  canvas.timeseries-canvas {
+    flex: 1;
+    display: block;
+    width: 100%;
+  }
+  .bottom-area {
+    flex: 1;
+    display: flex;
+    gap: 8px;
+    min-height: 0;
+  }
+  .snr-panel {
+    flex: 1;
+    background: #111;
+    border: 1px solid #222;
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
+  }
+  .controls-panel {
+    width: 260px;
+    background: #111;
+    border: 1px solid #222;
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    padding: 12px;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .snr-header {
+    padding: 6px 12px;
+    background: #161616;
+    border-bottom: 1px solid #1e1e1e;
+    font-size: 11px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+  }
+  #snrCanvas {
+    flex: 1;
+    display: block;
+    width: 100%;
+    min-height: 0;
+  }
+  .section-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #555;
+    margin-bottom: 2px;
+  }
+  .ctrl-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 2px;
+  }
+  .ctrl-label { font-size: 11px; color: #aaa; flex: 1; }
+  .ctrl-val { font-size: 12px; font-weight: 700; color: #fff; text-align: right; min-width: 38px; }
+  input[type=range] { width: 100%; accent-color: #4a90d9; cursor: pointer; }
+  button {
+    background: #1e1e1e;
+    border: 1px solid #333;
+    color: #ccc;
+    padding: 5px 10px;
+    font-size: 11px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  button:hover { background: #2a2a2a; border-color: #4a90d9; color: #fff; }
+  button.active { background: #1a3a5c; border-color: #4a90d9; color: #4a90d9; }
+  .divider { border: none; border-top: 1px solid #1e1e1e; }
+  .neuro-box {
+    background: #0a0f14;
+    border: 1px solid #1a3040;
+    border-radius: 4px;
+    padding: 8px;
+    font-size: 10px;
+    color: #6a9fc0;
+    line-height: 1.6;
+  }
+  .neuro-box strong { color: #4a90d9; font-size: 11px; }
+  .formula-box {
+    background: #0a0a0a;
+    border: 1px solid #1e2e1e;
+    border-radius: 4px;
+    padding: 7px;
+    font-size: 10px;
+    color: #6ab06a;
+    font-family: monospace;
+    line-height: 1.8;
+  }
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: #777;
+    padding: 1px 0;
+  }
+  .stat-row .v { color: #fff; font-weight: 600; }
+  .sigma-lock-row {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+  .sigma-lock-row button {
+    flex: 1;
+    font-size: 10px;
+    padding: 3px 4px;
+  }
 </style>
 </head>
 <body>
+<header>
+  <h1>随机共振</h1>
+  <span class="subtitle">dx/dt = x − x³ + A·sin(2πf₀t) + σ·ξ(t) &nbsp;|&nbsp; 双势阱 Langevin 方程</span>
+  <span style="flex:1"></span>
+  <span id="timeLabel" style="font-size:11px;color:#555">t = 0</span>
+</header>
 
-<div id="label">
-  Night 13 · 2026-05-10<br>随机共振 · 噪声是信息的载体
+<div class="main-area">
+  <!-- Three parallel panels -->
+  <div class="panels-row">
+    <div class="panel" id="panel0">
+      <div class="panel-header">
+        <span class="panel-title">σ 太小</span>
+        <span class="panel-sigma too-small" id="sigLabel0">σ = <span class="val">0.10</span></span>
+      </div>
+      <div class="panel-body">
+        <canvas class="potential-canvas" id="potCanvas0"></canvas>
+        <canvas class="timeseries-canvas" id="tsCanvas0"></canvas>
+      </div>
+    </div>
+    <div class="panel" id="panel1">
+      <div class="panel-header">
+        <span class="panel-title">最优噪声 ✦</span>
+        <span class="panel-sigma optimal" id="sigLabel1">σ = <span class="val">0.28</span></span>
+      </div>
+      <div class="panel-body">
+        <canvas class="potential-canvas" id="potCanvas1"></canvas>
+        <canvas class="timeseries-canvas" id="tsCanvas1"></canvas>
+      </div>
+    </div>
+    <div class="panel" id="panel2">
+      <div class="panel-header">
+        <span class="panel-title">噪声太大</span>
+        <span class="panel-sigma too-large" id="sigLabel2">σ = <span class="val">0.80</span></span>
+      </div>
+      <div class="panel-body">
+        <canvas class="potential-canvas" id="potCanvas2"></canvas>
+        <canvas class="timeseries-canvas" id="tsCanvas2"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom: SNR curve + controls -->
+  <div class="bottom-area">
+    <div class="snr-panel">
+      <div class="snr-header">
+        <span style="font-weight:600;font-size:11px">信噪比 SNR 曲线（实时计算）</span>
+        <span style="font-size:10px;color:#555">X 轴: 噪声强度 σ &nbsp;|&nbsp; Y 轴: SNR（dB）</span>
+      </div>
+      <canvas id="snrCanvas"></canvas>
+    </div>
+
+    <div class="controls-panel">
+      <div class="section-label">模拟控制</div>
+      <div class="ctrl-row">
+        <button id="btnPause" class="active" style="flex:1">⏸ 暂停</button>
+        <button id="btnReset" style="flex:1">↺ 重置</button>
+      </div>
+      <div class="ctrl-row">
+        <span class="ctrl-label">速度</span>
+        <span class="ctrl-val" id="speedVal">5×</span>
+      </div>
+      <input type="range" id="speedSlider" min="1" max="20" value="5">
+
+      <hr class="divider">
+      <div class="section-label">参数调节</div>
+
+      <div class="ctrl-row">
+        <span class="ctrl-label">信号幅度 A</span>
+        <span class="ctrl-val" id="aVal">0.10</span>
+      </div>
+      <input type="range" id="aSlider" min="0.05" max="0.30" step="0.01" value="0.10">
+
+      <div class="ctrl-row">
+        <span class="ctrl-label">信号频率 f₀</span>
+        <span class="ctrl-val" id="f0Val">0.050</span>
+      </div>
+      <input type="range" id="f0Slider" min="0.010" max="0.100" step="0.005" value="0.050">
+
+      <div class="ctrl-row">
+        <span class="ctrl-label">当前查看 σ</span>
+        <span class="ctrl-val" id="sigMainVal">0.28</span>
+      </div>
+      <input type="range" id="sigSlider" min="0.05" max="1.0" step="0.01" value="0.28">
+
+      <hr class="divider">
+      <div class="section-label">面板 σ 锁定</div>
+      <div class="sigma-lock-row">
+        <button id="lockFree" class="active">自动</button>
+        <button id="lockP0">锁定左</button>
+        <button id="lockP1">锁定中</button>
+        <button id="lockP2">锁定右</button>
+      </div>
+
+      <hr class="divider">
+      <div class="section-label">实时统计</div>
+      <div class="stat-row"><span>模拟时间 t</span><span class="v" id="stTime">0</span></div>
+      <div class="stat-row"><span>σ_opt 理论</span><span class="v" id="stSigOpt">—</span></div>
+      <div class="stat-row"><span>Kramers 速率</span><span class="v" id="stKR">—</span></div>
+
+      <hr class="divider">
+      <div class="section-label">克喇默斯理论</div>
+      <div class="formula-box">
+V(x) = -x²/2 + x⁴/4<br>
+ΔV = 0.25 (势垒高度)<br>
+r_K = (1/2π)·exp(-ΔV/σ²)<br>
+最优: 2·r_K ≈ f₀
+      </div>
+
+      <hr class="divider">
+      <div class="section-label">神经元类比</div>
+      <div class="neuro-box">
+        <strong>生物神经系统的随机共振</strong><br>
+        神经元的动作电位是<em>阈值触发</em>的——弱刺激无法单独跨越膜电位阈值。但突触噪声（来自热涨落和背景放电）恰好处于"最优强度"时，会周期性地把弱信号"托举"过阈值，使神经元<em>更可靠地编码</em>信息。<br><br>
+        实验证据：板鳃鱼（鲨鱼）的电感受器、蟋蟀机械感受器、人类视觉、听觉系统均观察到 SR 特征——适量噪声提升感知灵敏度。
+      </div>
+    </div>
+  </div>
 </div>
-
-<div id="controls">
-  <div class="ctrl-row">
-    <label>噪声强度 D = <span id="d-val">1.00</span></label>
-    <input type="range" id="d-slider" min="0" max="3" step="0.05" value="1.0">
-    <div class="ctrl-marks"><span>0 无噪声</span><span>3 全噪声</span></div>
-  </div>
-  <div class="ctrl-row">
-    <label>信号频率 f = <span id="f-val">0.30</span></label>
-    <input type="range" id="f-slider" min="0.05" max="1.0" step="0.05" value="0.3">
-  </div>
-  <div class="ctrl-row">
-    <label>信号幅度 A = <span id="a-val">0.60</span></label>
-    <input type="range" id="a-slider" min="0.1" max="1.2" step="0.05" value="0.6">
-  </div>
-  <div class="sep">
-    <div class="stat">SNR 峰值 D ≈ <span id="snr-peak">1.0</span></div>
-    <div class="stat" style="color:#888;font-size:10px;">← 最优噪声点</div>
-  </div>
-</div>
-
-<canvas id="main"></canvas>
-
-<div id="caption">「信号太微弱，探测器感知不到。加一点点噪声，反而能检测到——这就是"随机共振"。人类耳蜗里的听觉毛细胞、皮肤的触觉感受器……大自然偏爱用适量的噪声来放大微弱的信号。」</div>
 
 <script>
-const canvas = document.getElementById('main');
-const ctx = canvas.getContext('2d');
-let W, H;
+// ==================== SIMULATION PARAMETERS ====================
+const DT = 0.01;
+const TS_LEN = 500;   // time series display length (steps)
+const SNR_SIGMA_N = 40;  // number of sigma points for SNR curve
+const SNR_COLLECT = 2000; // steps to collect per sigma point
 
-// Parameters
-let D = 1.0;   // noise amplitude
-let freq = 0.3;
-let A = 0.6;   // signal amplitude (subthreshold: threshold=1.0)
+let A = 0.10;
+let f0 = 0.05;
+let speed = 5;
+let running = true;
+let simTime = 0;
+let sigmaLock = 'free'; // 'free','p0','p1','p2'
 
-// Simulation state
-let t = 0;
-const dt = 0.02;
+// Three simulators
+const SIGMAS_FIXED = [0.10, 0.28, 0.80];
+let sigmas = [...SIGMAS_FIXED];
+let sigMainVal = 0.28;
 
-// Double-well: V(x) = -x^2/2 + x^4/4, wells at x=±1, barrier at x=0
-// Force: F = -dV/dx = x - x^3
-// Langevin: dx/dt = x - x^3 + A*sin(2π*f*t) + sqrt(2D)*ξ
+// Per-panel state
+const states = [
+  { x: 1.0, ts: [], tAxis: [] },
+  { x: 1.0, ts: [], tAxis: [] },
+  { x: 1.0, ts: [], tAxis: [] },
+];
 
-// Ball state
-let xBall = 1.0;
-let vBall = 0;
-
-// Three comparison particles
-let x_no  = 1.0;  // no noise
-let x_opt = 1.0;  // optimal noise D=1
-let x_high = 1.0; // high noise D=2.5
-
-// Time series buffers
-const HIST = 500;
-let history_main = new Float32Array(HIST);
-let history_no   = new Float32Array(HIST);
-let history_opt  = new Float32Array(HIST);
-let history_high = new Float32Array(HIST);
-let histIdx = 0;
-
-// SNR curve data (pre-computed approximation)
-function snrTheory(d) {
-  // Kramers-like approximation for SNR in double-well SR
-  // Peak around D ≈ barrier_height / (some scale)
-  // Barrier height = 0.25 (at V(0) - V(1) = 0.25)
-  if (d < 0.01) return 0.01;
-  const omega = 2 * Math.PI * freq;
-  // Simplified: SNR ~ A^2/(4D) * exp(-0.25/D) ... normalized
-  const snr = (A * A / (4 * d)) * Math.exp(-0.25 / d) * 8;
-  return snr;
+// SNR data [sigma -> snr]
+const snrData = {};   // sigma_key -> {snr, ready}
+const SNR_SIGMAS = [];
+for (let i = 0; i <= SNR_SIGMA_N; i++) {
+  SNR_SIGMAS.push(+(0.05 + i * (1.0 - 0.05) / SNR_SIGMA_N).toFixed(3));
 }
+// Pre-initialize
+SNR_SIGMAS.forEach(s => { snrData[s] = { sum: 0, buf: [], ready: false, snr: null }; });
+let snrIdx = 0;   // which sigma we're currently computing for SNR
 
-function gaussNoise() {
+// ==================== PHYSICS ====================
+function dxdt(x, t) {
+  return x - x*x*x + A * Math.sin(2 * Math.PI * f0 * t);
+}
+function gaussRand() {
   // Box-Muller
   const u1 = Math.random(), u2 = Math.random();
-  return Math.sqrt(-2 * Math.log(u1 + 1e-10)) * Math.cos(2 * Math.PI * u2);
+  return Math.sqrt(-2 * Math.log(u1 + 1e-12)) * Math.cos(2 * Math.PI * u2);
+}
+function eulerMaruyama(x, t, sigma) {
+  const drift = dxdt(x, t) * DT;
+  const diffusion = sigma * Math.sqrt(DT) * gaussRand();
+  return x + drift + diffusion;
 }
 
-function updateParticle(x, D_val) {
-  const signal = A * Math.sin(2 * Math.PI * freq * t);
-  const force = x - x * x * x + signal;
-  const noise = Math.sqrt(2 * D_val * dt) * gaussNoise();
-  let xNew = x + force * dt + noise;
-  xNew = Math.max(-2.5, Math.min(2.5, xNew));
-  return xNew;
+// Potential V(x) = -x²/2 + x⁴/4, tilted by signal
+function potential(x, t) {
+  return -x*x/2 + x*x*x*x/4 - A * Math.sin(2 * Math.PI * f0 * t) * x;
 }
 
-function resize() {
-  W = window.innerWidth; H = window.innerHeight;
-  canvas.width = W; canvas.height = H;
+// ==================== SNR COMPUTATION ====================
+// Collect time series for each sigma point and compute DFT at f0
+const snrBufs = {};  // sigma -> array of x values
+SNR_SIGMAS.forEach(s => { snrBufs[s] = []; });
+let snrStateX = {};
+SNR_SIGMAS.forEach(s => { snrStateX[s] = 1.0; });
+let snrT = 0;
+
+function stepSNRCollect() {
+  // Advance one step for current SNR sigma
+  const s = SNR_SIGMAS[snrIdx];
+  const buf = snrBufs[s];
+  snrStateX[s] = eulerMaruyama(snrStateX[s], snrT, s);
+  buf.push(snrStateX[s]);
+  snrT += DT;
+  if (buf.length >= SNR_COLLECT) {
+    snrData[s].snr = computeSNR(buf, s);
+    snrData[s].ready = true;
+    snrIdx = (snrIdx + 1) % SNR_SIGMAS.length;
+  }
 }
 
-function drawPotentialPanel() {
-  // Panel: left third, top 55%
-  const px = 20, py = 55, pw = W * 0.38, ph = H * 0.42;
+function computeSNR(buf, sigma) {
+  // DFT at f0 and nearby bins
+  const N = buf.length;
+  const targetFreq = f0 * DT;  // cycles per step
+  let re = 0, im = 0;
+  for (let i = 0; i < N; i++) {
+    const phi = 2 * Math.PI * targetFreq * i;
+    re += buf[i] * Math.cos(phi);
+    im -= buf[i] * Math.sin(phi);
+  }
+  const signalPow = (re*re + im*im) / (N*N);
 
-  ctx.save();
-  // Panel background
-  ctx.fillStyle = 'rgba(15,15,25,0.85)';
-  ctx.strokeStyle = '#2a2a4a';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.rect(px, py, pw, ph);
-  ctx.fill(); ctx.stroke();
+  // Noise power: average of neighboring bins
+  let noisePow = 0;
+  const freqs = [targetFreq * 0.6, targetFreq * 0.8, targetFreq * 1.2, targetFreq * 1.4];
+  freqs.forEach(freq => {
+    let nr = 0, ni = 0;
+    for (let i = 0; i < N; i++) {
+      const phi = 2 * Math.PI * freq * i;
+      nr += buf[i] * Math.cos(phi);
+      ni -= buf[i] * Math.sin(phi);
+    }
+    noisePow += (nr*nr + ni*ni) / (N*N);
+  });
+  noisePow /= freqs.length;
 
-  // Title
-  ctx.fillStyle = '#666'; ctx.font = '10px Courier New';
-  ctx.fillText('双势阱 Double-Well  V(x) = −x²/2 + x⁴/4', px + 8, py + 14);
+  if (noisePow < 1e-15) return -40;
+  return 10 * Math.log10(signalPow / noisePow);
+}
 
-  // Axes
-  const axX = px + pw * 0.5;  // x=0 at center
-  const axY = py + ph * 0.72; // V=0 near bottom
-  const scaleX = pw * 0.22;
-  const scaleY = ph * 0.9;
+// ==================== DRAWING ====================
+function drawPotential(canvasEl, panelIdx, t) {
+  const w = canvasEl.offsetWidth || 300;
+  const h = canvasEl.offsetHeight || 85;
+  canvasEl.width = w;
+  canvasEl.height = h;
+  const c = canvasEl.getContext('2d');
+  c.clearRect(0, 0, w, h);
+
+  // Background
+  c.fillStyle = '#0a0a0a';
+  c.fillRect(0, 0, w, h);
+
+  // Map x [-2, 2] to pixel coords
+  const xToP = x => (x + 2) / 4 * w;
+  const vMin = -0.6, vMax = 1.0;
+  const vToP = v => h - (v - vMin) / (vMax - vMin) * h;
 
   // Draw potential curve
-  ctx.beginPath();
-  ctx.strokeStyle = '#4a4a8a'; ctx.lineWidth = 1.5;
-  for (let xi = -2.5; xi <= 2.5; xi += 0.05) {
-    const v = -xi * xi / 2 + xi * xi * xi * xi / 4;
-    const cx2 = axX + xi * scaleX;
-    const cy2 = axY - v * scaleY * 1.8;
-    xi === -2.5 ? ctx.moveTo(cx2, cy2) : ctx.lineTo(cx2, cy2);
+  c.beginPath();
+  c.strokeStyle = '#2a4a6a';
+  c.lineWidth = 1;
+  for (let px = 0; px < w; px++) {
+    const x = (px / w) * 4 - 2;
+    const v = potential(x, t);
+    const py = vToP(v);
+    px === 0 ? c.moveTo(px, py) : c.lineTo(px, py);
   }
-  ctx.stroke();
+  c.stroke();
 
-  // Threshold line (V at barrier, x=0, V=0)
-  // Signal shifts the potential, draw effective potential
-  const sig = A * Math.sin(2 * Math.PI * freq * t);
-  ctx.beginPath();
-  ctx.strokeStyle = 'rgba(167,139,250,0.4)'; ctx.lineWidth = 1;
-  ctx.setLineDash([3, 3]);
-  for (let xi = -2.5; xi <= 2.5; xi += 0.05) {
-    const v = -xi * xi / 2 + xi * xi * xi * xi / 4 - sig * xi;
-    const cx2 = axX + xi * scaleX;
-    const cy2 = axY - v * scaleY * 1.8;
-    xi === -2.5 ? ctx.moveTo(cx2, cy2) : ctx.lineTo(cx2, cy2);
-  }
-  ctx.stroke(); ctx.setLineDash([]);
+  // Zero line
+  c.strokeStyle = '#1a1a2a';
+  c.lineWidth = 1;
+  c.beginPath();
+  c.moveTo(0, vToP(0)); c.lineTo(w, vToP(0));
+  c.stroke();
 
-  // Ball (main particle)
-  const bx = axX + xBall * scaleX;
-  const bV = -xBall * xBall / 2 + xBall * xBall * xBall * xBall / 4;
-  const by = axY - bV * scaleY * 1.8;
+  // Draw wells markers
+  c.strokeStyle = '#1a3a4a';
+  c.lineWidth = 1;
+  [-1, 1].forEach(xw => {
+    const px = xToP(xw);
+    c.beginPath(); c.moveTo(px, 0); c.lineTo(px, h);
+    c.setLineDash([2, 4]); c.stroke(); c.setLineDash([]);
+  });
 
-  // Glow
-  const grad = ctx.createRadialGradient(bx, by, 0, bx, by, 10);
-  grad.addColorStop(0, 'rgba(167,139,250,0.9)');
-  grad.addColorStop(1, 'rgba(167,139,250,0)');
-  ctx.fillStyle = grad;
-  ctx.beginPath(); ctx.arc(bx, by, 10, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#c4b5fd';
-  ctx.beginPath(); ctx.arc(bx, by, 4, 0, Math.PI * 2); ctx.fill();
+  // Draw particle
+  const x = states[panelIdx].ts.length > 0 ? states[panelIdx].ts[states[panelIdx].ts.length - 1] : 1;
+  const xClamped = Math.max(-2, Math.min(2, x));
+  const v = potential(xClamped, t);
+  const px = xToP(xClamped);
+  const py = vToP(v);
 
-  // Labels
-  ctx.fillStyle = '#555'; ctx.font = '9px Courier New';
-  ctx.fillText('-1', axX - scaleX - 6, axY + 10);
-  ctx.fillText('+1', axX + scaleX - 6, axY + 10);
-  ctx.fillStyle = '#7c3aed'; ctx.font = '9px Courier New';
-  ctx.fillText(`信号 A·sin(2πft) = ${sig.toFixed(2)}`, px + 8, py + ph - 8);
+  const cols = ['#e74c3c', '#2ecc71', '#f39c12'];
+  c.beginPath();
+  c.arc(px, py, 5, 0, Math.PI * 2);
+  c.fillStyle = cols[panelIdx];
+  c.fill();
+  c.strokeStyle = '#fff';
+  c.lineWidth = 1;
+  c.stroke();
 
-  ctx.restore();
+  // Label
+  c.fillStyle = '#444';
+  c.font = `${9 * devicePixelRatio}px sans-serif`;
+  c.fillText('V(x)', 4, 12);
+  c.fillStyle = '#555';
+  c.fillText('x=-1', xToP(-1) - 12, h - 3);
+  c.fillText('x=+1', xToP(1) - 12, h - 3);
 }
 
-function drawSNRPanel() {
-  // Panel: right portion, top 55%
-  const px = W * 0.42, py = 55, pw = W * 0.54, ph = H * 0.42;
+function drawTimeSeries(canvasEl, panelIdx) {
+  const w = canvasEl.offsetWidth || 300;
+  const h = canvasEl.offsetHeight || 60;
+  canvasEl.width = w;
+  canvasEl.height = h;
+  const c = canvasEl.getContext('2d');
 
-  ctx.save();
-  ctx.fillStyle = 'rgba(15,25,15,0.85)';
-  ctx.strokeStyle = '#2a4a2a'; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.rect(px, py, pw, ph); ctx.fill(); ctx.stroke();
+  c.fillStyle = '#080808';
+  c.fillRect(0, 0, w, h);
 
-  ctx.fillStyle = '#666'; ctx.font = '10px Courier New';
-  ctx.fillText('SNR vs 噪声强度 D  (随机共振曲线)', px + 8, py + 14);
+  const ts = states[panelIdx].ts;
+  if (ts.length < 2) return;
 
-  const lx = px + 40, ly = py + 22, lw = pw - 55, lh = ph - 40;
+  const disp = ts.slice(-TS_LEN);
+
+  // reference lines
+  [-1, 0, 1].forEach(y => {
+    const py = h * (1 - (y + 2) / 4);
+    c.strokeStyle = y === 0 ? '#1a1a2a' : '#1a2a1a';
+    c.lineWidth = 1;
+    c.setLineDash(y === 0 ? [] : [3, 3]);
+    c.beginPath(); c.moveTo(0, py); c.lineTo(w, py);
+    c.stroke(); c.setLineDash([]);
+  });
+
+  // Signal reference (noiseless)
+  c.strokeStyle = '#1a3a5a';
+  c.lineWidth = 1;
+  c.beginPath();
+  const t0 = simTime - disp.length * DT;
+  for (let i = 0; i < disp.length; i++) {
+    const t = t0 + i * DT;
+    const ref = A * Math.sin(2 * Math.PI * f0 * t);
+    const px = (i / (TS_LEN - 1)) * w;
+    const py = h * (1 - (ref + 2) / 4);
+    i === 0 ? c.moveTo(px, py) : c.lineTo(px, py);
+  }
+  c.stroke();
+
+  // Time series
+  c.beginPath();
+  c.strokeStyle = '#4a90d9';
+  c.lineWidth = 1.5;
+  for (let i = 0; i < disp.length; i++) {
+    const px = (i / (TS_LEN - 1)) * w;
+    const v = Math.max(-2.5, Math.min(2.5, disp[i]));
+    const py = h * (1 - (v + 2.5) / 5);
+    i === 0 ? c.moveTo(px, py) : c.lineTo(px, py);
+  }
+  c.stroke();
+
+  // Axis label
+  c.fillStyle = '#333';
+  c.font = '9px sans-serif';
+  c.fillText('x(t)', 4, 10);
+  c.fillText('+1', 4, h * (1 - 3/5) + 3);
+  c.fillText('-1', 4, h * (1 - 1/5) + 3);
+}
+
+function drawSNR() {
+  const canvas = document.getElementById('snrCanvas');
+  const w = canvas.offsetWidth || 600;
+  const h = canvas.offsetHeight || 150;
+  canvas.width = w;
+  canvas.height = h;
+  const c = canvas.getContext('2d');
+
+  c.fillStyle = '#080808';
+  c.fillRect(0, 0, w, h);
+
+  const pad = { l: 45, r: 20, t: 15, b: 25 };
+  const pw = w - pad.l - pad.r;
+  const ph = h - pad.t - pad.b;
+
+  // Collect valid SNR points
+  const pts = SNR_SIGMAS.map(s => ({ s, snr: snrData[s].snr })).filter(p => p.snr !== null);
+
+  // Y range
+  let yMin = -35, yMax = 10;
+  if (pts.length > 0) {
+    const vals = pts.map(p => p.snr);
+    yMin = Math.min(-35, Math.min(...vals) - 5);
+    yMax = Math.max(10, Math.max(...vals) + 5);
+  }
+
+  const sigToX = s => pad.l + (s - 0.05) / (1.0 - 0.05) * pw;
+  const snrToY = snr => pad.t + ph - (snr - yMin) / (yMax - yMin) * ph;
+
+  // Grid
+  c.strokeStyle = '#1a1a1a';
+  c.lineWidth = 1;
+  for (let snr = Math.ceil(yMin / 5) * 5; snr <= yMax; snr += 5) {
+    const py = snrToY(snr);
+    c.beginPath(); c.moveTo(pad.l, py); c.lineTo(pad.l + pw, py);
+    c.stroke();
+    c.fillStyle = '#444';
+    c.font = '9px sans-serif';
+    c.fillText(snr + ' dB', 2, py + 3);
+  }
+  [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0].forEach(s => {
+    const px = sigToX(s);
+    c.strokeStyle = '#1a1a1a';
+    c.beginPath(); c.moveTo(px, pad.t); c.lineTo(px, pad.t + ph);
+    c.stroke();
+    c.fillStyle = '#444';
+    c.font = '9px sans-serif';
+    c.fillText(s.toFixed(1), px - 8, pad.t + ph + 14);
+  });
 
   // Axes
-  ctx.strokeStyle = '#333'; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(lx, ly); ctx.lineTo(lx, ly + lh); ctx.lineTo(lx + lw, ly + lh); ctx.stroke();
+  c.strokeStyle = '#333';
+  c.lineWidth = 1;
+  c.strokeRect(pad.l, pad.t, pw, ph);
+
+  // σ_opt theoretical line
+  const sigOpt = computeSigOpt();
+  if (sigOpt > 0.05 && sigOpt < 1.0) {
+    const px = sigToX(sigOpt);
+    c.strokeStyle = '#2ecc71';
+    c.lineWidth = 1;
+    c.setLineDash([4, 4]);
+    c.beginPath(); c.moveTo(px, pad.t); c.lineTo(px, pad.t + ph);
+    c.stroke(); c.setLineDash([]);
+    c.fillStyle = '#2ecc71';
+    c.font = '10px sans-serif';
+    c.fillText('σ_opt', px + 3, pad.t + 12);
+  }
+
+  // Current sigma line
+  const cPx = sigToX(sigMainVal);
+  c.strokeStyle = '#f5a623';
+  c.lineWidth = 1.5;
+  c.setLineDash([3, 3]);
+  c.beginPath(); c.moveTo(cPx, pad.t); c.lineTo(cPx, pad.t + ph);
+  c.stroke(); c.setLineDash([]);
+  c.fillStyle = '#f5a623';
+  c.font = '9px sans-serif';
+  c.fillText('σ=' + sigMainVal.toFixed(2), cPx + 2, pad.t + ph - 4);
+
+  // SNR curve
+  if (pts.length >= 2) {
+    // Gradient fill
+    const grad = c.createLinearGradient(0, pad.t, 0, pad.t + ph);
+    grad.addColorStop(0, 'rgba(74,144,217,0.3)');
+    grad.addColorStop(1, 'rgba(74,144,217,0.02)');
+
+    c.beginPath();
+    pts.forEach((p, i) => {
+      const px = sigToX(p.s);
+      const py = snrToY(p.snr);
+      i === 0 ? c.moveTo(px, py) : c.lineTo(px, py);
+    });
+    c.lineTo(sigToX(pts[pts.length-1].s), pad.t + ph);
+    c.lineTo(sigToX(pts[0].s), pad.t + ph);
+    c.closePath();
+    c.fillStyle = grad;
+    c.fill();
+
+    c.beginPath();
+    c.strokeStyle = '#4a90d9';
+    c.lineWidth = 2;
+    pts.forEach((p, i) => {
+      const px = sigToX(p.s);
+      const py = snrToY(p.snr);
+      i === 0 ? c.moveTo(px, py) : c.lineTo(px, py);
+    });
+    c.stroke();
+
+    // Find and mark peak
+    const peak = pts.reduce((a, b) => a.snr > b.snr ? a : b);
+    const peakPx = sigToX(peak.s);
+    const peakPy = snrToY(peak.snr);
+    c.beginPath();
+    c.arc(peakPx, peakPy, 5, 0, Math.PI*2);
+    c.fillStyle = '#4a90d9';
+    c.fill();
+    c.fillStyle = '#4a90d9';
+    c.font = '10px sans-serif';
+    c.fillText('峰值 σ=' + peak.s.toFixed(2), peakPx + 7, peakPy - 4);
+  } else {
+    c.fillStyle = '#333';
+    c.font = '12px sans-serif';
+    c.fillText('正在收集 SNR 数据...', pad.l + pw/2 - 70, pad.t + ph/2);
+  }
+
+  // Progress bar
+  const progress = snrIdx / SNR_SIGMAS.length;
+  c.fillStyle = '#1a2a3a';
+  c.fillRect(pad.l, pad.t + ph + 2, pw, 3);
+  c.fillStyle = '#4a90d9';
+  c.fillRect(pad.l, pad.t + ph + 2, pw * progress, 3);
 
   // Axis labels
-  ctx.fillStyle = '#555'; ctx.font = '9px Courier New';
-  ctx.fillText('SNR', lx - 28, ly + lh * 0.3);
-  ctx.fillText('0', lx - 10, ly + lh + 3);
-  ctx.fillText('3', lx + lw - 5, ly + lh + 10);
-  ctx.fillText('D →', lx + lw - 20, ly + lh + 10);
+  c.fillStyle = '#555';
+  c.font = '10px sans-serif';
+  c.fillText('σ（噪声强度）', pad.l + pw/2 - 30, h - 2);
+  c.save();
+  c.translate(10, pad.t + ph/2 + 15);
+  c.rotate(-Math.PI/2);
+  c.fillText('SNR (dB)', 0, 0);
+  c.restore();
+}
 
-  // Theory curve
-  const nPts = 100;
-  let maxSNR = 0;
-  let peakD = 0;
-  const pts = [];
-  for (let i = 0; i <= nPts; i++) {
-    const dv = (i / nPts) * 3;
-    const snr = snrTheory(dv);
-    if (snr > maxSNR) { maxSNR = snr; peakD = dv; }
-    pts.push({d: dv, snr});
-  }
+function computeSigOpt() {
+  // 2 * r_K = f0 => r_K = f0/2 => (1/2π)*exp(-ΔV/σ²) = f0/2
+  // => exp(-ΔV/σ²) = π*f0 => -ΔV/σ² = ln(π*f0)
+  // => σ² = -ΔV/ln(π*f0) => valid if π*f0 < 1
+  const DV = 0.25;
+  const val = Math.PI * f0;
+  if (val >= 1) return 0;
+  const sigSq = -DV / Math.log(val);
+  return sigSq > 0 ? Math.sqrt(sigSq) : 0;
+}
 
-  ctx.beginPath();
-  ctx.strokeStyle = '#22c55e'; ctx.lineWidth = 2;
-  pts.forEach((p, i) => {
-    const cx2 = lx + (p.d / 3) * lw;
-    const cy2 = ly + lh - (p.snr / (maxSNR * 1.2)) * lh;
-    i === 0 ? ctx.moveTo(cx2, cy2) : ctx.lineTo(cx2, cy2);
+function updateStats() {
+  const sigOpt = computeSigOpt();
+  document.getElementById('stSigOpt').textContent = sigOpt > 0 ? sigOpt.toFixed(3) : '—';
+  const sigma = sigMainVal;
+  const DV = 0.25;
+  const kr = (1/(2*Math.PI)) * Math.exp(-DV / (sigma*sigma));
+  document.getElementById('stKR').textContent = kr.toExponential(2);
+  document.getElementById('stTime').textContent = simTime.toFixed(1);
+  document.getElementById('timeLabel').textContent = 't = ' + simTime.toFixed(1);
+}
+
+// ==================== PANEL SIGMA MANAGEMENT ====================
+function getPanelSigmas() {
+  return sigmas;
+}
+
+function updateSigmaLabels() {
+  const s = sigmas;
+  const labels = [
+    { el: document.getElementById('sigLabel0'), cls: getSigmaClass(s[0]) },
+    { el: document.getElementById('sigLabel1'), cls: getSigmaClass(s[1]) },
+    { el: document.getElementById('sigLabel2'), cls: getSigmaClass(s[2]) },
+  ];
+  labels.forEach((l, i) => {
+    l.el.className = 'panel-sigma ' + l.cls;
+    l.el.querySelector('.val').textContent = s[i].toFixed(2);
   });
-  ctx.stroke();
-
-  // Peak marker
-  const peakX = lx + (peakD / 3) * lw;
-  const peakY = ly + lh - (maxSNR / (maxSNR * 1.2)) * lh;
-  ctx.strokeStyle = '#4ade80'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
-  ctx.beginPath(); ctx.moveTo(peakX, ly); ctx.lineTo(peakX, ly + lh); ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.fillStyle = '#4ade80'; ctx.font = '9px Courier New';
-  ctx.fillText(`最优 D≈${peakD.toFixed(1)}`, peakX + 4, ly + 18);
-
-  // Current D point
-  const curSNR = snrTheory(D);
-  const curX = lx + (D / 3) * lw;
-  const curY = ly + lh - (curSNR / (maxSNR * 1.2)) * lh;
-
-  const glowG = ctx.createRadialGradient(curX, curY, 0, curX, curY, 14);
-  glowG.addColorStop(0, 'rgba(167,139,250,0.8)');
-  glowG.addColorStop(1, 'rgba(167,139,250,0)');
-  ctx.fillStyle = glowG;
-  ctx.beginPath(); ctx.arc(curX, curY, 14, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#a78bfa';
-  ctx.beginPath(); ctx.arc(curX, curY, 5, 0, Math.PI * 2); ctx.fill();
-
-  ctx.fillStyle = '#a78bfa'; ctx.font = '9px Courier New';
-  ctx.fillText(`D=${D.toFixed(2)}`, curX + 6, curY - 5);
-
-  ctx.restore();
 }
 
-function drawTimeSeriesPanel() {
-  // Bottom panel: three parallel time series
-  const px = 20, py = H * 0.55 + 10, pw = W - 40, ph = H * 0.36;
-  const labels = ['无噪声 (D=0)', '最优噪声 (D≈1.0)', '过多噪声 (D=2.5)'];
-  const colors = ['#64748b', '#22c55e', '#ef4444'];
-  const histories = [history_no, history_opt, history_high];
-  const rowH = ph / 3;
+function getSigmaClass(s) {
+  if (s < 0.18) return 'too-small';
+  if (s > 0.45) return 'too-large';
+  return 'optimal';
+}
 
-  ctx.save();
+// ==================== ANIMATION LOOP ====================
+let running2 = true;
+let lastTs = 0;
+let frameAcc = 0;
 
-  for (let row = 0; row < 3; row++) {
-    const ry = py + row * rowH;
-    ctx.fillStyle = row % 2 === 0 ? 'rgba(10,10,20,0.6)' : 'rgba(5,15,10,0.6)';
-    ctx.strokeStyle = '#1a1a2a'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.rect(px, ry, pw, rowH - 2); ctx.fill(); ctx.stroke();
-
-    ctx.fillStyle = colors[row]; ctx.font = '10px Courier New';
-    ctx.fillText(labels[row], px + 8, ry + 13);
-
-    // Signal reference (subthreshold input)
-    const midY = ry + rowH * 0.5;
-    const ampScale = rowH * 0.35;
-
-    // Threshold lines
-    ctx.strokeStyle = '#333'; ctx.lineWidth = 1; ctx.setLineDash([2, 4]);
-    ctx.beginPath(); ctx.moveTo(px + 80, midY - ampScale); ctx.lineTo(px + pw - 5, midY - ampScale); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(px + 80, midY + ampScale); ctx.lineTo(px + pw - 5, midY + ampScale); ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle = '#333'; ctx.font = '8px Courier New';
-    ctx.fillText('+阈', px + 62, midY - ampScale + 3);
-    ctx.fillText('-阈', px + 62, midY + ampScale + 3);
-
-    // Draw history
-    const hist = histories[row];
-    if (histIdx > 2) {
-      ctx.beginPath();
-      ctx.strokeStyle = colors[row]; ctx.lineWidth = 1.5;
-      const startI = (histIdx + 1) % HIST;
-      for (let i = 0; i < HIST; i++) {
-        const dataI = (startI + i) % HIST;
-        const cx2 = px + 80 + (i / HIST) * (pw - 85);
-        const cy2 = midY - hist[dataI] * ampScale * 0.6;
-        i === 0 ? ctx.moveTo(cx2, cy2) : ctx.lineTo(cx2, cy2);
+function loop(ts) {
+  if (running2) {
+    const stepsPerFrame = speed * 2;
+    const panelSigs = getPanelSigmas();
+    for (let i = 0; i < stepsPerFrame; i++) {
+      for (let p = 0; p < 3; p++) {
+        const x = states[p].ts.length > 0 ? states[p].ts[states[p].ts.length-1] : 1.0;
+        const nx = eulerMaruyama(x, simTime, panelSigs[p]);
+        states[p].ts.push(nx);
+        if (states[p].ts.length > TS_LEN * 2) states[p].ts.splice(0, states[p].ts.length - TS_LEN);
       }
-      ctx.stroke();
+      // SNR collection
+      for (let j = 0; j < 3; j++) stepSNRCollect();
+      simTime += DT;
     }
+
+    // Render
+    for (let p = 0; p < 3; p++) {
+      const potEl = document.getElementById('potCanvas' + p);
+      const tsEl  = document.getElementById('tsCanvas' + p);
+      drawPotential(potEl, p, simTime);
+      drawTimeSeries(tsEl, p);
+    }
+    drawSNR();
+    updateStats();
   }
-
-  // Captions
-  ctx.fillStyle = '#555'; ctx.font = '9px Courier New';
-  ctx.fillText('← 时间', px + pw - 50, py + ph - 8);
-
-  ctx.restore();
+  requestAnimationFrame(loop);
 }
+requestAnimationFrame(loop);
 
-let frameCount = 0;
-
-function frame() {
-  ctx.fillStyle = '#000';
-  ctx.fillRect(0, 0, W, H);
-
-  // Simulate multiple steps per frame
-  for (let s = 0; s < 3; s++) {
-    xBall = updateParticle(xBall, D);
-    x_no  = updateParticle(x_no,  0.0);
-    x_opt = updateParticle(x_opt, 1.0);
-    x_high = updateParticle(x_high, 2.5);
-    t += dt;
-
-    history_main[histIdx % HIST] = xBall;
-    history_no[histIdx % HIST]   = x_no;
-    history_opt[histIdx % HIST]  = x_opt;
-    history_high[histIdx % HIST] = x_high;
-    histIdx++;
-  }
-
-  drawPotentialPanel();
-  drawSNRPanel();
-  drawTimeSeriesPanel();
-
-  requestAnimationFrame(frame);
-}
-
-document.getElementById('d-slider').addEventListener('input', function() {
-  D = parseFloat(this.value);
-  document.getElementById('d-val').textContent = D.toFixed(2);
-  // Update peak estimate
-  let bestD = 0.1, bestSNR = 0;
-  for (let dv = 0.05; dv <= 3; dv += 0.05) {
-    const s = snrTheory(dv);
-    if (s > bestSNR) { bestSNR = s; bestD = dv; }
-  }
-  document.getElementById('snr-peak').textContent = bestD.toFixed(1);
+// ==================== CONTROLS ====================
+document.getElementById('btnPause').addEventListener('click', function() {
+  running2 = !running2;
+  this.textContent = running2 ? '⏸ 暂停' : '▶ 运行';
+  this.classList.toggle('active', running2);
 });
-document.getElementById('f-slider').addEventListener('input', function() {
-  freq = parseFloat(this.value);
-  document.getElementById('f-val').textContent = freq.toFixed(2);
+document.getElementById('btnReset').addEventListener('click', () => {
+  simTime = 0;
+  states.forEach(s => { s.ts = []; s.x = 1.0; });
+  SNR_SIGMAS.forEach(s => {
+    snrBufs[s] = [];
+    snrStateX[s] = 1.0;
+    snrData[s].snr = null;
+    snrData[s].ready = false;
+  });
+  snrIdx = 0; snrT = 0;
 });
-document.getElementById('a-slider').addEventListener('input', function() {
+
+document.getElementById('speedSlider').addEventListener('input', function() {
+  speed = +this.value;
+  document.getElementById('speedVal').textContent = speed + '×';
+});
+document.getElementById('aSlider').addEventListener('input', function() {
   A = parseFloat(this.value);
-  document.getElementById('a-val').textContent = A.toFixed(2);
+  document.getElementById('aVal').textContent = A.toFixed(2);
+  // Reset SNR
+  SNR_SIGMAS.forEach(s => { snrBufs[s] = []; snrData[s].snr = null; snrData[s].ready = false; });
+  snrIdx = 0;
+});
+document.getElementById('f0Slider').addEventListener('input', function() {
+  f0 = parseFloat(this.value);
+  document.getElementById('f0Val').textContent = f0.toFixed(3);
+  SNR_SIGMAS.forEach(s => { snrBufs[s] = []; snrData[s].snr = null; snrData[s].ready = false; });
+  snrIdx = 0;
+});
+document.getElementById('sigSlider').addEventListener('input', function() {
+  sigMainVal = parseFloat(this.value);
+  document.getElementById('sigMainVal').textContent = sigMainVal.toFixed(2);
+  // Apply to locked panel
+  if (sigmaLock === 'p0') { sigmas[0] = sigMainVal; }
+  else if (sigmaLock === 'p1') { sigmas[1] = sigMainVal; }
+  else if (sigmaLock === 'p2') { sigmas[2] = sigMainVal; }
+  updateSigmaLabels();
 });
 
-window.addEventListener('resize', resize);
-resize();
-frame();
+// Lock buttons
+['free','p0','p1','p2'].forEach(id => {
+  document.getElementById('lock' + id.charAt(0).toUpperCase() + id.slice(1)).addEventListener('click', function() {
+    sigmaLock = id;
+    ['lockFree','lockP0','lockP1','lockP2'].forEach(bid => {
+      document.getElementById(bid).classList.remove('active');
+    });
+    this.classList.add('active');
+    if (id !== 'free') {
+      const pidx = id === 'p0' ? 0 : id === 'p1' ? 1 : 2;
+      sigmas[pidx] = sigMainVal;
+    } else {
+      sigmas = [...SIGMAS_FIXED];
+    }
+    updateSigmaLabels();
+  });
+});
+
+// ==================== INIT ====================
+updateSigmaLabels();
+updateStats();
 </script>
 </body>
 </html>

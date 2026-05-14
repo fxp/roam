@@ -1,195 +1,622 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Night 3 · 奇异吸引子</title>
+<title>Strange Attractors — Density Renderer</title>
 <style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { background: #0a0a0a; overflow: hidden; font-family: monospace; color: #ccc; }
-canvas { display: block; }
-#ui {
-  position: fixed; top: 12px; left: 12px;
-  font-size: 11px; line-height: 1.6; color: #fa8;
-  text-shadow: 0 0 8px #fa8;
-  pointer-events: none;
-}
-#controls {
-  position: fixed; top: 12px; right: 12px;
-  display: flex; flex-direction: column; gap: 6px; align-items: flex-end;
-}
-.att-btn {
-  background: rgba(120,60,0,0.3); border: 1px solid #fa8;
-  color: #fa8; padding: 4px 10px; font-family: monospace;
-  font-size: 11px; cursor: pointer; border-radius: 3px;
-  transition: all 0.2s;
-}
-.att-btn:hover, .att-btn.active { background: rgba(200,100,0,0.4); color: #fff; }
-#caption {
-  position: fixed; bottom: 0; left: 0; right: 0;
-  text-align: center; padding: 10px 20px 14px;
-  font-family: 'PingFang SC', 'Noto Sans SC', sans-serif;
-  font-size: 12px; line-height: 1.7; color: #aaa;
-  background: linear-gradient(transparent, rgba(0,0,0,0.85));
-  pointer-events: none;
-}
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0f;
+    color: #c8d8e8;
+    font-family: 'Courier New', monospace;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+    user-select: none;
+  }
+  #header {
+    padding: 10px 20px;
+    background: #0f0f1a;
+    border-bottom: 1px solid #1a2a3a;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-shrink: 0;
+  }
+  #attractor-title {
+    font-size: 18px;
+    font-weight: bold;
+    color: #4af;
+    min-width: 200px;
+  }
+  #attractor-year {
+    font-size: 12px;
+    color: #5a7a9a;
+  }
+  #attractor-desc {
+    font-size: 11px;
+    color: #6a8aaa;
+    font-style: italic;
+    flex: 1;
+  }
+  #stats {
+    font-size: 11px;
+    color: #4a6a7a;
+    text-align: right;
+  }
+  #main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+  #sidebar {
+    width: 160px;
+    background: #0c0c18;
+    border-right: 1px solid #1a2a3a;
+    padding: 12px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  #sidebar h3 {
+    font-size: 10px;
+    color: #3a5a7a;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 4px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #1a2a3a;
+  }
+  .attractor-btn {
+    background: #121222;
+    border: 1px solid #1e2e3e;
+    color: #8aaabb;
+    padding: 8px 10px;
+    cursor: pointer;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    text-align: left;
+    transition: all 0.15s;
+    line-height: 1.4;
+  }
+  .attractor-btn:hover {
+    background: #1a2a3a;
+    border-color: #2a5a7a;
+    color: #aaccdd;
+  }
+  .attractor-btn.active {
+    background: #0d2035;
+    border-color: #2a7aaa;
+    color: #4af;
+    box-shadow: 0 0 8px #0a4a7a44;
+  }
+  .attractor-btn .btn-name {
+    font-weight: bold;
+    display: block;
+  }
+  .attractor-btn .btn-year {
+    font-size: 10px;
+    color: #4a6a7a;
+  }
+  #canvas-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    background: #080810;
+  }
+  #mainCanvas {
+    display: block;
+    cursor: crosshair;
+  }
+  #tooltip {
+    position: absolute;
+    background: #0d1a2a;
+    border: 1px solid #2a4a6a;
+    color: #7abacc;
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: 3px;
+    pointer-events: none;
+    display: none;
+    font-family: 'Courier New', monospace;
+  }
+  #controls {
+    background: #0c0c18;
+    border-top: 1px solid #1a2a3a;
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    flex-shrink: 0;
+  }
+  .ctrl-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .ctrl-label {
+    font-size: 11px;
+    color: #5a7a8a;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    white-space: nowrap;
+  }
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 100px;
+    height: 4px;
+    background: #1a2a3a;
+    border-radius: 2px;
+    outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #2a7aaa;
+    cursor: pointer;
+  }
+  #speedVal {
+    font-size: 12px;
+    color: #4af;
+    min-width: 24px;
+  }
+  #particleCount {
+    font-size: 12px;
+    color: #4af;
+  }
+  button#resetBtn {
+    background: #121a2a;
+    border: 1px solid #2a4a6a;
+    color: #7abacc;
+    padding: 5px 14px;
+    cursor: pointer;
+    border-radius: 3px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    transition: all 0.15s;
+  }
+  button#resetBtn:hover {
+    background: #1a2a3a;
+    border-color: #3a7aaa;
+    color: #4af;
+  }
+  #progress-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  #progressBar {
+    flex: 1;
+    height: 3px;
+    background: #1a2a3a;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  #progressFill {
+    height: 100%;
+    background: linear-gradient(90deg, #0a4a8a, #2abadd);
+    width: 0%;
+    transition: width 0.1s;
+  }
+  #progressLabel {
+    font-size: 10px;
+    color: #3a5a7a;
+    min-width: 80px;
+  }
 </style>
 </head>
 <body>
-<canvas id="c"></canvas>
-<div id="ui">
-  <div>▓ NIGHT LAB · N03</div>
-  <div>2026-04-30</div>
-  <div style="color:#888">奇异吸引子 · 7000粒子</div>
+<div id="header">
+  <div id="attractor-title">Lorenz Attractor</div>
+  <div id="attractor-year">Discovered 1963</div>
+  <div id="attractor-desc">The butterfly effect — deterministic chaos in atmospheric convection</div>
+  <div id="stats">
+    <span id="frameCount">Frames: 0</span><br>
+    <span id="densityMax">Max density: 0</span>
+  </div>
+</div>
+<div id="main">
+  <div id="sidebar">
+    <h3>Attractors</h3>
+    <button class="attractor-btn active" data-idx="0">
+      <span class="btn-name">Lorenz</span>
+      <span class="btn-year">1963 · σ=10 ρ=28</span>
+    </button>
+    <button class="attractor-btn" data-idx="1">
+      <span class="btn-name">Rössler</span>
+      <span class="btn-year">1976 · a=0.2 c=5.7</span>
+    </button>
+    <button class="attractor-btn" data-idx="2">
+      <span class="btn-name">Thomas</span>
+      <span class="btn-year">1999 · b=0.19</span>
+    </button>
+    <button class="attractor-btn" data-idx="3">
+      <span class="btn-name">Halvorsen</span>
+      <span class="btn-year">2000s · a=1.4</span>
+    </button>
+    <button class="attractor-btn" data-idx="4">
+      <span class="btn-name">Aizawa</span>
+      <span class="btn-year">1994 · b=0.7</span>
+    </button>
+  </div>
+  <div id="canvas-wrap">
+    <canvas id="mainCanvas" width="800" height="600"></canvas>
+    <div id="tooltip"></div>
+  </div>
 </div>
 <div id="controls">
-  <button class="att-btn active" onclick="setAttractor('lorenz',this)">Lorenz</button>
-  <button class="att-btn" onclick="setAttractor('rossler',this)">Rössler</button>
-  <button class="att-btn" onclick="setAttractor('thomas',this)">Thomas</button>
-  <button class="att-btn" onclick="setAttractor('halvorsen',this)">Halvorsen</button>
+  <div class="ctrl-group">
+    <span class="ctrl-label">Speed</span>
+    <input type="range" id="speedSlider" min="1" max="10" value="3" step="1">
+    <span id="speedVal">3x</span>
+  </div>
+  <div class="ctrl-group">
+    <span class="ctrl-label">Particles</span>
+    <span id="particleCount">7000</span>
+  </div>
+  <button id="resetBtn">Reset</button>
+  <div id="progress-wrap">
+    <div id="progressBar"><div id="progressFill"></div></div>
+    <span id="progressLabel">Warming up...</span>
+  </div>
 </div>
-<div id="caption">「7000个粒子在混沌方程里游荡，每条轨迹都不重复，但也永远不会逃出某个看不见的"边界"。这朵鬼魅的花，是数学里最美的意外之一。」</div>
 
 <script>
-const canvas = document.getElementById('c');
+const W = 800, H = 600;
+const N_PARTICLES = 7000;
+const WARMUP = 1000;
+
+const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
+const tooltip = document.getElementById('tooltip');
+const canvasWrap = document.getElementById('canvas-wrap');
 
-const N = 7000;
-const TRAIL = 12;
-let attType = 'lorenz';
-let angle = 0;
-let positions = [];
-let trails = [];
+// Density buffer
+let density = new Float32Array(W * H);
+let maxDensity = 1;
+let frameCount = 0;
+let warmupDone = false;
+let warmupStep = 0;
 
-const attractors = {
-  lorenz: {
-    dt: 0.008,
-    step(x, y, z) {
-      const s=10, r=28, b=8/3;
-      return [s*(y-x), x*(r-z)-y, x*y-b*z];
-    },
-    init() { return [(Math.random()-0.5)*2, (Math.random()-0.5)*2+1, 20+Math.random()*10]; },
-    scale: 0.018, cx: 0, cy: 5
-  },
-  rossler: {
-    dt: 0.025,
-    step(x, y, z) {
-      const a=0.2, b=0.2, c=5.7;
-      return [-y-z, x+a*y, b+z*(x-c)];
-    },
-    init() { return [(Math.random()-0.5)*4, (Math.random()-0.5)*4, Math.random()*2]; },
-    scale: 0.022, cx: 0, cy: 0
-  },
-  thomas: {
-    dt: 0.06,
-    step(x, y, z) {
-      const b=0.19;
-      return [Math.sin(y)-b*x, Math.sin(z)-b*y, Math.sin(x)-b*z];
-    },
-    init() { return [(Math.random()-0.5)*3, (Math.random()-0.5)*3, (Math.random()-0.5)*3]; },
-    scale: 0.12, cx: 0, cy: 0
-  },
-  halvorsen: {
-    dt: 0.012,
-    step(x, y, z) {
-      const a=1.4;
-      return [-a*x-4*y-4*z-y*y, -a*y-4*z-4*x-z*z, -a*z-4*x-4*y-x*x];
-    },
-    init() { return [(Math.random()-0.5)*0.5, (Math.random()-0.5)*0.5+0.1, (Math.random()-0.5)*0.5]; },
-    scale: 0.042, cx: 0, cy: 0
+// Color LUT (viridis-inspired: black -> deep blue -> cyan -> white)
+const LUT_SIZE = 1024;
+const colorLUT = new Uint8ClampedArray(LUT_SIZE * 4);
+(function buildLUT() {
+  for (let i = 0; i < LUT_SIZE; i++) {
+    const t = i / (LUT_SIZE - 1);
+    let r, g, b;
+    if (t < 0.25) {
+      const s = t / 0.25;
+      r = Math.round(0 + s * 0);
+      g = Math.round(0 + s * 10);
+      b = Math.round(0 + s * 80);
+    } else if (t < 0.5) {
+      const s = (t - 0.25) / 0.25;
+      r = Math.round(0 + s * 0);
+      g = Math.round(10 + s * 100);
+      b = Math.round(80 + s * 120);
+    } else if (t < 0.75) {
+      const s = (t - 0.5) / 0.25;
+      r = Math.round(0 + s * 50);
+      g = Math.round(110 + s * 100);
+      b = Math.round(200 + s * 30);
+    } else {
+      const s = (t - 0.75) / 0.25;
+      r = Math.round(50 + s * 205);
+      g = Math.round(210 + s * 45);
+      b = Math.round(230 + s * 25);
+    }
+    colorLUT[i*4]   = Math.min(255, r);
+    colorLUT[i*4+1] = Math.min(255, g);
+    colorLUT[i*4+2] = Math.min(255, b);
+    colorLUT[i*4+3] = 255;
   }
-};
+})();
+
+// Attractor definitions
+const attractors = [
+  {
+    name: 'Lorenz',
+    year: 1963,
+    desc: 'The butterfly effect — deterministic chaos in atmospheric convection',
+    params: { sigma: 10, rho: 28, beta: 8/3 },
+    dt: 0.005,
+    proj: 'XY',
+    deriv(x, y, z, p) {
+      return [
+        p.sigma * (y - x),
+        x * (p.rho - z) - y,
+        x * y - p.beta * z
+      ];
+    },
+    initBall(i) {
+      return [
+        (Math.random()-0.5)*2,
+        (Math.random()-0.5)*2 + 1,
+        (Math.random()-0.5)*2 + 20
+      ];
+    },
+    viewScale: 11, viewOX: W/2, viewOY: H/2+60
+  },
+  {
+    name: 'Rössler',
+    year: 1976,
+    desc: 'Spiral chaos — prototype of folded-band strange attractors',
+    params: { a: 0.2, b: 0.2, c: 5.7 },
+    dt: 0.02,
+    proj: 'XY',
+    deriv(x, y, z, p) {
+      return [
+        -y - z,
+        x + p.a * y,
+        p.b + z * (x - p.c)
+      ];
+    },
+    initBall(i) {
+      return [
+        (Math.random()-0.5)*2,
+        (Math.random()-0.5)*2,
+        (Math.random()-0.5)*0.5
+      ];
+    },
+    viewScale: 16, viewOX: W/2, viewOY: H/2+30
+  },
+  {
+    name: 'Thomas',
+    year: 1999,
+    desc: 'Symmetric dissipative chaos — three coupled pendula in sinusoidal coupling',
+    params: { b: 0.19 },
+    dt: 0.05,
+    proj: 'XZ',
+    deriv(x, y, z, p) {
+      return [
+        Math.sin(y) - p.b * x,
+        Math.sin(z) - p.b * y,
+        Math.sin(x) - p.b * z
+      ];
+    },
+    initBall(i) {
+      return [
+        (Math.random()-0.5)*0.4,
+        (Math.random()-0.5)*0.4,
+        (Math.random()-0.5)*0.4
+      ];
+    },
+    viewScale: 70, viewOX: W/2, viewOY: H/2
+  },
+  {
+    name: 'Halvorsen',
+    year: null,
+    desc: 'Cyclic symmetry with quadratic coupling — rich fractal structure',
+    params: { a: 1.4 },
+    dt: 0.005,
+    proj: 'XY',
+    deriv(x, y, z, p) {
+      return [
+        -p.a*x - 4*y - 4*z - y*y,
+        -p.a*y - 4*z - 4*x - z*z,
+        -p.a*z - 4*x - 4*y - x*x
+      ];
+    },
+    initBall(i) {
+      return [
+        (Math.random()-0.5)*0.2 - 5,
+        (Math.random()-0.5)*0.2,
+        (Math.random()-0.5)*0.2
+      ];
+    },
+    viewScale: 28, viewOX: W/2, viewOY: H/2+20
+  },
+  {
+    name: 'Aizawa',
+    year: 1994,
+    desc: 'Toroidal chaos — spiraling trajectory around an unstable torus',
+    params: { a: 0.95, b: 0.7, c: 0.6, d: 3.5, e: 0.25, f: 0.1 },
+    dt: 0.01,
+    proj: 'XY',
+    deriv(x, y, z, p) {
+      return [
+        (z - p.b)*x - p.d*y,
+        p.d*x + (z - p.b)*y,
+        p.c + p.a*z - z*z*z/3 - (x*x + y*y)*(1 + p.e*z) + p.f*z*x*x*x
+      ];
+    },
+    initBall(i) {
+      return [
+        (Math.random()-0.5)*0.2 + 0.1,
+        (Math.random()-0.5)*0.2,
+        (Math.random()-0.5)*0.2 - 0.3
+      ];
+    },
+    viewScale: 140, viewOX: W/2, viewOY: H/2
+  }
+];
+
+let currentIdx = 0;
+let particles = null; // Float64Array, 3 floats per particle
+let speed = 3;
+let running = true;
+let animId = null;
+
+function getAttractor() { return attractors[currentIdx]; }
 
 function initParticles() {
-  const att = attractors[attType];
-  positions = [];
-  trails = [];
-  for (let i = 0; i < N; i++) {
-    positions.push(att.init());
-    trails.push([]);
+  const attr = getAttractor();
+  particles = new Float64Array(N_PARTICLES * 3);
+  for (let i = 0; i < N_PARTICLES; i++) {
+    const [x, y, z] = attr.initBall(i);
+    particles[i*3]   = x;
+    particles[i*3+1] = y;
+    particles[i*3+2] = z;
   }
-  // warm up
-  for (let iter = 0; iter < 500; iter++) {
-    for (let i = 0; i < N; i++) {
-      const p = positions[i];
-      const [dx, dy, dz] = att.step(p[0], p[1], p[2]);
-      p[0] += dx * att.dt;
-      p[1] += dy * att.dt;
-      p[2] += dz * att.dt;
+  density.fill(0);
+  maxDensity = 1;
+  frameCount = 0;
+  warmupDone = false;
+  warmupStep = 0;
+  document.getElementById('progressFill').style.width = '0%';
+  document.getElementById('progressLabel').textContent = 'Warming up...';
+}
+
+function rk4step(attr, x, y, z) {
+  const p = attr.params;
+  const dt = attr.dt;
+  const [k1x, k1y, k1z] = attr.deriv(x, y, z, p);
+  const [k2x, k2y, k2z] = attr.deriv(x+dt/2*k1x, y+dt/2*k1y, z+dt/2*k1z, p);
+  const [k3x, k3y, k3z] = attr.deriv(x+dt/2*k2x, y+dt/2*k2y, z+dt/2*k2z, p);
+  const [k4x, k4y, k4z] = attr.deriv(x+dt*k3x, y+dt*k3y, z+dt*k3z, p);
+  return [
+    x + dt/6*(k1x+2*k2x+2*k3x+k4x),
+    y + dt/6*(k1y+2*k2y+2*k3y+k4y),
+    z + dt/6*(k1z+2*k2z+2*k3z+k4z)
+  ];
+}
+
+function splatDensity(px, py) {
+  // Bilinear splat
+  const x0 = Math.floor(px), y0 = Math.floor(py);
+  const fx = px - x0, fy = py - y0;
+  const x1 = x0+1, y1 = y0+1;
+  if (x0 >= 0 && x1 < W && y0 >= 0 && y1 < H) {
+    density[y0*W+x0] += (1-fx)*(1-fy);
+    density[y0*W+x1] += fx*(1-fy);
+    density[y1*W+x0] += (1-fx)*fy;
+    density[y1*W+x1] += fx*fy;
+  }
+}
+
+function projectParticle(attr, x, y, z) {
+  let px, py;
+  if (attr.proj === 'XY') { px = x; py = -y; }
+  else if (attr.proj === 'XZ') { px = x; py = -z; }
+  else { px = y; py = -z; }
+  return [
+    attr.viewOX + px * attr.viewScale,
+    attr.viewOY + py * attr.viewScale
+  ];
+}
+
+function stepParticles(stepsPerFrame) {
+  const attr = getAttractor();
+  for (let s = 0; s < stepsPerFrame; s++) {
+    for (let i = 0; i < N_PARTICLES; i++) {
+      let x = particles[i*3], y = particles[i*3+1], z = particles[i*3+2];
+
+      // Sanity check
+      if (!isFinite(x) || !isFinite(y) || !isFinite(z) ||
+          Math.abs(x)>1e6 || Math.abs(y)>1e6 || Math.abs(z)>1e6) {
+        const [nx, ny, nz] = attr.initBall(i);
+        particles[i*3] = nx; particles[i*3+1] = ny; particles[i*3+2] = nz;
+        continue;
+      }
+
+      const [nx, ny, nz] = rk4step(attr, x, y, z);
+      particles[i*3] = nx; particles[i*3+1] = ny; particles[i*3+2] = nz;
+
+      if (warmupDone) {
+        const [px, py] = projectParticle(attr, nx, ny, nz);
+        splatDensity(px, py);
+      }
+    }
+
+    if (!warmupDone) {
+      warmupStep++;
+      const pct = Math.min(100, (warmupStep/WARMUP)*100);
+      document.getElementById('progressFill').style.width = pct + '%';
+      if (warmupStep >= WARMUP) {
+        warmupDone = true;
+        document.getElementById('progressLabel').textContent = 'Accumulating...';
+      }
     }
   }
 }
 
-function project(x, y, z) {
-  const att = attractors[attType];
-  const ca = Math.cos(angle), sa = Math.sin(angle);
-  const rx = x * ca - z * sa;
-  const ry = y * 0.85 - x * sa * 0.3 - z * ca * 0.3;
-  const W = canvas.width, H = canvas.height;
-  const s = Math.min(W, H) * att.scale;
-  return [W/2 + (rx + att.cx) * s, H/2 - (ry + att.cy) * s];
-}
+function renderDensity() {
+  const imgData = ctx.createImageData(W, H);
+  const data = imgData.data;
 
-function setAttractor(name, btn) {
-  attType = name;
-  document.querySelectorAll('.att-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  ctx.fillStyle = '#0a0a0a';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  initParticles();
-}
+  // Find max
+  let mx = 0;
+  for (let i = 0; i < W*H; i++) if (density[i] > mx) mx = density[i];
+  maxDensity = Math.max(1, mx);
 
-function heatColor(i) {
-  const t = (i / N);
-  // amber/gold palette
-  const r = Math.floor(255 * Math.min(1, t * 2.5));
-  const g = Math.floor(180 * Math.min(1, t * 1.5));
-  const b = Math.floor(60 * t);
-  return `rgb(${r},${g},${b})`;
-}
+  const logMax = Math.log(1 + maxDensity);
 
-let frameCount = 0;
-function loop() {
-  const att = attractors[attType];
-
-  // fade
-  ctx.fillStyle = 'rgba(10,10,10,0.18)';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  angle += 0.003;
-
-  for (let i = 0; i < N; i++) {
-    const p = positions[i];
-    const [dx, dy, dz] = att.step(p[0], p[1], p[2]);
-    const np = [p[0] + dx * att.dt, p[1] + dy * att.dt, p[2] + dz * att.dt];
-    positions[i] = np;
-
-    const [px, py] = project(p[0], p[1], p[2]);
-    const [npx, npy] = project(np[0], np[1], np[2]);
-
-    const alpha = 0.6 + 0.4 * (i / N);
-    ctx.strokeStyle = heatColor(i);
-    ctx.globalAlpha = alpha * 0.3;
-    ctx.lineWidth = 0.8;
-    ctx.beginPath();
-    ctx.moveTo(px, py);
-    ctx.lineTo(npx, npy);
-    ctx.stroke();
+  for (let i = 0; i < W*H; i++) {
+    if (density[i] === 0) {
+      data[i*4+3] = 255;
+      continue;
+    }
+    const t = Math.log(1 + density[i]) / logMax;
+    const li = Math.min(LUT_SIZE-1, Math.floor(t * (LUT_SIZE-1)));
+    data[i*4]   = colorLUT[li*4];
+    data[i*4+1] = colorLUT[li*4+1];
+    data[i*4+2] = colorLUT[li*4+2];
+    data[i*4+3] = 255;
   }
-  ctx.globalAlpha = 1;
+
+  ctx.putImageData(imgData, 0, 0);
+}
+
+function loop() {
+  if (!running) return;
+  stepParticles(speed * 2);
+  renderDensity();
   frameCount++;
-  requestAnimationFrame(loop);
+  document.getElementById('frameCount').textContent = 'Frames: ' + frameCount;
+  document.getElementById('densityMax').textContent = 'Max density: ' + maxDensity.toFixed(0);
+  animId = requestAnimationFrame(loop);
 }
 
-function resize() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-  ctx.fillStyle = '#0a0a0a';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-}
+// UI
+document.querySelectorAll('.attractor-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const idx = parseInt(btn.dataset.idx);
+    currentIdx = idx;
+    document.querySelectorAll('.attractor-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const attr = attractors[idx];
+    document.getElementById('attractor-title').textContent = attr.name + ' Attractor';
+    document.getElementById('attractor-year').textContent = attr.year ? 'Discovered ' + attr.year : 'Modern era';
+    document.getElementById('attractor-desc').textContent = attr.desc;
+    initParticles();
+  });
+});
 
-resize();
-window.addEventListener('resize', resize);
+document.getElementById('speedSlider').addEventListener('input', e => {
+  speed = parseInt(e.target.value);
+  document.getElementById('speedVal').textContent = speed + 'x';
+});
+
+document.getElementById('resetBtn').addEventListener('click', () => {
+  initParticles();
+});
+
+// Tooltip on hover
+canvas.addEventListener('mousemove', e => {
+  const rect = canvas.getBoundingClientRect();
+  const x = Math.floor((e.clientX - rect.left) * (W / rect.width));
+  const y = Math.floor((e.clientY - rect.top) * (H / rect.height));
+  if (x >= 0 && x < W && y >= 0 && y < H) {
+    const d = density[y*W+x];
+    tooltip.style.display = 'block';
+    tooltip.style.left = (e.clientX - rect.left + 12) + 'px';
+    tooltip.style.top  = (e.clientY - rect.top - 20) + 'px';
+    tooltip.textContent = 'density: ' + d.toFixed(2);
+  }
+});
+canvas.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
+
+// Init
 initParticles();
 loop();
 </script>

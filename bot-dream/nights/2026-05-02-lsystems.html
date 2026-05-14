@@ -3,242 +3,663 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Night 5 · L-Systems</title>
+<title>L-Systems 文法可视化器</title>
 <style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { background: #080c10; overflow: hidden; font-family: monospace; color: #ccc; }
-canvas { display: block; }
-#ui {
-  position: fixed; top: 12px; left: 12px;
-  font-size: 11px; line-height: 1.6; color: #6f8;
-  text-shadow: 0 0 8px #6f8;
-  pointer-events: none;
-}
-#controls {
-  position: fixed; top: 12px; right: 12px;
-  display: flex; flex-direction: column; gap: 5px; align-items: flex-end;
-}
-.preset-btn {
-  background: rgba(0,60,20,0.3); border: 1px solid #6f8;
-  color: #6f8; padding: 4px 10px; font-family: monospace;
-  font-size: 11px; cursor: pointer; border-radius: 3px;
-  transition: all 0.2s; min-width: 90px; text-align: center;
-}
-.preset-btn:hover, .preset-btn.active { background: rgba(0,140,60,0.4); color: #fff; }
-#caption {
-  position: fixed; bottom: 0; left: 0; right: 0;
-  text-align: center; padding: 10px 20px 14px;
-  font-family: 'PingFang SC', 'Noto Sans SC', sans-serif;
-  font-size: 12px; line-height: 1.7; color: #aaa;
-  background: linear-gradient(transparent, rgba(0,0,0,0.85));
-  pointer-events: none;
-}
-#info {
-  position: fixed; bottom: 70px; left: 50%; transform: translateX(-50%);
-  font-size: 10px; color: #444; pointer-events: none; white-space: nowrap;
-}
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a10;
+    color: #dde;
+    font-family: 'Courier New', monospace;
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+  }
+  #left-panel {
+    width: 240px;
+    min-width: 240px;
+    background: #0f1018;
+    border-right: 1px solid #1e2030;
+    display: flex;
+    flex-direction: column;
+    padding: 14px;
+    gap: 10px;
+    overflow-y: auto;
+  }
+  #right-panel {
+    width: 240px;
+    min-width: 240px;
+    background: #0f1018;
+    border-left: 1px solid #1e2030;
+    display: flex;
+    flex-direction: column;
+    padding: 14px;
+    gap: 10px;
+    overflow-y: auto;
+  }
+  #canvas-area {
+    flex: 1;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  canvas#main-canvas {
+    position: absolute;
+    top: 0; left: 0;
+  }
+  h1 {
+    font-size: 12px;
+    color: #88ccff;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    border-bottom: 1px solid #88ccff33;
+    padding-bottom: 7px;
+  }
+  .section-title {
+    font-size: 9px;
+    color: #445566;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 3px;
+  }
+  button {
+    background: #101824;
+    border: 1px solid #88ccff44;
+    color: #88ccff;
+    padding: 7px 10px;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.15s;
+    width: 100%;
+  }
+  button:hover { background: #88ccff18; border-color: #88ccff; }
+  button:active { background: #88ccff33; }
+  button.active {
+    background: #88ccff22;
+    border-color: #88ccff;
+    color: #fff;
+  }
+  .preset-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5px;
+  }
+  .preset-btn {
+    font-size: 9px;
+    padding: 6px 4px;
+    text-align: center;
+    border-radius: 4px;
+  }
+  input[type=range] {
+    width: 100%;
+    accent-color: #88ccff;
+    cursor: pointer;
+  }
+  input[type=text], input[type=number], textarea {
+    background: #080c14;
+    border: 1px solid #1e2a3a;
+    color: #aac8e8;
+    padding: 5px 7px;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    border-radius: 4px;
+    width: 100%;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  input:focus, textarea:focus { border-color: #88ccff55; }
+  textarea { resize: vertical; min-height: 50px; }
+  select {
+    background: #080c14;
+    border: 1px solid #1e2a3a;
+    color: #aac8e8;
+    padding: 6px;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    border-radius: 4px;
+    width: 100%;
+    cursor: pointer;
+  }
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    padding: 2px 0;
+  }
+  .stat-label { color: #445566; }
+  .stat-value { color: #88ccff; }
+  #status-bar {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #0f1018dd;
+    border: 1px solid #1e2a3a;
+    padding: 4px 14px;
+    font-size: 10px;
+    border-radius: 16px;
+    color: #556677;
+    white-space: nowrap;
+    z-index: 10;
+    backdrop-filter: blur(4px);
+  }
+  .color-scheme-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 4px;
+  }
+  .cs-btn {
+    height: 22px;
+    border-radius: 4px;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: border-color 0.15s;
+    padding: 0;
+  }
+  .cs-btn.selected { border-color: #fff; }
+  .range-row { display: flex; justify-content: space-between; font-size: 9px; color: #334; margin-top: 2px; }
+  .rule-row { display: flex; gap: 4px; align-items: center; margin-bottom: 4px; }
+  .rule-lhs { width: 28px; flex-shrink: 0; font-size: 12px; text-align: center; }
+  .rule-arrow { color: #445; font-size: 11px; flex-shrink: 0; }
+  .rule-rhs { flex: 1; }
+  .badge {
+    display: inline-block;
+    background: #88ccff22;
+    color: #88ccff;
+    font-size: 9px;
+    padding: 1px 5px;
+    border-radius: 8px;
+    margin-left: 4px;
+  }
 </style>
 </head>
 <body>
-<canvas id="c"></canvas>
-<div id="ui">
-  <div>▓ NIGHT LAB · N05</div>
-  <div>2026-05-02</div>
-  <div style="color:#888" id="current-name">L-Systems</div>
+
+<div id="left-panel">
+  <h1>L-Systems</h1>
+  <div style="font-size:9px;color:#334;line-height:1.5">
+    文法 + 龟图解释<br>
+    F=前进 +/-=旋转 [/]=堆栈
+  </div>
+
+  <div>
+    <div class="section-title">经典预设</div>
+    <div class="preset-grid">
+      <button class="preset-btn active" data-preset="0">分形树</button>
+      <button class="preset-btn" data-preset="1">龙曲线</button>
+      <button class="preset-btn" data-preset="2">科赫雪花</button>
+      <button class="preset-btn" data-preset="3">谢尔平斯基</button>
+      <button class="preset-btn" data-preset="4">Gosper</button>
+      <button class="preset-btn" data-preset="5">Barnsley蕨</button>
+      <button class="preset-btn" data-preset="6">希尔伯特</button>
+      <button class="preset-btn" data-preset="7">彭罗斯丛</button>
+    </div>
+  </div>
+
+  <div>
+    <div class="section-title">动画速度</div>
+    <input type="range" id="anim-speed" min="0" max="3" step="1" value="1">
+    <div class="range-row">
+      <span>慢</span><span id="speed-label">中速</span><span>瞬间</span>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:6px">
+    <button id="btn-run" style="flex:2">生成 ▶</button>
+    <button id="btn-stop" style="flex:1;border-color:#c84b1e55;color:#c84b1e">停止</button>
+  </div>
+
+  <div>
+    <div class="section-title">色彩方案</div>
+    <div class="color-scheme-grid">
+      <div class="cs-btn selected" data-cs="0" style="background:linear-gradient(135deg,#000 50%,#fff)" title="经典黑白"></div>
+      <div class="cs-btn" data-cs="1" style="background:linear-gradient(135deg,#0a0a1a,#ff00ff)" title="霓虹"></div>
+      <div class="cs-btn" data-cs="2" style="background:linear-gradient(135deg,#0a1a0a,#44ff88)" title="森林"></div>
+      <div class="cs-btn" data-cs="3" style="background:linear-gradient(135deg,#050a14,#00ffcc)" title="极光"></div>
+      <div class="cs-btn" data-cs="4" style="background:linear-gradient(135deg,#1a0820,#ff88cc)" title="水彩"></div>
+    </div>
+  </div>
+
+  <div>
+    <div class="section-title">统计</div>
+    <div class="stat-row"><span class="stat-label">字符串长度</span><span class="stat-value" id="stat-len">-</span></div>
+    <div class="stat-row"><span class="stat-label">绘制步数</span><span class="stat-value" id="stat-steps">-</span></div>
+    <div class="stat-row"><span class="stat-label">迭代深度</span><span class="stat-value" id="stat-iters">-</span></div>
+    <div class="stat-row"><span class="stat-label">进度</span><span class="stat-value" id="stat-progress">-</span></div>
+  </div>
 </div>
-<div id="controls">
-  <button class="preset-btn active" onclick="selectPreset(0,this)">植物 Plant</button>
-  <button class="preset-btn" onclick="selectPreset(1,this)">龙形 Dragon</button>
-  <button class="preset-btn" onclick="selectPreset(2,this)">科赫 Koch</button>
-  <button class="preset-btn" onclick="selectPreset(3,this)">希尔伯特</button>
-  <button class="preset-btn" onclick="selectPreset(4,this)">蕨类 Fern</button>
-  <button class="preset-btn" onclick="selectPreset(5,this)">莱维曲线</button>
-  <button class="preset-btn" onclick="selectPreset(6,this)">谢尔宾斯基</button>
-  <button class="preset-btn" onclick="selectPreset(7,this)">雪花</button>
+
+<div id="canvas-area">
+  <canvas id="main-canvas"></canvas>
+  <div id="status-bar">选择预设，点击"生成"</div>
 </div>
-<div id="info" id="sys-info"></div>
-<div id="caption">「把字母F替换成F+F-F，重复十次，然后把F翻译成"往前走"，+翻译成"左转"。真正的植物细胞分裂，用的是完全一样的递归逻辑。语法就是生长。」</div>
+
+<div id="right-panel">
+  <h1>文法编辑器</h1>
+
+  <div>
+    <div class="section-title">公理 (Axiom)</div>
+    <input type="text" id="ed-axiom" placeholder="例: F" value="F">
+  </div>
+
+  <div>
+    <div class="section-title">重写规则 (最多3条)</div>
+    <div class="rule-row">
+      <input type="text" class="rule-lhs" id="rule-lhs-0" value="F" maxlength="2">
+      <span class="rule-arrow">→</span>
+      <input type="text" class="rule-rhs" id="rule-rhs-0" value="F[+F]F[-F]F">
+    </div>
+    <div class="rule-row">
+      <input type="text" class="rule-lhs" id="rule-lhs-1" value="" placeholder="X" maxlength="2">
+      <span class="rule-arrow">→</span>
+      <input type="text" class="rule-rhs" id="rule-rhs-1" value="">
+    </div>
+    <div class="rule-row">
+      <input type="text" class="rule-lhs" id="rule-lhs-2" value="" placeholder="Y" maxlength="2">
+      <span class="rule-arrow">→</span>
+      <input type="text" class="rule-rhs" id="rule-rhs-2" value="">
+    </div>
+  </div>
+
+  <div>
+    <div class="section-title">旋转角度</div>
+    <input type="number" id="ed-angle" value="25.7" step="0.1" min="1" max="180">
+  </div>
+
+  <div>
+    <div class="section-title">迭代次数</div>
+    <input type="range" id="ed-iters" min="1" max="10" step="1" value="5">
+    <div class="range-row">
+      <span>1</span><span id="iter-label">5</span><span>10</span>
+    </div>
+  </div>
+
+  <div>
+    <div class="section-title">步长缩放</div>
+    <input type="range" id="ed-scale" min="50" max="200" step="1" value="100">
+    <div class="range-row">
+      <span>50%</span><span id="scale-label">100%</span><span>200%</span>
+    </div>
+  </div>
+
+  <button id="btn-apply">应用编辑器参数 ▶</button>
+
+  <div>
+    <div class="section-title">符号说明</div>
+    <div style="font-size:9px;color:#445;line-height:1.7">
+      <b style="color:#88ccff">F, G</b> — 前进并绘制<br>
+      <b style="color:#88ccff">f</b> — 前进不绘制<br>
+      <b style="color:#88ccff">+</b> — 左转 angle°<br>
+      <b style="color:#88ccff">-</b> — 右转 angle°<br>
+      <b style="color:#88ccff">[</b> — 压入位置/方向<br>
+      <b style="color:#88ccff">]</b> — 弹出位置/方向<br>
+      <b style="color:#88ccff">X, Y, A, B</b> — 虚符号(不绘制)<br>
+    </div>
+  </div>
+</div>
 
 <script>
-const canvas = document.getElementById('c');
-const ctx = canvas.getContext('2d');
-
+// ── Presets ────────────────────────────────────────────────
 const PRESETS = [
   {
-    name: '植物 Plant', axiom: 'X', angle: 25, iter: 6,
-    rules: { X: 'F+[[X]-X]-F[-FX]+X', F: 'FF' },
-    color: '#5dfc8a'
+    name: '分形树',
+    axiom: 'F',
+    rules: { F: 'F[+F]F[-F]F' },
+    angle: 25.7, iters: 5,
+    startAngle: -90,
+    colorMode: 'tree',
   },
   {
-    name: '龙形 Dragon', axiom: 'FX', angle: 90, iter: 13,
+    name: '龙曲线',
+    axiom: 'FX',
     rules: { X: 'X+YF+', Y: '-FX-Y' },
-    color: '#f06090'
+    angle: 90, iters: 12,
+    startAngle: 0,
+    colorMode: 'depth',
   },
   {
-    name: '科赫 Koch', axiom: 'F', angle: 60, iter: 5,
-    rules: { F: 'F+F--F+F' },
-    color: '#60c8ff'
-  },
-  {
-    name: '希尔伯特 Hilbert', axiom: 'A', angle: 90, iter: 6,
-    rules: { A: '+BF-AFA-FB+', B: '-AF+BFB+FA-' },
-    color: '#ffd060'
-  },
-  {
-    name: '蕨类 Fern', axiom: 'X', angle: 22.5, iter: 7,
-    rules: { X: 'F+[[X]-X]-F[-FX]+X', F: 'FF' },
-    color: '#80ff60'
-  },
-  {
-    name: '莱维曲线 Levy', axiom: 'F', angle: 45, iter: 14,
-    rules: { F: '+F--F+' },
-    color: '#c0a0ff'
-  },
-  {
-    name: '谢尔宾斯基 Sierpinski', axiom: 'F-G-G', angle: 120, iter: 7,
-    rules: { F: 'F-G+F+G-F', G: 'GG' },
-    color: '#ff9060'
-  },
-  {
-    name: '雪花 Snowflake', axiom: 'F++F++F', angle: 60, iter: 5,
+    name: '科赫雪花',
+    axiom: 'F++F++F',
     rules: { F: 'F-F++F-F' },
-    color: '#a0e8ff'
-  }
+    angle: 60, iters: 4,
+    startAngle: 0,
+    colorMode: 'rainbow',
+  },
+  {
+    name: '谢尔平斯基',
+    axiom: 'F-G-G',
+    rules: { F: 'F-G+F+G-F', G: 'GG' },
+    angle: 120, iters: 5,
+    startAngle: 0,
+    colorMode: 'rainbow',
+  },
+  {
+    name: 'Gosper',
+    axiom: 'F',
+    rules: { F: 'F-G--G+F++FF+G-', G: '+F-GG--G-F++F+G' },
+    angle: 60, iters: 4,
+    startAngle: 0,
+    colorMode: 'depth',
+  },
+  {
+    name: 'Barnsley蕨',
+    axiom: 'X',
+    rules: { X: 'F+[[X]-X]-F[-FX]+X', F: 'FF' },
+    angle: 25, iters: 6,
+    startAngle: -90,
+    colorMode: 'fern',
+  },
+  {
+    name: '希尔伯特',
+    axiom: 'A',
+    rules: { A: '+BF-AFA-FB+', B: '-AF+BFB+FA-' },
+    angle: 90, iters: 6,
+    startAngle: 0,
+    colorMode: 'rainbow',
+  },
+  {
+    name: '彭罗斯丛',
+    axiom: 'F',
+    rules: { F: 'FF+[+F-F-F]-[-F+F+F]' },
+    angle: 22.5, iters: 4,
+    startAngle: -90,
+    colorMode: 'tree',
+  },
 ];
 
-let currentPreset = 0;
-let drawCommands = [];
-let drawIndex = 0;
-let animId = null;
-let turtleState = null;
+// ── Color Schemes ──────────────────────────────────────────
+const COLOR_SCHEMES = [
+  { name: '黑白', bg: '#000000', fn: (t, d, stackDepth) => `hsl(0,0%,${80+t*20}%)` },
+  { name: '霓虹', bg: '#050008', fn: (t, d, stackDepth) => `hsl(${t*360+d*30},100%,60%)` },
+  { name: '森林', bg: '#020802', fn: (t, d, stackDepth) => `hsl(${100+stackDepth*15},${60+t*40}%,${30+t*40}%)` },
+  { name: '极光', bg: '#00050f', fn: (t, d, stackDepth) => `hsl(${160+t*80},80%,${40+stackDepth*8}%)` },
+  { name: '水彩', bg: '#0a020e', fn: (t, d, stackDepth) => `hsl(${280+t*140},${50+stackDepth*10}%,${50+t*30}%)` },
+];
 
-function expandLSystem(preset) {
-  let str = preset.axiom;
-  for (let i = 0; i < preset.iter; i++) {
-    let next = '';
-    for (const ch of str) {
-      next += preset.rules[ch] || ch;
-    }
-    str = next;
-    if (str.length > 600000) break;
-  }
-  return str;
+let selectedCS = 0;
+let currentPreset = 0;
+
+const canvas = document.getElementById('main-canvas');
+const ctx = canvas.getContext('2d');
+
+function resizeCanvas() {
+  const area = document.getElementById('canvas-area');
+  canvas.width = area.clientWidth;
+  canvas.height = area.clientHeight;
 }
 
-function computeBounds(cmds, preset) {
-  let x = 0, y = 0, angle = -90;
-  const rad = preset.angle * Math.PI / 180;
+// ── L-System String Generation ──────────────────────────────
+function generateString(axiom, rules, iters) {
+  let s = axiom;
+  for (let i = 0; i < iters; i++) {
+    let next = '';
+    for (const ch of s) {
+      next += rules[ch] !== undefined ? rules[ch] : ch;
+    }
+    s = next;
+    if (s.length > 5_000_000) break; // safety cap
+  }
+  return s;
+}
+
+// ── Turtle Path Builder ─────────────────────────────────────
+function buildPath(str, angle, startAngle, scale) {
+  const rad = angle * Math.PI / 180;
+  const startRad = startAngle * Math.PI / 180;
+  let x = 0, y = 0, a = startRad;
   const stack = [];
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const ch of cmds) {
-    if (ch === 'F' || ch === 'G') {
-      x += Math.cos(angle * Math.PI / 180);
-      y += Math.sin(angle * Math.PI / 180);
+  const lines = []; // {x1,y1,x2,y2,t,depth}
+  let minX = 0, maxX = 0, minY = 0, maxY = 0;
+  let totalF = 0;
+  let depth = 0;
+
+  // Count F/G for t normalization
+  let fCount = 0;
+  for (const c of str) { if (c === 'F' || c === 'G') fCount++; }
+
+  let fi = 0;
+  for (const c of str) {
+    if (c === 'F' || c === 'G') {
+      const nx = x + Math.cos(a) * scale;
+      const ny = y + Math.sin(a) * scale;
+      lines.push({ x1: x, y1: y, x2: nx, y2: ny, t: fi / fCount, depth: stack.length });
+      x = nx; y = ny;
       if (x < minX) minX = x; if (x > maxX) maxX = x;
       if (y < minY) minY = y; if (y > maxY) maxY = y;
-    } else if (ch === '+') { angle += preset.angle; }
-    else if (ch === '-') { angle -= preset.angle; }
-    else if (ch === '[') { stack.push([x, y, angle]); }
-    else if (ch === ']') { const s = stack.pop(); x=s[0]; y=s[1]; angle=s[2]; }
-  }
-  return { minX, minY, maxX, maxY };
-}
-
-function selectPreset(idx, btn) {
-  currentPreset = idx;
-  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  document.getElementById('current-name').textContent = PRESETS[idx].name;
-  startDraw();
-}
-
-function startDraw() {
-  if (animId) cancelAnimationFrame(animId);
-  ctx.fillStyle = '#080c10';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  const preset = PRESETS[currentPreset];
-  const str = expandLSystem(preset);
-  drawCommands = str;
-
-  // compute bounds and fit
-  const bounds = computeBounds(str, preset);
-  const W = canvas.width, H = canvas.height;
-  const margin = 0.08;
-  const bw = bounds.maxX - bounds.minX || 1;
-  const bh = bounds.maxY - bounds.minY || 1;
-  const scaleX = (W * (1 - 2*margin)) / bw;
-  const scaleY = (H * 0.78 * (1 - 2*margin)) / bh;
-  const scale = Math.min(scaleX, scaleY);
-  const ox = W/2 - (bounds.minX + bw/2) * scale;
-  const oy = H * 0.44 - (bounds.minY + bh/2) * scale;
-
-  turtleState = {
-    x: ox, y: oy, angle: -90,
-    scale, ox, oy, preset,
-    stack: [], cmdIdx: 0,
-    str, color: preset.color
-  };
-
-  ctx.strokeStyle = preset.color;
-  ctx.lineWidth = Math.max(0.4, Math.min(1.5, 300 / str.length * 10));
-  ctx.shadowColor = preset.color;
-  ctx.shadowBlur = 3;
-  ctx.beginPath();
-  ctx.moveTo(ox, oy);
-
-  animate();
-}
-
-function animate() {
-  const t = turtleState;
-  if (!t) return;
-  const batchSize = Math.max(50, Math.floor(t.str.length / 120));
-
-  let drawing = false;
-  for (let i = 0; i < batchSize && t.cmdIdx < t.str.length; i++, t.cmdIdx++) {
-    const ch = t.str[t.cmdIdx];
-    if (ch === 'F' || ch === 'G') {
-      const nx = t.x + Math.cos(t.angle * Math.PI / 180) * t.scale;
-      const ny = t.y + Math.sin(t.angle * Math.PI / 180) * t.scale;
-      if (!drawing) { ctx.beginPath(); ctx.moveTo(t.x, t.y); drawing = true; }
-      ctx.lineTo(nx, ny);
-      t.x = nx; t.y = ny;
-    } else if (ch === 'f') {
-      if (drawing) { ctx.stroke(); drawing = false; }
-      t.x += Math.cos(t.angle * Math.PI / 180) * t.scale;
-      t.y += Math.sin(t.angle * Math.PI / 180) * t.scale;
-      ctx.moveTo(t.x, t.y);
-    } else if (ch === '+') {
-      t.angle += t.preset.angle;
-    } else if (ch === '-') {
-      t.angle -= t.preset.angle;
-    } else if (ch === '[') {
-      if (drawing) { ctx.stroke(); drawing = false; }
-      t.stack.push({ x: t.x, y: t.y, angle: t.angle });
-      ctx.moveTo(t.x, t.y);
-    } else if (ch === ']') {
-      if (drawing) { ctx.stroke(); drawing = false; }
-      const s = t.stack.pop();
-      t.x = s.x; t.y = s.y; t.angle = s.angle;
-      ctx.moveTo(t.x, t.y);
+      fi++;
+    } else if (c === 'f') {
+      x += Math.cos(a) * scale;
+      y += Math.sin(a) * scale;
+    } else if (c === '+') {
+      a -= rad;
+    } else if (c === '-') {
+      a += rad;
+    } else if (c === '[') {
+      stack.push({ x, y, a });
+    } else if (c === ']') {
+      if (stack.length > 0) { const s = stack.pop(); x = s.x; y = s.y; a = s.a; }
     }
   }
-  if (drawing) ctx.stroke();
+  return { lines, minX, maxX, minY, maxY };
+}
 
-  if (t.cmdIdx < t.str.length) {
-    animId = requestAnimationFrame(animate);
+// ── Animation State ─────────────────────────────────────────
+let animId = null;
+let isAnimating = false;
+let currentLines = [];
+let animIdx = 0;
+let animBatchSize = 100;
+
+const SPEED_BATCHES = [20, 200, 2000, Infinity];
+const SPEED_LABELS = ['慢速', '中速', '快速', '瞬间'];
+
+function stopAnim() {
+  if (animId) { cancelAnimationFrame(animId); animId = null; }
+  isAnimating = false;
+  document.getElementById('btn-run').textContent = '生成 ▶';
+}
+
+function drawAll(lines, offsetX, offsetY, cs, colorMode, preset) {
+  const scheme = COLOR_SCHEMES[cs];
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = scheme.bg;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  for (const ln of lines) {
+    ctx.strokeStyle = scheme.fn(ln.t, ln.depth, ln.depth);
+    ctx.beginPath();
+    ctx.moveTo(ln.x1 + offsetX, ln.y1 + offsetY);
+    ctx.lineTo(ln.x2 + offsetX, ln.y2 + offsetY);
+    ctx.stroke();
   }
 }
 
-function resize() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-  startDraw();
+function startDraw(preset, iters, customScale) {
+  stopAnim();
+  const p = preset;
+  const str = generateString(p.axiom, p.rules, iters);
+  document.getElementById('stat-len').textContent = str.length.toLocaleString();
+  document.getElementById('stat-iters').textContent = iters;
+
+  const scale = (customScale || 1.0) * 8;
+  const { lines, minX, maxX, minY, maxY } = buildPath(str, p.angle, p.startAngle || 0, scale);
+
+  if (lines.length === 0) {
+    document.getElementById('status-bar').textContent = '没有绘制指令';
+    return;
+  }
+
+  document.getElementById('stat-steps').textContent = lines.length.toLocaleString();
+
+  const W = canvas.width, H = canvas.height;
+  const bw = maxX - minX, bh = maxY - minY;
+  const pad = 30;
+  const scaleF = Math.min((W - pad * 2) / (bw || 1), (H - pad * 2) / (bh || 1));
+
+  // Compute scaled + offset lines
+  const scaledLines = lines.map(ln => ({
+    x1: (ln.x1 - minX) * scaleF + pad,
+    y1: (ln.y1 - minY) * scaleF + pad,
+    x2: (ln.x2 - minX) * scaleF + pad,
+    y2: (ln.y2 - minY) * scaleF + pad,
+    t: ln.t,
+    depth: ln.depth,
+  }));
+
+  // Offset to center
+  const drawnW = bw * scaleF, drawnH = bh * scaleF;
+  const offX = (W - drawnW) / 2 - pad * (W - drawnW - pad * 2 > 0 ? 0 : 0);
+  const offY = (H - drawnH) / 2 - pad * (H - drawnH - pad * 2 > 0 ? 0 : 0);
+
+  // Center properly
+  const cx = W / 2 - (drawnW / 2 + pad);
+  const cy = H / 2 - (drawnH / 2 + pad);
+
+  currentLines = scaledLines;
+  animIdx = 0;
+
+  const speedIdx = parseInt(document.getElementById('anim-speed').value);
+  const batch = SPEED_BATCHES[speedIdx];
+
+  const scheme = COLOR_SCHEMES[selectedCS];
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = scheme.bg;
+  ctx.fillRect(0, 0, W, H);
+  ctx.lineWidth = Math.max(0.5, Math.min(2, 500 / Math.sqrt(lines.length)));
+
+  isAnimating = true;
+  document.getElementById('btn-run').textContent = '绘制中...';
+
+  if (batch === Infinity) {
+    // Instant
+    drawAll(scaledLines, cx, cy, selectedCS, p.colorMode, p);
+    animIdx = scaledLines.length;
+    document.getElementById('stat-progress').textContent = '100%';
+    document.getElementById('status-bar').textContent = `${p.name} — 完成 (${lines.length.toLocaleString()} 步)`;
+    stopAnim();
+    return;
+  }
+
+  function frame() {
+    const end = Math.min(animIdx + batch, scaledLines.length);
+    for (let i = animIdx; i < end; i++) {
+      const ln = scaledLines[i];
+      ctx.strokeStyle = scheme.fn(ln.t, ln.depth, ln.depth);
+      ctx.beginPath();
+      ctx.moveTo(ln.x1 + cx, ln.y1 + cy);
+      ctx.lineTo(ln.x2 + cx, ln.y2 + cy);
+      ctx.stroke();
+    }
+    animIdx = end;
+    const pct = Math.round(animIdx / scaledLines.length * 100);
+    document.getElementById('stat-progress').textContent = pct + '%';
+    if (animIdx < scaledLines.length) {
+      animId = requestAnimationFrame(frame);
+    } else {
+      document.getElementById('status-bar').textContent = `${p.name} — 完成 (${lines.length.toLocaleString()} 步)`;
+      stopAnim();
+    }
+  }
+  animId = requestAnimationFrame(frame);
 }
 
-resize();
-window.addEventListener('resize', resize);
+// ── Load Preset ──────────────────────────────────────────────
+function loadPreset(idx) {
+  const p = PRESETS[idx];
+  currentPreset = idx;
+  document.getElementById('ed-axiom').value = p.axiom;
+  const lhsKeys = Object.keys(p.rules);
+  for (let i = 0; i < 3; i++) {
+    document.getElementById(`rule-lhs-${i}`).value = lhsKeys[i] || '';
+    document.getElementById(`rule-rhs-${i}`).value = lhsKeys[i] ? p.rules[lhsKeys[i]] : '';
+  }
+  document.getElementById('ed-angle').value = p.angle;
+  const iters = p.iters;
+  document.getElementById('ed-iters').value = iters;
+  document.getElementById('iter-label').textContent = iters;
+
+  document.querySelectorAll('.preset-btn').forEach((b, i) => {
+    b.classList.toggle('active', i === idx);
+  });
+
+  resizeCanvas();
+  startDraw(p, iters, 1.0);
+}
+
+// ── Editor Apply ─────────────────────────────────────────────
+function applyEditor() {
+  const axiom = document.getElementById('ed-axiom').value.trim() || 'F';
+  const rules = {};
+  for (let i = 0; i < 3; i++) {
+    const lhs = document.getElementById(`rule-lhs-${i}`).value.trim();
+    const rhs = document.getElementById(`rule-rhs-${i}`).value.trim();
+    if (lhs && rhs) rules[lhs] = rhs;
+  }
+  const angle = parseFloat(document.getElementById('ed-angle').value) || 25;
+  const iters = parseInt(document.getElementById('ed-iters').value) || 4;
+  const scaleRaw = parseInt(document.getElementById('ed-scale').value) || 100;
+  const customScale = scaleRaw / 100;
+
+  const custom = {
+    name: '自定义',
+    axiom, rules, angle,
+    startAngle: -90,
+    colorMode: 'rainbow',
+  };
+
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  resizeCanvas();
+  startDraw(custom, iters, customScale);
+}
+
+// ── Events ────────────────────────────────────────────────────
+document.querySelectorAll('.preset-btn').forEach((btn, i) => {
+  btn.addEventListener('click', () => loadPreset(i));
+});
+
+document.getElementById('btn-run').addEventListener('click', () => {
+  loadPreset(currentPreset);
+});
+
+document.getElementById('btn-stop').addEventListener('click', stopAnim);
+
+document.getElementById('btn-apply').addEventListener('click', applyEditor);
+
+document.getElementById('anim-speed').addEventListener('input', function() {
+  const idx = parseInt(this.value);
+  document.getElementById('speed-label').textContent = SPEED_LABELS[idx];
+});
+
+document.getElementById('ed-iters').addEventListener('input', function() {
+  document.getElementById('iter-label').textContent = this.value;
+});
+
+document.getElementById('ed-scale').addEventListener('input', function() {
+  document.getElementById('scale-label').textContent = this.value + '%';
+});
+
+document.querySelectorAll('.cs-btn').forEach((btn, i) => {
+  btn.addEventListener('click', () => {
+    selectedCS = i;
+    document.querySelectorAll('.cs-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    // Redraw if done
+    if (!isAnimating && currentLines.length > 0) {
+      const p = PRESETS[currentPreset] || { name: '自定义', colorMode: 'rainbow' };
+      drawAll(currentLines, 0, 0, selectedCS, p.colorMode, p);
+    }
+  });
+});
+
+window.addEventListener('load', () => {
+  resizeCanvas();
+  loadPreset(0);
+  window.addEventListener('resize', () => {
+    resizeCanvas();
+  });
+});
 </script>
 </body>
 </html>

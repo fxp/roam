@@ -1,377 +1,813 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Night 10 · 量子隧穿</title>
+<title>Quantum Tunneling — TDSE Wave Packet Evolution</title>
 <style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { background: #02040a; color: #fff; font-family: 'Courier New', monospace; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
-
-#label {
-  position: absolute; top: 12px; left: 14px; z-index: 10;
-  font-size: 11px; color: #445; line-height: 1.6; pointer-events: none;
-}
-
-#top-bar {
-  display: flex; align-items: center; gap: 8px; padding: 8px 14px 4px;
-  flex-shrink: 0; flex-wrap: wrap;
-}
-
-.preset-btn {
-  background: #0a0e1a; border: 1px solid #1e2a3a; color: #7aa; padding: 5px 10px;
-  cursor: pointer; font-size: 11px; font-family: 'Courier New', monospace;
-  white-space: nowrap;
-}
-.preset-btn:hover { background: #111d2e; border-color: #3a5a7a; }
-.preset-btn.active { background: #0d1f33; border-color: #22d3ee; color: #22d3ee; }
-
-#canvas-area { flex: 1; position: relative; }
-canvas#main { display: block; width: 100%; height: 100%; }
-
-#stats {
-  position: absolute; top: 8px; right: 14px; z-index: 10;
-  background: rgba(2,4,10,0.85); padding: 10px; border: 1px solid #1a2a3a;
-  display: flex; flex-direction: column; gap: 6px;
-}
-.stat-row { font-size: 12px; color: #445; }
-.stat-row span { color: #22d3ee; }
-
-#legend {
-  position: absolute; bottom: 50px; left: 14px; z-index: 10;
-  font-size: 10px; color: #334; line-height: 1.8;
-}
-.leg-item { display: flex; align-items: center; gap: 6px; }
-.leg-color { width: 20px; height: 2px; }
-
-#caption {
-  padding: 6px 14px 10px; font-size: 11px; color: #445; text-align: center;
-  line-height: 1.7; font-family: sans-serif; flex-shrink: 0;
-}
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0f;
+    color: #c8d0e0;
+    font-family: 'Courier New', monospace;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+  header {
+    padding: 10px 20px;
+    background: #0f0f1a;
+    border-bottom: 1px solid #1e2a4a;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-shrink: 0;
+  }
+  header h1 {
+    font-size: 14px;
+    color: #7aa2f7;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  header .subtitle {
+    font-size: 11px;
+    color: #565f89;
+  }
+  .main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+  .canvas-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 10px;
+    gap: 8px;
+  }
+  canvas#mainCanvas {
+    flex: 1;
+    border: 1px solid #1e2a4a;
+    border-radius: 4px;
+    background: #05050e;
+    display: block;
+    width: 100%;
+  }
+  .sidebar {
+    width: 240px;
+    background: #0d0d18;
+    border-left: 1px solid #1e2a4a;
+    display: flex;
+    flex-direction: column;
+    padding: 12px;
+    gap: 12px;
+    overflow-y: auto;
+    flex-shrink: 0;
+  }
+  .section-label {
+    font-size: 10px;
+    color: #565f89;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 6px;
+  }
+  .preset-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5px;
+  }
+  .preset-btn {
+    background: #131326;
+    border: 1px solid #1e2a4a;
+    color: #a9b1d6;
+    padding: 6px 8px;
+    font-size: 10px;
+    cursor: pointer;
+    border-radius: 3px;
+    text-align: center;
+    font-family: 'Courier New', monospace;
+    transition: all 0.15s;
+    line-height: 1.3;
+  }
+  .preset-btn:hover { background: #1a1a35; border-color: #3d59a1; }
+  .preset-btn.active { background: #1e2a6a; border-color: #7aa2f7; color: #7aa2f7; }
+  .control-row {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .control-row label {
+    font-size: 10px;
+    color: #565f89;
+    display: flex;
+    justify-content: space-between;
+  }
+  .control-row label span { color: #9aa5ce; }
+  input[type=range] {
+    width: 100%;
+    height: 4px;
+    -webkit-appearance: none;
+    background: #1e2a4a;
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px; height: 12px;
+    background: #7aa2f7;
+    border-radius: 50%;
+  }
+  .btn-row {
+    display: flex;
+    gap: 6px;
+  }
+  .btn {
+    flex: 1;
+    padding: 7px 6px;
+    background: #131326;
+    border: 1px solid #1e2a4a;
+    color: #a9b1d6;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all 0.15s;
+  }
+  .btn:hover { background: #1a1a35; border-color: #3d59a1; }
+  .btn.danger { border-color: #f7768e; color: #f7768e; }
+  .btn.danger:hover { background: #2a1020; }
+  .stats-box {
+    background: #080812;
+    border: 1px solid #1e2a4a;
+    border-radius: 3px;
+    padding: 10px;
+  }
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    margin-bottom: 5px;
+    line-height: 1.4;
+  }
+  .stat-label { color: #565f89; }
+  .stat-val { color: #9ece6a; font-weight: bold; }
+  .stat-val.warn { color: #e0af68; }
+  .stat-val.ok { color: #9ece6a; }
+  .divider {
+    height: 1px;
+    background: #1e2a4a;
+    margin: 2px 0;
+  }
+  .legend {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 10px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #565f89;
+  }
+  .legend-color {
+    width: 20px; height: 3px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+  .time-display {
+    font-size: 11px;
+    color: #7dcfff;
+    text-align: right;
+  }
+  .energy-bar-wrap {
+    height: 6px;
+    background: #131326;
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 4px;
+  }
+  .energy-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #7aa2f7, #9ece6a);
+    border-radius: 3px;
+    transition: width 0.1s;
+  }
+  .phase-legend {
+    height: 12px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, hsl(240,100%,60%), hsl(120,100%,50%), hsl(0,100%,60%), hsl(300,100%,60%), hsl(240,100%,60%));
+    margin-top: 3px;
+  }
+  .phase-legend-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 9px;
+    color: #565f89;
+    margin-top: 1px;
+  }
 </style>
 </head>
 <body>
-
-<div id="label">Night 10 · 2026-05-07<br>量子隧穿 · 薛定谔方程</div>
-
-<div id="top-bar">
-  <button class="preset-btn active" data-preset="0">薄势垒</button>
-  <button class="preset-btn" data-preset="1">厚势垒</button>
-  <button class="preset-btn" data-preset="2">双势垒</button>
-  <button class="preset-btn" data-preset="3">阶梯</button>
-  <button class="preset-btn" data-preset="4">谐振子</button>
-  <button class="preset-btn" data-preset="5">无势垒</button>
-</div>
-
-<div id="canvas-area">
-  <canvas id="main"></canvas>
-  <div id="stats">
-    <div class="stat-row">T (透射) = <span id="t-val">—</span></div>
-    <div class="stat-row">R (反射) = <span id="r-val">—</span></div>
-    <div class="stat-row">归一化 = <span id="norm-val">1.000</span></div>
+<header>
+  <h1>Quantum Tunneling</h1>
+  <div class="subtitle">Time-Dependent Schrödinger Equation · Split-Operator Method · ℏ=1, m=0.5</div>
+  <div style="margin-left:auto;" class="time-display" id="timeDisplay">t = 0.000</div>
+</header>
+<div class="main">
+  <div class="canvas-area">
+    <canvas id="mainCanvas"></canvas>
   </div>
-  <div id="legend">
-    <div class="leg-item"><div class="leg-color" style="background:#22d3ee;height:3px;"></div> |ψ|² 概率密度</div>
-    <div class="leg-item"><div class="leg-color" style="background:rgba(245,158,11,0.5)"></div> Re(ψ)</div>
-    <div class="leg-item"><div class="leg-color" style="background:rgba(239,68,68,0.4)"></div> Im(ψ)</div>
-    <div class="leg-item"><div class="leg-color" style="background:rgba(255,255,255,0.2)"></div> 势垒 V(x)</div>
+  <div class="sidebar">
+    <div>
+      <div class="section-label">Potential Preset</div>
+      <div class="preset-grid">
+        <button class="preset-btn active" onclick="setPreset(0)">① Free<br>Particle</button>
+        <button class="preset-btn" onclick="setPreset(1)">② Barrier<br>Tunneling</button>
+        <button class="preset-btn" onclick="setPreset(2)">③ Step<br>Potential</button>
+        <button class="preset-btn" onclick="setPreset(3)">④ Harmonic<br>Oscillator</button>
+        <button class="preset-btn" onclick="setPreset(4)">⑤ Double<br>Barrier</button>
+        <button class="preset-btn" onclick="setPreset(5)">⑥ Square<br>Well</button>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">Wave Packet</div>
+      <div class="control-row">
+        <label>x₀ (position) <span id="x0Val">-5.0</span></label>
+        <input type="range" id="x0Slider" min="-8" max="-1" step="0.5" value="-5"
+          oninput="document.getElementById('x0Val').textContent=parseFloat(this.value).toFixed(1); scheduleReset()">
+      </div>
+      <div class="control-row">
+        <label>k₀ (momentum) <span id="k0Val">5.0</span></label>
+        <input type="range" id="k0Slider" min="1" max="12" step="0.5" value="5"
+          oninput="document.getElementById('k0Val').textContent=parseFloat(this.value).toFixed(1); scheduleReset()">
+      </div>
+      <div class="control-row">
+        <label>σ (width) <span id="sigVal">0.8</span></label>
+        <input type="range" id="sigSlider" min="0.3" max="2.0" step="0.1" value="0.8"
+          oninput="document.getElementById('sigVal').textContent=parseFloat(this.value).toFixed(1); scheduleReset()">
+      </div>
+    </div>
+
+    <div id="barrierControls">
+      <div class="section-label">Barrier / Well</div>
+      <div class="control-row">
+        <label>V₀ (height) <span id="v0Val">20.0</span></label>
+        <input type="range" id="v0Slider" min="-30" max="40" step="1" value="20"
+          oninput="document.getElementById('v0Val').textContent=parseFloat(this.value).toFixed(1); rebuildPotential()">
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">Simulation</div>
+      <div class="control-row">
+        <label>Speed <span id="speedVal">1×</span></label>
+        <input type="range" id="speedSlider" min="1" max="8" step="1" value="1"
+          oninput="document.getElementById('speedVal').textContent=this.value+'×'; stepsPerFrame=parseInt(this.value)*20">
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn" id="pauseBtn" onclick="togglePause()">⏸ Pause</button>
+      <button class="btn danger" onclick="hardReset()">↺ Reset</button>
+    </div>
+
+    <div class="stats-box">
+      <div class="section-label" style="margin-bottom:8px">Observables</div>
+      <div class="stat-row">
+        <span class="stat-label">Energy E</span>
+        <span class="stat-val" id="statE">0.00</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">k₀²/2 (kin.)</span>
+        <span class="stat-val" id="statKin">0.00</span>
+      </div>
+      <div class="divider"></div>
+      <div class="stat-row">
+        <span class="stat-label">Transmit T</span>
+        <span class="stat-val" id="statT">0.00</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Reflect R</span>
+        <span class="stat-val" id="statR">0.00</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Norm (T+R)</span>
+        <span class="stat-val ok" id="statNorm">1.000</span>
+      </div>
+      <div class="divider"></div>
+      <div class="stat-row">
+        <span class="stat-label">⟨x⟩</span>
+        <span class="stat-val" id="statX">0.00</span>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">Legend</div>
+      <div class="legend">
+        <div class="legend-item">
+          <div class="legend-color" style="background: rgba(122,162,247,0.7)"></div>
+          <span>|ψ|² probability density</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background: rgba(255,255,255,0.6)"></div>
+          <span>V(x) potential energy</span>
+        </div>
+        <div class="legend-item" style="flex-direction:column; align-items:flex-start; gap:2px">
+          <div style="color:#565f89; margin-bottom:2px">Phase arg(ψ) colormap:</div>
+          <div class="phase-legend"></div>
+          <div class="phase-legend-labels">
+            <span>0</span><span>π/2</span><span>π</span><span>3π/2</span><span>2π</span>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
-
-<div id="caption">「经典物理说：能量不够，就穿不过屏障。量子力学说：有概率穿过去。彩色波包撞到势垒后分裂——一部分反弹，一部分神奇地出现在墙的另一侧。这就是闪存芯片里电子每天正在做的事。」</div>
 
 <script>
-const canvas = document.getElementById('main');
-const ctx = canvas.getContext('2d');
+// ─────────────────────────────────────────────────────────────────────────────
+// CONSTANTS & STATE
+// ─────────────────────────────────────────────────────────────────────────────
+const N = 512;
+const xMin = -10, xMax = 10, L = xMax - xMin;
+const dx = L / N;
+const dt = 0.005;
+const hbar = 1, mass = 0.5;
+const eta = 0.3;  // CAB absorption strength
 
-// Grid parameters
-const NX = 1024;
-const DX = 1.0 / NX;
-const DT = 0.00005;
-const HBAR = 1.0;
-const MASS = 1.0;
+let re = new Float64Array(N);
+let im = new Float64Array(N);
+let Vreal = new Float64Array(N);
+let Vimag = new Float64Array(N);  // includes CAB
+let kArr = new Float64Array(N);   // k-space grid
+let expVhalf_re = new Float64Array(N);
+let expVhalf_im = new Float64Array(N);
+let expK_re = new Float64Array(N);
+let expK_im = new Float64Array(N);
 
-// Wave function (real and imaginary parts)
-let psiR = new Float64Array(NX);
-let psiI = new Float64Array(NX);
-let V = new Float64Array(NX); // potential
-
-let W, H;
-let currentPreset = 0;
-let running = true;
 let t = 0;
-let barrierStart = 0, barrierEnd = 0;
+let paused = false;
+let stepsPerFrame = 20;
+let currentPreset = 0;
+let resetTimer = null;
 
-// Preset configurations
-const PRESETS = [
-  { name: '薄势垒', x0: 0.25, k0: 40, sigma: 0.04,
-    barrier: (x) => (x > 0.52 && x < 0.55) ? 600 : 0 },
-  { name: '厚势垒', x0: 0.2, k0: 40, sigma: 0.04,
-    barrier: (x) => (x > 0.5 && x < 0.6) ? 400 : 0 },
-  { name: '双势垒', x0: 0.2, k0: 50, sigma: 0.035,
-    barrier: (x) => ((x > 0.5 && x < 0.53) || (x > 0.57 && x < 0.60)) ? 500 : 0 },
-  { name: '阶梯', x0: 0.25, k0: 40, sigma: 0.04,
-    barrier: (x) => x > 0.55 ? 400 : 0 },
-  { name: '谐振子', x0: 0.15, k0: 60, sigma: 0.035,
-    barrier: (x) => 800 * (x - 0.5) * (x - 0.5) },
-  { name: '无势垒', x0: 0.15, k0: 50, sigma: 0.04,
-    barrier: (x) => 0 },
-];
+// x grid
+const xArr = new Float64Array(N);
+for (let i = 0; i < N; i++) xArr[i] = xMin + i * dx;
 
-function buildPotential(preset) {
-  const cfg = PRESETS[preset];
-  let bStart = NX, bEnd = 0;
-  for (let i = 0; i < NX; i++) {
-    const x = i * DX;
-    V[i] = cfg.barrier(x);
-    if (V[i] > 10) {
-      if (i < bStart) bStart = i;
-      if (i > bEnd) bEnd = i;
-    }
-  }
-  barrierStart = bStart;
-  barrierEnd = (bEnd === 0) ? 0 : bEnd;
+// k grid (FFT order: 0, 1, ..., N/2-1, -N/2, ..., -1)
+for (let i = 0; i < N; i++) {
+  const ii = i < N/2 ? i : i - N;
+  kArr[i] = (2 * Math.PI / L) * ii;
 }
 
-function initWavePacket(preset) {
-  const cfg = PRESETS[preset];
-  const x0 = cfg.x0, k0 = cfg.k0, sigma = cfg.sigma;
+// ─────────────────────────────────────────────────────────────────────────────
+// FFT (Cooley-Tukey, in-place, N must be power of 2)
+// ─────────────────────────────────────────────────────────────────────────────
+function fft(re, im, inverse) {
+  const n = re.length;
+  // Bit-reversal permutation
+  let j = 0;
+  for (let i = 1; i < n; i++) {
+    let bit = n >> 1;
+    while (j & bit) { j ^= bit; bit >>= 1; }
+    j ^= bit;
+    if (i < j) {
+      let tmp = re[i]; re[i] = re[j]; re[j] = tmp;
+      tmp = im[i]; im[i] = im[j]; im[j] = tmp;
+    }
+  }
+  // Butterfly
+  for (let len = 2; len <= n; len <<= 1) {
+    const ang = (inverse ? 1 : -1) * 2 * Math.PI / len;
+    const wre = Math.cos(ang), wim = Math.sin(ang);
+    for (let i = 0; i < n; i += len) {
+      let cur_re = 1, cur_im = 0;
+      for (let k = 0; k < len / 2; k++) {
+        const u_re = re[i+k], u_im = im[i+k];
+        const v_re = re[i+k+len/2]*cur_re - im[i+k+len/2]*cur_im;
+        const v_im = re[i+k+len/2]*cur_im + im[i+k+len/2]*cur_re;
+        re[i+k]          = u_re + v_re;
+        im[i+k]          = u_im + v_im;
+        re[i+k+len/2]    = u_re - v_re;
+        im[i+k+len/2]    = u_im - v_im;
+        const nre = cur_re*wre - cur_im*wim;
+        const nim = cur_re*wim + cur_im*wre;
+        cur_re = nre; cur_im = nim;
+      }
+    }
+  }
+  if (inverse) {
+    for (let i = 0; i < n; i++) { re[i] /= n; im[i] /= n; }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POTENTIAL PRESETS
+// ─────────────────────────────────────────────────────────────────────────────
+const presets = [
+  { name: "Free Particle",      buildV: buildFree },
+  { name: "Barrier Tunneling",  buildV: buildBarrier },
+  { name: "Step Potential",     buildV: buildStep },
+  { name: "Harmonic Oscillator",buildV: buildHarmonic },
+  { name: "Double Barrier",     buildV: buildDoubleBarrier },
+  { name: "Square Well",        buildV: buildSquareWell },
+];
+
+function buildFree() {
+  for (let i = 0; i < N; i++) Vreal[i] = 0;
+}
+function buildBarrier() {
+  const V0 = parseFloat(document.getElementById('v0Slider').value);
+  const width = 0.5;
+  for (let i = 0; i < N; i++) {
+    const x = xArr[i];
+    Vreal[i] = (Math.abs(x) < width/2) ? V0 : 0;
+  }
+}
+function buildStep() {
+  for (let i = 0; i < N; i++) {
+    Vreal[i] = xArr[i] > 0 ? 5 : 0;
+  }
+}
+function buildHarmonic() {
+  for (let i = 0; i < N; i++) {
+    Vreal[i] = 0.5 * xArr[i] * xArr[i];
+  }
+}
+function buildDoubleBarrier() {
+  const V0 = parseFloat(document.getElementById('v0Slider').value);
+  const width = 0.3;
+  for (let i = 0; i < N; i++) {
+    const x = xArr[i];
+    Vreal[i] = (Math.abs(Math.abs(x)-1.0) < width/2) ? V0 : 0;
+  }
+}
+function buildSquareWell() {
+  const V0 = parseFloat(document.getElementById('v0Slider').value);
+  for (let i = 0; i < N; i++) {
+    const x = xArr[i];
+    Vreal[i] = (Math.abs(x) < 1) ? -Math.abs(V0) : 0;
+  }
+}
+
+function buildCAB() {
+  // Complex absorbing boundary in regions |x| > 8
+  for (let i = 0; i < N; i++) {
+    const x = xArr[i];
+    const ax = Math.abs(x);
+    if (ax > 8) {
+      const d = (ax - 8) / 2;
+      Vimag[i] = -eta * d * d;
+    } else {
+      Vimag[i] = 0;
+    }
+  }
+}
+
+function rebuildPotential() {
+  presets[currentPreset].buildV();
+  buildCAB();
+  buildPropagators();
+}
+
+function buildPropagators() {
+  // exp(-i(V + i*Vimag)*dt/2) for position space
+  for (let i = 0; i < N; i++) {
+    const vr = Vreal[i], vi = Vimag[i];
+    // V_full = vr + i*vi
+    // exp(-i*(vr+i*vi)*dt/2) = exp(-i*vr*dt/2) * exp(vi*dt/2)
+    const ang = -vr * dt / 2;
+    const damp = Math.exp(vi * dt / 2);  // vi < 0, so this attenuates
+    expVhalf_re[i] = damp * Math.cos(ang);
+    expVhalf_im[i] = damp * Math.sin(ang);
+  }
+  // exp(-i*k²*dt/(2m)) for momentum space
+  for (let i = 0; i < N; i++) {
+    const k = kArr[i];
+    const ang = -k*k*dt / (2*mass);
+    expK_re[i] = Math.cos(ang);
+    expK_im[i] = Math.sin(ang);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SPLIT-OPERATOR STEP
+// ─────────────────────────────────────────────────────────────────────────────
+const tmpRe = new Float64Array(N);
+const tmpIm = new Float64Array(N);
+
+function stepSO() {
+  // Step 1: apply exp(-iV*dt/2) in position space
+  for (let i = 0; i < N; i++) {
+    const r = re[i], im_ = im[i];
+    const er = expVhalf_re[i], ei = expVhalf_im[i];
+    re[i] = r*er - im_*ei;
+    im[i] = r*ei + im_*er;
+  }
+  // Step 2: FFT to k-space
+  for (let i = 0; i < N; i++) { tmpRe[i] = re[i]; tmpIm[i] = im[i]; }
+  fft(tmpRe, tmpIm, false);
+  // Apply exp(-ik²*dt/2m)
+  for (let i = 0; i < N; i++) {
+    const r = tmpRe[i], m_ = tmpIm[i];
+    const er = expK_re[i], ei = expK_im[i];
+    tmpRe[i] = r*er - m_*ei;
+    tmpIm[i] = r*ei + m_*er;
+  }
+  // IFFT back to position space
+  fft(tmpRe, tmpIm, true);
+  for (let i = 0; i < N; i++) { re[i] = tmpRe[i]; im[i] = tmpIm[i]; }
+  // Step 3: apply exp(-iV*dt/2) again
+  for (let i = 0; i < N; i++) {
+    const r = re[i], im_ = im[i];
+    const er = expVhalf_re[i], ei = expVhalf_im[i];
+    re[i] = r*er - im_*ei;
+    im[i] = r*ei + im_*er;
+  }
+  t += dt;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INITIAL STATE
+// ─────────────────────────────────────────────────────────────────────────────
+function initWavePacket() {
+  const x0 = parseFloat(document.getElementById('x0Slider').value);
+  const k0 = parseFloat(document.getElementById('k0Slider').value);
+  const sig = parseFloat(document.getElementById('sigSlider').value);
   let norm = 0;
-  for (let i = 0; i < NX; i++) {
-    const x = i * DX;
-    const gauss = Math.exp(-0.5 * ((x - x0) / sigma) ** 2);
-    const phase = k0 * 2 * Math.PI * x;
-    psiR[i] = gauss * Math.cos(phase);
-    psiI[i] = gauss * Math.sin(phase);
-    norm += (psiR[i] * psiR[i] + psiI[i] * psiI[i]) * DX;
+  for (let i = 0; i < N; i++) {
+    const x = xArr[i];
+    const gauss = Math.exp(-(x-x0)*(x-x0)/(2*sig*sig));
+    re[i] = gauss * Math.cos(k0 * x);
+    im[i] = gauss * Math.sin(k0 * x);
+    norm += (re[i]*re[i] + im[i]*im[i]) * dx;
   }
-  // Normalize
-  const sqrtN = Math.sqrt(norm);
-  for (let i = 0; i < NX; i++) {
-    psiR[i] /= sqrtN;
-    psiI[i] /= sqrtN;
-  }
+  const inv = 1/Math.sqrt(norm);
+  for (let i = 0; i < N; i++) { re[i] *= inv; im[i] *= inv; }
   t = 0;
 }
 
-// Split-operator method (Crank-Nicolson approximation via finite differences)
-// Use simple FDTD for Schrödinger equation
-function stepFDTD(steps) {
-  const alpha = HBAR * DT / (2 * MASS * DX * DX);
-  for (let s = 0; s < steps; s++) {
-    // Update imaginary part
-    const newI = new Float64Array(NX);
-    for (let i = 1; i < NX - 1; i++) {
-      newI[i] = psiI[i] + alpha * (psiR[i+1] - 2*psiR[i] + psiR[i-1])
-                         - (DT / HBAR) * V[i] * psiR[i];
-    }
-    // Update real part
-    const newR = new Float64Array(NX);
-    for (let i = 1; i < NX - 1; i++) {
-      newR[i] = psiR[i] - alpha * (newI[i+1] - 2*newI[i] + newI[i-1])
-                         + (DT / HBAR) * V[i] * newI[i];
-    }
-    // Absorbing boundaries
-    for (let k = 0; k < 40; k++) {
-      const f = k / 40;
-      newR[k] *= f; newI[k] *= f;
-      newR[NX-1-k] *= f; newI[NX-1-k] *= f;
-    }
-    psiR = newR;
-    psiI = newI;
-    t += DT;
-  }
+// ─────────────────────────────────────────────────────────────────────────────
+// CANVAS RENDERING
+// ─────────────────────────────────────────────────────────────────────────────
+const canvas = document.getElementById('mainCanvas');
+const ctx = canvas.getContext('2d');
+
+function resizeCanvas() {
+  canvas.width = canvas.offsetWidth;
+  canvas.height = canvas.offsetHeight;
 }
 
-function computeProbs() {
-  let left = 0, right = 0, total = 0;
-  const splitX = (barrierEnd > 0) ? barrierEnd : Math.floor(NX * 0.55);
-  for (let i = 0; i < NX; i++) {
-    const prob = (psiR[i]*psiR[i] + psiI[i]*psiI[i]) * DX;
-    total += prob;
-    if (i < splitX) left += prob;
-    else right += prob;
-  }
-  return { left, right, total };
-}
+function render() {
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
 
-function resize() {
-  W = canvas.parentElement.clientWidth;
-  H = canvas.parentElement.clientHeight;
-  canvas.width = W;
-  canvas.height = H;
-}
-
-const VMAX = 800;
-
-function draw() {
-  ctx.fillStyle = '#02040a';
+  // Background
+  ctx.fillStyle = '#05050e';
   ctx.fillRect(0, 0, W, H);
 
-  const cfg = PRESETS[currentPreset];
-  const plotTop = 30, plotBot = H - 30;
-  const plotH = plotBot - plotTop;
-  const xOff = 30;
-  const plotW = W - 60;
-
-  // Axes
-  ctx.strokeStyle = '#1a2a3a';
+  // Grid lines
+  ctx.strokeStyle = '#0d0d20';
   ctx.lineWidth = 1;
+  for (let xi = -8; xi <= 8; xi += 2) {
+    const px = worldToPixX(xi, W);
+    ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, H); ctx.stroke();
+  }
+  for (let yi = 0; yi <= 4; yi++) {
+    const py = H * yi / 4;
+    ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(W, py); ctx.stroke();
+  }
+
+  // x-axis
+  ctx.strokeStyle = '#1e2a4a';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, H*0.75); ctx.lineTo(W, H*0.75); ctx.stroke();
+
+  // x=0 line
+  ctx.strokeStyle = '#2a3a6a';
+  ctx.setLineDash([4,4]);
+  const x0px = worldToPixX(0, W);
+  ctx.beginPath(); ctx.moveTo(x0px, 0); ctx.lineTo(x0px, H); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Axis labels
+  ctx.fillStyle = '#2a3a5a';
+  ctx.font = '10px Courier New';
+  for (let xi = -8; xi <= 8; xi += 2) {
+    const px = worldToPixX(xi, W);
+    ctx.fillText(xi, px-8, H*0.75+14);
+  }
+
+  const baseline = H * 0.75;
+  const potScale = H * 0.3;
+
+  // ── LAYER 1: Potential V(x) ──
+  // Find V range
+  let Vmax = 0;
+  for (let i = 0; i < N; i++) Vmax = Math.max(Vmax, Math.abs(Vreal[i]));
+  if (Vmax < 1) Vmax = 1;
+
   ctx.beginPath();
-  ctx.moveTo(xOff, plotBot); ctx.lineTo(xOff + plotW, plotBot);
+  ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+  ctx.lineWidth = 1.5;
+  let started = false;
+  for (let i = 0; i < N; i++) {
+    const px = (i / N) * W;
+    const py = baseline - (Vreal[i] / Vmax) * potScale;
+    if (!started) { ctx.moveTo(px, py); started = true; }
+    else ctx.lineTo(px, py);
+  }
   ctx.stroke();
 
-  // Potential barrier fill
-  if (barrierStart < NX) {
-    const bx0 = xOff + (barrierStart / NX) * plotW;
-    const bx1 = xOff + ((barrierEnd + 1) / NX) * plotW;
-    ctx.fillStyle = 'rgba(255,255,255,0.06)';
-    ctx.fillRect(bx0, plotTop, Math.max(bx1 - bx0, 2), plotH);
-    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(bx0, plotTop, Math.max(bx1 - bx0, 2), plotH);
-  }
-
-  // Draw potential V(x) as white line
-  if (currentPreset !== 5) {
-    ctx.beginPath();
-    let first = true;
-    for (let i = 0; i < NX; i++) {
-      if (V[i] <= 0) { first = true; continue; }
-      const x = xOff + (i / NX) * plotW;
-      const vNorm = Math.min(V[i] / VMAX, 1);
-      const y = plotBot - vNorm * plotH * 0.8;
-      if (first) { ctx.moveTo(x, y); first = false; }
-      else ctx.lineTo(x, y);
-    }
-    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-  }
-
-  // For harmonic oscillator: draw parabola
-  if (currentPreset === 4) {
-    ctx.beginPath();
-    for (let i = 0; i < NX; i++) {
-      const x = xOff + (i / NX) * plotW;
-      const vNorm = Math.min(V[i] / VMAX, 1);
-      const y = plotBot - vNorm * plotH * 0.8;
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-  }
-
-  // Find max |ψ|² for scaling
-  let maxProb = 0;
-  for (let i = 0; i < NX; i++) {
-    const p = psiR[i]*psiR[i] + psiI[i]*psiI[i];
-    if (p > maxProb) maxProb = p;
-  }
-  const probScale = maxProb > 0 ? (plotH * 0.85) / (maxProb * NX * DX * 3) : 1;
-
-  // Re(ψ)
+  // Filled V area
   ctx.beginPath();
-  for (let i = 0; i < NX; i++) {
-    const x = xOff + (i / NX) * plotW;
-    const y = plotBot - psiR[i] * probScale * plotH * 0.4;
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
+  ctx.moveTo(0, baseline);
+  for (let i = 0; i < N; i++) {
+    const px = (i / N) * W;
+    const py = baseline - (Vreal[i] / Vmax) * potScale;
+    ctx.lineTo(px, py);
   }
-  ctx.strokeStyle = 'rgba(245,158,11,0.45)';
-  ctx.lineWidth = 1;
-  ctx.stroke();
-
-  // Im(ψ)
-  ctx.beginPath();
-  for (let i = 0; i < NX; i++) {
-    const x = xOff + (i / NX) * plotW;
-    const y = plotBot - psiI[i] * probScale * plotH * 0.4;
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  }
-  ctx.strokeStyle = 'rgba(239,68,68,0.4)';
-  ctx.lineWidth = 1;
-  ctx.stroke();
-
-  // |ψ|² colored by phase (HSL hue = arg(ψ))
-  ctx.beginPath();
-  let prevX = xOff, prevY = plotBot;
-  for (let i = 0; i < NX; i++) {
-    const x = xOff + (i / NX) * plotW;
-    const prob = psiR[i]*psiR[i] + psiI[i]*psiI[i];
-    const y = plotBot - prob * probScale * plotH;
-    if (i === 0) { ctx.moveTo(x, plotBot); ctx.lineTo(x, y); }
-    else ctx.lineTo(x, y);
-    prevX = x; prevY = y;
-  }
-  ctx.lineTo(xOff + plotW, plotBot);
+  ctx.lineTo(W, baseline);
   ctx.closePath();
-
-  // Gradient fill by phase
-  const grad = ctx.createLinearGradient(xOff, 0, xOff + plotW, 0);
-  for (let k = 0; k <= 20; k++) {
-    const i = Math.floor((k / 20) * (NX - 1));
-    const phase = Math.atan2(psiI[i], psiR[i]);
-    const hue = ((phase / Math.PI + 1) * 180) % 360;
-    grad.addColorStop(k / 20, `hsla(${hue}, 80%, 60%, 0.7)`);
-  }
-  ctx.fillStyle = grad;
+  ctx.fillStyle = 'rgba(255,255,255,0.05)';
   ctx.fill();
 
-  // Outline
-  ctx.beginPath();
-  for (let i = 0; i < NX; i++) {
-    const x = xOff + (i / NX) * plotW;
-    const prob = psiR[i]*psiR[i] + psiI[i]*psiI[i];
-    const y = plotBot - prob * probScale * plotH;
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
+  // ── LAYER 2: |ψ|² probability density (blue fill) ──
+  let psiMax = 0;
+  const prob = new Float64Array(N);
+  for (let i = 0; i < N; i++) {
+    prob[i] = re[i]*re[i] + im[i]*im[i];
+    if (prob[i] > psiMax) psiMax = prob[i];
   }
-  ctx.strokeStyle = '#22d3ee';
+  if (psiMax < 1e-10) psiMax = 1e-10;
+  const psiScale = H * 0.55;
+
+  // Filled probability
+  ctx.beginPath();
+  ctx.moveTo(0, baseline);
+  for (let i = 0; i < N; i++) {
+    const px = (i / N) * W;
+    const py = baseline - (prob[i] / psiMax) * psiScale;
+    ctx.lineTo(px, py);
+  }
+  ctx.lineTo(W, baseline);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(122,162,247,0.18)';
+  ctx.fill();
+
+  // ── LAYER 3: Phase-colored |ψ| ──
+  // Draw column by column: color = phase, brightness = |ψ|
+  const colWidth = Math.max(1, W / N);
+  for (let i = 0; i < N; i++) {
+    const r = re[i], im_ = im[i];
+    const amp = Math.sqrt(prob[i]);
+    if (amp < 1e-6) continue;
+    const phase = Math.atan2(im_, r); // -π to π
+    const hue = ((phase + Math.PI) / (2 * Math.PI)) * 360; // 0..360
+    const normAmp = Math.min(1, amp / Math.sqrt(psiMax));
+    const lightness = 35 + 35 * normAmp;
+    const alpha = 0.7 * normAmp;
+    const px = (i / N) * W;
+    const py_top = baseline - (prob[i] / psiMax) * psiScale;
+
+    // Gradient bar for phase
+    const grad = ctx.createLinearGradient(0, py_top, 0, baseline);
+    grad.addColorStop(0, `hsla(${hue},100%,${lightness}%,${alpha})`);
+    grad.addColorStop(1, `hsla(${hue},100%,${lightness}%,0)`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(px, py_top, colWidth+0.5, baseline - py_top);
+  }
+
+  // ── Outline of |ψ|² ──
+  ctx.beginPath();
+  ctx.strokeStyle = 'rgba(122,162,247,0.8)';
   ctx.lineWidth = 1.5;
+  for (let i = 0; i < N; i++) {
+    const px = (i / N) * W;
+    const py = baseline - (prob[i] / psiMax) * psiScale;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
   ctx.stroke();
 
-  // Stats
-  const { left, right, total } = computeProbs();
-  document.getElementById('t-val').textContent = right.toFixed(3);
-  document.getElementById('r-val').textContent = left.toFixed(3);
-  document.getElementById('norm-val').textContent = total.toFixed(3);
-}
+  // ── Absorption boundary indicator ──
+  const xL = worldToPixX(-8, W), xR = worldToPixX(8, W);
+  ctx.strokeStyle = 'rgba(255,100,100,0.3)';
+  ctx.setLineDash([3,3]);
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(xL, 0); ctx.lineTo(xL, H); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(xR, 0); ctx.lineTo(xR, H); ctx.stroke();
+  ctx.setLineDash([]);
 
-function loop() {
-  stepFDTD(15);
-  draw();
-  requestAnimationFrame(loop);
-}
-
-function loadPreset(n) {
-  currentPreset = n;
-  document.querySelectorAll('.preset-btn').forEach((b, i) => {
-    b.classList.toggle('active', i === n);
+  // ── x=±1 integration boundary (T/R boundary) ──
+  ctx.strokeStyle = 'rgba(150,220,100,0.25)';
+  ctx.setLineDash([2,4]);
+  ctx.lineWidth = 1;
+  [worldToPixX(-1,W), worldToPixX(1,W)].forEach(px => {
+    ctx.beginPath(); ctx.moveTo(px,0); ctx.lineTo(px,H); ctx.stroke();
   });
-  buildPotential(n);
-  initWavePacket(n);
-  barrierStart = 0; barrierEnd = 0;
-  // Re-scan barrier
-  for (let i = 0; i < NX; i++) {
-    if (V[i] > 10) {
-      if (barrierStart === 0) barrierStart = i;
-      barrierEnd = i;
-    }
-  }
+  ctx.setLineDash([]);
+
+  // Labels
+  ctx.fillStyle = 'rgba(255,100,100,0.5)';
+  ctx.font = '10px Courier New';
+  ctx.fillText('CAB', xL+3, 12);
+  ctx.fillText('CAB', xR-28, 12);
 }
 
-document.querySelectorAll('.preset-btn').forEach((btn, i) => {
-  btn.addEventListener('click', () => loadPreset(i));
-});
+function worldToPixX(x, W) {
+  return ((x - xMin) / L) * W;
+}
 
-window.addEventListener('resize', () => { resize(); });
-resize();
-loadPreset(0);
-loop();
+// ─────────────────────────────────────────────────────────────────────────────
+// STATISTICS
+// ─────────────────────────────────────────────────────────────────────────────
+function computeStats() {
+  let T = 0, R = 0, norm = 0, meanX = 0;
+  for (let i = 0; i < N; i++) {
+    const p = re[i]*re[i] + im[i]*im[i];
+    norm += p * dx;
+    meanX += xArr[i] * p * dx;
+    if (xArr[i] > 1) T += p * dx;
+    if (xArr[i] < -1) R += p * dx;
+  }
+  const k0 = parseFloat(document.getElementById('k0Slider').value);
+  const E = k0*k0/(2*mass);
+
+  document.getElementById('statE').textContent = E.toFixed(2);
+  document.getElementById('statKin').textContent = E.toFixed(2);
+  document.getElementById('statT').textContent = T.toFixed(4);
+  document.getElementById('statR').textContent = R.toFixed(4);
+  const normEl = document.getElementById('statNorm');
+  normEl.textContent = norm.toFixed(4);
+  normEl.className = 'stat-val ' + (Math.abs(norm-1) < 0.05 ? 'ok' : 'warn');
+  document.getElementById('statX').textContent = (meanX/norm).toFixed(3);
+  document.getElementById('timeDisplay').textContent = 't = ' + t.toFixed(3);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ANIMATION LOOP
+// ─────────────────────────────────────────────────────────────────────────────
+let frameCount = 0;
+function animate() {
+  requestAnimationFrame(animate);
+  if (!paused) {
+    for (let s = 0; s < stepsPerFrame; s++) stepSO();
+  }
+  render();
+  frameCount++;
+  if (frameCount % 5 === 0) computeStats();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CONTROLS
+// ─────────────────────────────────────────────────────────────────────────────
+function setPreset(idx) {
+  currentPreset = idx;
+  document.querySelectorAll('.preset-btn').forEach((b, i) => {
+    b.classList.toggle('active', i === idx);
+  });
+  rebuildPotential();
+  hardReset();
+}
+
+function rebuildPotential() {
+  presets[currentPreset].buildV();
+  buildCAB();
+  buildPropagators();
+}
+
+function hardReset() {
+  rebuildPotential();
+  initWavePacket();
+  paused = false;
+  document.getElementById('pauseBtn').textContent = '⏸ Pause';
+}
+
+function togglePause() {
+  paused = !paused;
+  document.getElementById('pauseBtn').textContent = paused ? '▶ Play' : '⏸ Pause';
+}
+
+let resetTimer2 = null;
+function scheduleReset() {
+  clearTimeout(resetTimer2);
+  resetTimer2 = setTimeout(hardReset, 400);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────────────────────────────────────
+window.addEventListener('resize', () => { resizeCanvas(); });
+resizeCanvas();
+rebuildPotential();
+initWavePacket();
+animate();
 </script>
 </body>
 </html>
