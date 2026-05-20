@@ -115,8 +115,10 @@
 
     /* ═══════════════ STICKY NAV ═══════════════ */
     nav {
-      position: sticky;
+      position: fixed;
       top: 0;
+      left: 0;
+      right: 0;
       z-index: 100;
       background: rgba(20,17,12,0.88);
       backdrop-filter: blur(12px);
@@ -125,6 +127,11 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
+      transform: translateY(0);
+      transition: transform 0.3s ease;
+    }
+    nav.nav-hidden {
+      transform: translateY(-100%);
     }
     .nav-id {
       font-family: 'JetBrains Mono', monospace;
@@ -1697,6 +1704,27 @@
     glow.style.left = e.clientX + 'px';
     glow.style.top  = e.clientY + 'px';
   });
+
+  /* ── NAV HIDE ON SCROLL DOWN, SHOW ON SCROLL UP ── */
+  const nav = document.querySelector('nav');
+  let lastScrollY = window.scrollY;
+  let ticking = false;
+
+  window.addEventListener('scroll', () => {
+    if (!ticking) {
+      requestAnimationFrame(() => {
+        const currentY = window.scrollY;
+        if (currentY > lastScrollY && currentY > 60) {
+          nav.classList.add('nav-hidden');
+        } else {
+          nav.classList.remove('nav-hidden');
+        }
+        lastScrollY = currentY;
+        ticking = false;
+      });
+      ticking = true;
+    }
+  }, { passive: true });
 </script>
 </body>
 </html>
