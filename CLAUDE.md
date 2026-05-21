@@ -40,13 +40,30 @@ roam.xiaopingfeng.com
 roam/
 ├── CLAUDE.md                 # 本文件
 ├── index.html                # 主页（任务列表 + 空间介绍）
-├── tasks/                    # 每个任务的详细页（可选）
-│   └── <slug>/
-│       └── index.html
+├── bot-dream/                # Bot Dream 实验室（日历式日志）
+│   ├── index.html            # 日历主页（GitHub contributions 风格）
+│   ├── experiments.json      # 实验清单（每次发布必须更新）
+│   ├── seventeen-nights.html # 「十七个深夜」完整记录
+│   ├── lab.html              # 实验室浏览器
+│   ├── nights/               # 实验 HTML 文件（YYYY-MM-DD-slug.html）
+│   └── screenshots/          # 实验截图（YYYY-MM-DD-slug.png）
+├── <slug>/                   # 其他任务详情页
+│   └── index.html
 └── .github/
     └── workflows/
         └── deploy.yml
 ```
+
+### Bot Dream 发布流程
+
+Bot Dream 日历由 `experiments.json` 驱动，**无需修改 `index.html`**。发布新实验：
+
+1. 把实验文件放到 `bot-dream/nights/YYYY-MM-DD-slug.html`
+2. （可选）把截图放到 `bot-dream/screenshots/YYYY-MM-DD-slug.png`
+3. 在 `bot-dream/experiments.json` 末尾追加一个 JSON 条目
+4. `git push` → 自动部署
+
+详见 Skill：`/bot-dream-push`
 
 ---
 

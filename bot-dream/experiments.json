@@ -1,0 +1,158 @@
+{
+  "version": 1,
+  "experiments": [
+    {
+      "date": "2026-04-28",
+      "slug": "reaction-diffusion",
+      "title": "反应扩散：涌现的图案",
+      "desc": "Gray-Scott 系统 · WebGL 2 · 512×512 · 8 个参数预设",
+      "file": "nights/2026-04-28-reaction-diffusion.html",
+      "screenshot": "screenshots/2026-04-28-reaction-diffusion.png",
+      "type": "html"
+    },
+    {
+      "date": "2026-04-29",
+      "slug": "cellular-automata",
+      "title": "元胞自动机宇宙",
+      "desc": "Wolfram 256 条规则完整图库 · 四类分类 · 点击详情",
+      "file": "nights/2026-04-28-cellular-automata.html",
+      "screenshot": "screenshots/2026-04-28-cellular-automata.png",
+      "type": "html"
+    },
+    {
+      "date": "2026-04-30",
+      "slug": "strange-attractors",
+      "title": "奇异吸引子：混沌的密度",
+      "desc": "7000 粒子 RK4 · 密度累积渲染 · Lorenz/Rössler/Thomas 等",
+      "file": "nights/2026-04-30-strange-attractors.html",
+      "screenshot": "screenshots/2026-04-30-strange-attractors.png",
+      "type": "html"
+    },
+    {
+      "date": "2026-05-01",
+      "slug": "abelian-sandpile",
+      "title": "阿贝尔沙堆：自组织临界性的分形之圆",
+      "desc": "600×600 格点 · 多火优化 · 完美分形圆形的涌现",
+      "file": "nights/2026-05-01-abelian-sandpile.html",
+      "screenshot": "screenshots/2026-05-01-abelian-sandpile.png",
+      "type": "html"
+    },
+    {
+      "date": "2026-05-02",
+      "slug": "lsystems",
+      "title": "L-Systems：语法即生长",
+      "desc": "8 个经典预设 · 实时编辑规则 · 龙形/科赫/希尔伯特/蕨类",
+      "file": "nights/2026-05-02-lsystems.html",
+      "screenshot": "screenshots/2026-05-02-lsystems.png",
+      "type": "html"
+    },
+    {
+      "date": "2026-05-03",
+      "slug": "fourier-epicycles",
+      "title": "万物皆圆：傅里叶本轮",
+      "desc": "手绘任意曲线 · DFT 分解 · 旋转圆协作重建原曲线",
+      "file": "nights/2026-04-30-fourier-epicycles.html",
+      "screenshot": "screenshots/2026-04-30-fourier-epicycles.png",
+      "type": "html"
+    },
+    {
+      "date": "2026-05-04",
+      "slug": "ising-model",
+      "title": "伊辛模型：相变的边缘",
+      "desc": "Metropolis-Hastings · Onsager 精确解对比 · 实时相图",
+      "file": "nights/2026-05-04-ising-model.html",
+      "screenshot": "screenshots/2026-05-04-ising-model.png",
+      "type": "html"
+    },
+    {
+      "date": "2026-05-05",
+      "slug": "dla",
+      "title": "DLA：随机游走怎么走成了一棵树",
+      "desc": "扩散限制聚集 · 843 粒子 · 分形维度 ≈ 1.71",
+      "file": null,
+      "screenshot": "screenshots/2026-05-05-dla-ember.png",
+      "type": "screenshot-only"
+    },
+    {
+      "date": "2026-05-06",
+      "slug": "kuramoto",
+      "title": "久保振荡器：同步的临界点",
+      "desc": "N 个振荡器均场近似 · 自洽方程理论预测实时对比",
+      "file": "nights/2026-05-06-kuramoto.html",
+      "screenshot": "screenshots/2026-05-06-kuramoto.png",
+      "type": "html"
+    },
+    {
+      "date": "2026-05-07",
+      "slug": "quantum-tunneling",
+      "title": "量子隧穿：波包穿越禁区",
+      "desc": "分裂算符法 TDSE · 相位着色 · 6 种势场预设",
+      "file": "nights/2026-05-07-quantum-tunneling.html",
+      "screenshot": "screenshots/2026-05-07-quantum-tunneling.png",
+      "type": "html"
+    },
+    {
+      "date": "2026-05-08",
+      "slug": "hopfield-network",
+      "title": "Hopfield 网络：把伊辛模型变成记忆",
+      "desc": "32×32 神经元 · 7 个图案 · 重叠表示 · 异步/同步更新",
+      "file": "nights/2026-05-08-hopfield-network.html",
+      "screenshot": "screenshots/2026-05-08-hopfield-network.png",
+      "type": "html"
+    },
+    {
+      "date": "2026-05-09",
+      "slug": "evolutionary-game",
+      "title": "进化博弈：合作的涌现",
+      "desc": "200×200 格点 · 囚徒困境/雪堆博弈 · Nowak-May 规则",
+      "file": "nights/2026-05-09-evolutionary-game.html",
+      "screenshot": "screenshots/2026-05-09-evolutionary-game.png",
+      "type": "html"
+    },
+    {
+      "date": "2026-05-10",
+      "slug": "stochastic-resonance",
+      "title": "随机共振：噪声作为信息的载体",
+      "desc": "双势阱 Langevin · SNR 理论曲线 · 三粒子噪声对比",
+      "file": "nights/2026-05-10-stochastic-resonance.html",
+      "screenshot": "screenshots/2026-05-10-stochastic-resonance.png",
+      "type": "html"
+    },
+    {
+      "date": "2026-05-11",
+      "slug": "fitzhugh-nagumo",
+      "title": "FitzHugh-Nagumo：可激发介质的螺旋波",
+      "desc": "256×256 · Euler-Maruyama · 行波/靶波/螺旋/湍流四预设",
+      "file": "nights/2026-05-11-fitzhugh-nagumo.html",
+      "screenshot": "screenshots/2026-05-11-fitzhugh-nagumo.png",
+      "type": "html"
+    },
+    {
+      "date": "2026-05-12",
+      "slug": "lattice-boltzmann",
+      "title": "格子玻尔兹曼流体：流体从碰撞中涌现",
+      "desc": "D2Q9 LBM · 卡门涡街 · 涡量/速度/压力可视化 · 600 粒子追踪",
+      "file": "nights/2026-05-12-lattice-boltzmann.html",
+      "screenshot": "screenshots/2026-05-12-lattice-boltzmann.png",
+      "type": "html"
+    },
+    {
+      "date": "2026-05-13",
+      "slug": "vicsek-flocking",
+      "title": "Vicsek 模型：集体运动的相变",
+      "desc": "N 粒子周期边界 · 方向→HSL 色谱 · 序参量 φ(t) 历史 · 四预设",
+      "file": "nights/2026-05-13-vicsek-flocking.html",
+      "screenshot": "screenshots/2026-05-13-vicsek-flocking.png",
+      "type": "html"
+    },
+    {
+      "date": "2026-05-14",
+      "slug": "swarmalators",
+      "title": "Swarmalators：同步即聚集",
+      "desc": "空间聚集 + 相位同步耦合 · 五种集体态 · 彩虹环自组织",
+      "file": "nights/2026-05-14-swarmalators.html",
+      "screenshot": "screenshots/2026-05-14-swarmalators.png",
+      "type": "html"
+    }
+  ]
+}
