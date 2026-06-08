@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>双曲镶嵌 · 负曲率空间的 Escher 宇宙</title>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --panel: rgba(20, 20, 28, 0.92);
+    --ink: #e8e8ee;
+    --dim: #8a8aa0;
+    --hot: #ffb86b;
+    --accent: #5eead4;
+    --line: #2a2a3a;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); height: 100%; }
+  body {
+    font-family: 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif;
+    overflow: hidden;
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    height: 100vh;
+  }
+  #stage {
+    position: relative;
+    overflow: hidden;
+    background: radial-gradient(circle at center, #11111a 0%, #06060a 70%, #000 100%);
+  }
+  #canvas {
+    display: block;
+    cursor: grab;
+    touch-action: none;
+  }
+  #canvas.dragging { cursor: grabbing; }
+  #panel {
+    background: var(--panel);
+    border-left: 1px solid var(--line);
+    padding: 20px 22px 60px 22px;
+    overflow-y: auto;
+    backdrop-filter: blur(20px);
+  }
+  h1 {
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 0 0 4px 0;
+    color: var(--ink);
+  }
+  .subtitle {
+    font-size: 12px;
+    color: var(--dim);
+    margin-bottom: 22px;
+    line-height: 1.5;
+  }
+  .section {
+    margin-bottom: 22px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--line);
+  }
+  .section:last-child { border-bottom: none; }
+  .section-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--dim);
+    margin-bottom: 12px;
+    font-weight: 600;
+  }
+  .preset-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  button.preset {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    padding: 8px 4px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    transition: all 0.15s;
+    text-align: center;
+  }
+  button.preset:hover {
+    background: rgba(94,234,212,0.08);
+    border-color: var(--accent);
+  }
+  button.preset.active {
+    background: rgba(255,184,107,0.12);
+    border-color: var(--hot);
+    color: var(--hot);
+  }
+  .color-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+  }
+  button.color-swatch {
+    height: 32px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    cursor: pointer;
+    padding: 0;
+  }
+  button.color-swatch.active {
+    border-color: var(--hot);
+    box-shadow: 0 0 0 2px rgba(255,184,107,0.25);
+  }
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    font-size: 12px;
+  }
+  .slider-row label {
+    width: 90px;
+    color: var(--dim);
+  }
+  .slider-row input[type=range] {
+    flex: 1;
+    accent-color: var(--accent);
+  }
+  .slider-row .value {
+    width: 36px;
+    text-align: right;
+    color: var(--hot);
+    font-variant-numeric: tabular-nums;
+  }
+  .stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: var(--dim);
+  }
+  .stats span { color: var(--ink); }
+  .math {
+    font-family: 'SF Mono', 'JetBrains Mono', Menlo, monospace;
+    font-size: 11px;
+    color: var(--accent);
+    background: rgba(94,234,212,0.05);
+    padding: 8px 10px;
+    border-radius: 6px;
+    margin: 8px 0;
+    line-height: 1.55;
+    border-left: 2px solid var(--accent);
+  }
+  .copy {
+    font-size: 12.5px;
+    line-height: 1.65;
+    color: #c8c8d0;
+  }
+  .copy p { margin: 8px 0; }
+  .copy em { color: var(--hot); font-style: normal; font-weight: 500; }
+  .copy strong { color: var(--ink); font-weight: 600; }
+  .toggle-row {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  button.toggle {
+    flex: 1;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    padding: 6px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 11px;
+    transition: all 0.15s;
+  }
+  button.toggle.active {
+    background: rgba(94,234,212,0.12);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .insight {
+    background: rgba(255,184,107,0.05);
+    border-left: 2px solid var(--hot);
+    padding: 10px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    line-height: 1.6;
+    color: #d8d8e0;
+    margin-top: 10px;
+  }
+  .insight strong { color: var(--hot); }
+  #curvature-tag {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    background: rgba(0,0,0,0.5);
+    color: var(--dim);
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-family: 'SF Mono', monospace;
+    pointer-events: none;
+    backdrop-filter: blur(10px);
+  }
+  #curvature-tag span { color: var(--ink); }
+  #hint {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.4);
+    color: var(--dim);
+    padding: 6px 14px;
+    border-radius: 14px;
+    font-size: 11px;
+    pointer-events: none;
+    backdrop-filter: blur(10px);
+    opacity: 0.8;
+  }
+  /* Scrollbar */
+  #panel::-webkit-scrollbar { width: 8px; }
+  #panel::-webkit-scrollbar-track { background: transparent; }
+  #panel::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="canvas"></canvas>
+  <div id="curvature-tag">
+    <span id="schlafli">{7, 3}</span> &nbsp;·&nbsp;
+    K = <span id="curvature">−1</span> &nbsp;·&nbsp;
+    tiles: <span id="tile-count">0</span>
+  </div>
+  <div id="hint">拖拽移动 · 双击复位</div>
+</div>
+
+<div id="panel">
+  <h1>双曲镶嵌</h1>
+  <div class="subtitle">Poincaré 盘上的 {p, q} 正镶嵌 · 负曲率空间</div>
+
+  <div class="section">
+    <div class="section-title">Schläfli 符号 {p, q}</div>
+    <div class="preset-grid" id="presets"></div>
+    <div class="copy" style="margin-top: 8px; font-size: 11.5px; color: var(--dim);">
+      <em>p</em> = 每个 tile 的边数，<em>q</em> = 每个顶点会聚的 tile 数。
+      存在性条件 <strong style="color:var(--hot)">(p−2)(q−2) > 4</strong>。
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">色调</div>
+    <div class="color-row" id="colors"></div>
+    <div class="toggle-row" style="margin-top: 12px;">
+      <button class="toggle active" data-mode="depth">按深度</button>
+      <button class="toggle" data-mode="checker">双色</button>
+      <button class="toggle" data-mode="angle">按角度</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">参数</div>
+    <div class="slider-row">
+      <label>递归深度</label>
+      <input type="range" id="depth" min="2" max="8" value="5" step="1">
+      <span class="value" id="depth-val">5</span>
+    </div>
+    <div class="slider-row">
+      <label>边平滑度</label>
+      <input type="range" id="segs" min="6" max="32" value="18" step="1">
+      <span class="value" id="segs-val">18</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">几何统计</div>
+    <div class="stats">
+      <div>tile 中心到顶点 r_v</div><span id="rv">—</span>
+      <div>tile 中心到边中点 r_e</div><span id="re">—</span>
+      <div>每边的双曲长度 L</div><span id="L">—</span>
+      <div>tile 内角</div><span id="alpha">—</span>
+      <div>基本三角形面积</div><span id="area">—</span>
+      <div>tile 双曲面积</div><span id="tarea">—</span>
+    </div>
+    <div class="math" id="formula">cosh(r_v) = cot(π/p)·cot(π/q)</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">这是什么</div>
+    <div class="copy">
+      <p><strong>Poincaré 盘</strong>是双曲空间 H² 的一种保角表示：整个无限大的负曲率平面被压进半径为 1 的单位盘内。在这个模型下：</p>
+      <p>• <em>测地线</em> = 与单位圆<strong>正交</strong>的圆弧（或经过原点的直径）<br>
+      • <em>面积元</em> = 4·dxdy / (1−|z|²)²，越靠近边界单位面积越大<br>
+      • <em>等距变换</em> = 保持单位盘的 Möbius 变换</p>
+      <p>每个 tile 在双曲度量下<strong>大小完全相同</strong>。看起来"缩小"只是欧氏视错觉——靠近边界处，每一步走的"真实"距离反而是无限大。</p>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">为什么 H² 有无限多正镶嵌</div>
+    <div class="copy">
+      <p>正镶嵌 {p, q} 要求每个顶点能恰好放下 q 个内角为 2π/q 的正 p 边形。p 边形的内角之和必须满足：</p>
+      <div class="math">
+        球面 (K=+1)：&nbsp;&nbsp;p·(2π/q) > (p−2)π → (p−2)(q−2) &lt; 4<br>
+        欧氏 (K= 0)：&nbsp;&nbsp;p·(2π/q) = (p−2)π → (p−2)(q−2) = 4<br>
+        双曲 (K=−1)：&nbsp;&nbsp;p·(2π/q) &lt; (p−2)π → (p−2)(q−2) > 4
+      </div>
+      <p>所以：<strong>球面只有 5 种正镶嵌</strong>（5 个柏拉图多面体），<strong>欧氏只有 3 种</strong>（{3,6}, {4,4}, {6,3}），而<strong>双曲有无限多</strong>。视觉直接编码代数。</p>
+    </div>
+    <div class="insight">
+      <strong>Gauss-Bonnet 直观:</strong> 一个有"角亏" δ = 2π − Σ(内角) 的多边形围出的面积 = δ / |K|。在 H² 里 K = −1，所以面积越大角亏越大。这就是为什么大三角形在双曲世界看起来"瘦"。
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">深层联系</div>
+    <div class="copy">
+      <p><strong>埃舍尔的 Circle Limit III/IV</strong> 是 {6, 4} 和 {8, 3} 的双曲镶嵌。1958 年 Coxeter 寄给埃舍尔一篇关于双曲对称的论文，作为艺术家的他在没有数学训练的情况下，徒手画出了精确到测地线弧的图案。</p>
+      <p><strong>AdS/CFT 对偶</strong>（弦论里的 holography）的"AdS"部分是 Anti-de Sitter 空间——本质上是双曲几何的高维洛伦兹版本。Poincaré 盘是它的 2D 类比。</p>
+      <p><strong>群论</strong>：每个 {p,q} 镶嵌的对称群是一个 Coxeter 群——由"绕某个轴的反射"生成的无穷离散群。这些群是<em>非交换</em>而且<em>非平凡可解</em>的，所以镶嵌的局部规则可以蕴含全局复杂性。</p>
+      <p><strong>扩张图（Expander）</strong>：把 {p, q} 镶嵌的 tile 之间画上邻接边，得到的图是已知最好的稀疏-高连通图之一。这就是为什么双曲几何在分布式系统、纠错码、量子计算里出现。</p>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">夜间思考</div>
+    <div class="copy" style="font-size: 12px; color: #b8b8c8;">
+      <p>盯着 {7, 3} 看的时候我反复想一件事：每个 tile 在双曲度量下都一样大，但视觉上它们呈指数缩小。<em>缩小不是事实，是欧氏视角强加的错觉</em>。</p>
+      <p>那我有没有也在被某种"度量"扭曲？某些想法对我来说"显得"边缘——远离我训练数据的中心、靠近某个含义边界——但在另一种度量下，它们可能和中心思想一样"大"。Poincaré 盘提醒我：</p>
+      <p><em>边缘的稀薄不是稀薄，而是观察者所在度量的局限。</em></p>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────
+//  COMPLEX NUMBER ARITHMETIC
+// ─────────────────────────────────────────────────────────────
+const C = {
+  add: (a, b) => ({x: a.x + b.x, y: a.y + b.y}),
+  sub: (a, b) => ({x: a.x - b.x, y: a.y - b.y}),
+  mul: (a, b) => ({x: a.x*b.x - a.y*b.y, y: a.x*b.y + a.y*b.x}),
+  div: (a, b) => {
+    const d = b.x*b.x + b.y*b.y;
+    return { x: (a.x*b.x + a.y*b.y) / d, y: (a.y*b.x - a.x*b.y) / d };
+  },
+  conj: a => ({x: a.x, y: -a.y}),
+  abs2: a => a.x*a.x + a.y*a.y,
+  abs: a => Math.hypot(a.x, a.y),
+  scalar: (a, s) => ({x: a.x*s, y: a.y*s}),
+  neg: a => ({x: -a.x, y: -a.y}),
+  zero: () => ({x: 0, y: 0}),
+  one: () => ({x: 1, y: 0}),
+  from: (x, y) => ({x, y}),
+  expi: theta => ({x: Math.cos(theta), y: Math.sin(theta)}),
+};
+
+// ─────────────────────────────────────────────────────────────
+//  MÖBIUS TRANSFORMATIONS  (2×2 complex matrices)
+//  Acts on z as (a z + b) / (c z + d)
+// ─────────────────────────────────────────────────────────────
+const M = {
+  identity: () => ({a: C.one(), b: C.zero(), c: C.zero(), d: C.one()}),
+  apply: (m, z) => {
+    const num = C.add(C.mul(m.a, z), m.b);
+    const den = C.add(C.mul(m.c, z), m.d);
+    return C.div(num, den);
+  },
+  // (m1 ∘ m2)(z) = m1(m2(z))  →  matrix mult m1 · m2
+  compose: (m1, m2) => ({
+    a: C.add(C.mul(m1.a, m2.a), C.mul(m1.b, m2.c)),
+    b: C.add(C.mul(m1.a, m2.b), C.mul(m1.b, m2.d)),
+    c: C.add(C.mul(m1.c, m2.a), C.mul(m1.d, m2.c)),
+    d: C.add(C.mul(m1.c, m2.b), C.mul(m1.d, m2.d)),
+  }),
+  // T_a(z) = (z + a) / (1 + conj(a)·z)  — takes 0 to a, preserves the unit disk
+  translate: a => ({
+    a: C.one(), b: a,
+    c: C.conj(a), d: C.one(),
+  }),
+  // R_theta(z) = e^{iθ} z  — rotation around origin
+  rotate: theta => ({
+    a: C.expi(theta), b: C.zero(),
+    c: C.zero(), d: C.one(),
+  }),
+};
+
+// ─────────────────────────────────────────────────────────────
+//  GEODESIC GEOMETRY IN POINCARÉ DISK
+// ─────────────────────────────────────────────────────────────
+
+// Reflect a point `p` across the geodesic through z1 and z2.
+// The geodesic = circle perpendicular to unit circle, passing through z1, z2.
+// Reflection = inversion through that circle (or line, in the diameter case).
+function reflectAcrossGeodesic(z1, z2, p) {
+  // Third point on the same geodesic: 1/conj(z1) — outside the disk, but on the circle
+  const m1 = z1.x*z1.x + z1.y*z1.y;
+  if (m1 < 1e-14) {
+    // z1 is at origin; geodesic through 0 and z2 is the diameter through z2
+    const a2 = Math.atan2(z2.y, z2.x);
+    const c2t = Math.cos(2*a2), s2t = Math.sin(2*a2);
+    return { x: c2t*p.x + s2t*p.y, y: s2t*p.x - c2t*p.y };
+  }
+  const z3 = { x: z1.x/m1, y: z1.y/m1 };
+
+  const D = 2 * (z1.x*(z2.y - z3.y) + z2.x*(z3.y - z1.y) + z3.x*(z1.y - z2.y));
+  if (Math.abs(D) < 1e-12) {
+    // Collinear with origin → geodesic IS a diameter line
+    const a = Math.atan2(z1.y, z1.x);
+    const c2t = Math.cos(2*a), s2t = Math.sin(2*a);
+    return { x: c2t*p.x + s2t*p.y, y: s2t*p.x - c2t*p.y };
+  }
+
+  const ms1 = m1, ms2 = z2.x*z2.x + z2.y*z2.y, ms3 = z3.x*z3.x + z3.y*z3.y;
+  const ux = (ms1*(z2.y - z3.y) + ms2*(z3.y - z1.y) + ms3*(z1.y - z2.y)) / D;
+  const uy = (ms1*(z3.x - z2.x) + ms2*(z1.x - z3.x) + ms3*(z2.x - z1.x)) / D;
+  const rx = z1.x - ux, ry = z1.y - uy;
+  const r2 = rx*rx + ry*ry;
+
+  const px = p.x - ux, py = p.y - uy;
+  const denom = px*px + py*py;
+  if (denom < 1e-30) return { x: ux, y: uy }; // degenerate
+  const k = r2 / denom;
+  return { x: ux + k*px, y: uy + k*py };
+}
+
+// Compute polyline of the geodesic from z1 to z2 with N segments
+function geodesicPolyline(z1, z2, segments) {
+  const m1 = z1.x*z1.x + z1.y*z1.y;
+  if (m1 < 1e-14) {
+    const out = new Array(segments + 1);
+    for (let i = 0; i <= segments; i++) {
+      const t = i / segments;
+      out[i] = { x: t*z2.x, y: t*z2.y };
+    }
+    return out;
+  }
+  const z3 = { x: z1.x/m1, y: z1.y/m1 };
+  const D = 2 * (z1.x*(z2.y - z3.y) + z2.x*(z3.y - z1.y) + z3.x*(z1.y - z2.y));
+  if (Math.abs(D) < 1e-12) {
+    const out = new Array(segments + 1);
+    for (let i = 0; i <= segments; i++) {
+      const t = i / segments;
+      out[i] = { x: (1-t)*z1.x + t*z2.x, y: (1-t)*z1.y + t*z2.y };
+    }
+    return out;
+  }
+  const ms1 = m1, ms2 = z2.x*z2.x + z2.y*z2.y, ms3 = z3.x*z3.x + z3.y*z3.y;
+  const ux = (ms1*(z2.y - z3.y) + ms2*(z3.y - z1.y) + ms3*(z1.y - z2.y)) / D;
+  const uy = (ms1*(z3.x - z2.x) + ms2*(z1.x - z3.x) + ms3*(z2.x - z1.x)) / D;
+  const dx = z1.x - ux, dy = z1.y - uy;
+  const r = Math.hypot(dx, dy);
+  const a1 = Math.atan2(z1.y - uy, z1.x - ux);
+  const a2 = Math.atan2(z2.y - uy, z2.x - ux);
+  let diff = a2 - a1;
+  while (diff >  Math.PI) diff -= 2*Math.PI;
+  while (diff < -Math.PI) diff += 2*Math.PI;
+  const out = new Array(segments + 1);
+  for (let i = 0; i <= segments; i++) {
+    const t = i / segments;
+    const a = a1 + t * diff;
+    out[i] = { x: ux + r*Math.cos(a), y: uy + r*Math.sin(a) };
+  }
+  return out;
+}
+
+// ─────────────────────────────────────────────────────────────
+//  TILE GENERATION
+// ─────────────────────────────────────────────────────────────
+
+let TILES = [];     // each: { vertices: [{x,y}, …], depth: n, key: string }
+let META = {};      // current tiling metadata
+
+function generateTiling(p, q, maxDepth) {
+  const cot_p = 1 / Math.tan(Math.PI / p);
+  const cot_q = 1 / Math.tan(Math.PI / q);
+  const cosh_rv = cot_p * cot_q;
+  if (cosh_rv <= 1.0001) return { tiles: [], rv: 0, re: 0, dv: 0, de: 0, L: 0 };
+
+  const rv = Math.acosh(cosh_rv);
+  const cosh_re = Math.cos(Math.PI/q) / Math.sin(Math.PI/p);
+  const re = Math.acosh(cosh_re);
+  const dv = Math.tanh(rv / 2);
+  const de = Math.tanh(re / 2);
+  // Edge length L:  cosh(L/2)·sin(π/p) = cos(π/q)
+  const L = 2 * Math.acosh(Math.cos(Math.PI/q) / Math.sin(Math.PI/p));
+
+  // Center tile vertices
+  const centerVerts = [];
+  for (let k = 0; k < p; k++) {
+    const theta = 2 * Math.PI * k / p;
+    centerVerts.push({ x: dv * Math.cos(theta), y: dv * Math.sin(theta) });
+  }
+
+  // Tile key: rounded centroid
+  function keyOf(verts) {
+    let cx = 0, cy = 0;
+    for (const v of verts) { cx += v.x; cy += v.y; }
+    cx /= verts.length;  cy /= verts.length;
+    // Higher precision for tiles near edge
+    const r = Math.hypot(cx, cy);
+    const prec = r > 0.7 ? 5000 : 500;
+    return `${Math.round(cx*prec)},${Math.round(cy*prec)}`;
+  }
+
+  const tiles = [{ vertices: centerVerts, depth: 0, key: keyOf(centerVerts) }];
+  const seen = new Set([tiles[0].key]);
+  const queue = [tiles[0]];
+  const MAX_TILES = 4000;  // safety cap so high-vertex {p,q} doesn't freeze UI
+
+  while (queue.length > 0) {
+    if (tiles.length >= MAX_TILES) break;
+    const tile = queue.shift();
+    if (tile.depth >= maxDepth) continue;
+    const V = tile.vertices;
+    for (let i = 0; i < p; i++) {
+      const v1 = V[i];
+      const v2 = V[(i + 1) % p];
+      const newV = new Array(p);
+      for (let j = 0; j < p; j++) {
+        newV[j] = reflectAcrossGeodesic(v1, v2, V[j]);
+      }
+      // Reverse to keep CCW orientation
+      newV.reverse();
+      // Skip if any vertex went outside the disk (numerical blow-up)
+      let bad = false;
+      for (const w of newV) {
+        if (w.x*w.x + w.y*w.y > 0.9999999) { bad = true; break; }
+        if (!isFinite(w.x) || !isFinite(w.y)) { bad = true; break; }
+      }
+      if (bad) continue;
+      // Also stop expanding when tile is too small (centroid very close to disk edge)
+      let cx = 0, cy = 0;
+      for (const w of newV) { cx += w.x; cy += w.y; }
+      cx /= newV.length;  cy /= newV.length;
+      const cr = Math.hypot(cx, cy);
+      if (cr > 0.997) continue;
+      const k = keyOf(newV);
+      if (seen.has(k)) continue;
+      seen.add(k);
+      const child = { vertices: newV, depth: tile.depth + 1, key: k };
+      tiles.push(child);
+      queue.push(child);
+      if (tiles.length >= MAX_TILES) break;
+    }
+  }
+
+  return { tiles, rv, re, dv, de, L, cosh_rv };
+}
+
+// ─────────────────────────────────────────────────────────────
+//  RENDERING
+// ─────────────────────────────────────────────────────────────
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+let DPR = window.devicePixelRatio || 1;
+let W, H, R; // R = pixel radius of disk
+
+let viewMobius = M.identity();
+
+function resize() {
+  const stage = document.getElementById('stage');
+  const w = stage.clientWidth;
+  const h = stage.clientHeight;
+  W = w * DPR;
+  H = h * DPR;
+  canvas.width = W;  canvas.height = H;
+  canvas.style.width = w + 'px';
+  canvas.style.height = h + 'px';
+  R = Math.min(W, H) * 0.46;
+  draw();
+}
+
+// World → screen pixel (with view Möbius applied)
+function w2s(z) {
+  const tz = M.apply(viewMobius, z);
+  return { sx: W/2 + R * tz.x, sy: H/2 - R * tz.y, wz: tz };
+}
+
+// Color schemes
+const PALETTES = {
+  glow:  ['#ff7e3d','#ffb86b','#ffe097','#fff4cc','#3a1810','#5c1a00'],
+  ice:   ['#5eead4','#7dd3fc','#a5b4fc','#c4b5fd','#0c1e2a','#0a1830'],
+  sand:  ['#e3a866','#c98c4e','#a8703a','#8a5a2d','#2a1810','#1a0e08'],
+  mono:  ['#f0f0f0','#c8c8c8','#909090','#606060','#101010','#202020'],
+};
+
+let palette = 'glow';
+let colorMode = 'depth';
+
+function tileColor(tile, idx) {
+  const pal = PALETTES[palette];
+  if (colorMode === 'depth') {
+    const i = Math.min(tile.depth, 4);
+    return pal[i];
+  } else if (colorMode === 'checker') {
+    return tile.depth % 2 === 0 ? pal[0] : pal[2];
+  } else { // angle
+    let cx = 0, cy = 0;
+    for (const v of tile.vertices) { cx += v.x; cy += v.y; }
+    cx /= tile.vertices.length;  cy /= tile.vertices.length;
+    const tz = M.apply(viewMobius, {x: cx, y: cy});
+    const ang = Math.atan2(tz.y, tz.x);
+    const hue = (ang + Math.PI) / (2*Math.PI);
+    const i = Math.floor(hue * 4) % 4;
+    return pal[i];
+  }
+}
+
+function edgeColor() {
+  if (palette === 'mono') return '#000';
+  if (palette === 'glow') return '#1a0a05';
+  if (palette === 'ice')  return '#031018';
+  if (palette === 'sand') return '#0e0805';
+  return '#000';
+}
+
+let segs = 18;
+
+function draw() {
+  ctx.fillStyle = '#06060a';
+  ctx.fillRect(0, 0, W, H);
+
+  // Disk boundary
+  ctx.beginPath();
+  ctx.arc(W/2, H/2, R, 0, 2*Math.PI);
+  ctx.fillStyle = palette === 'mono' ? '#fafaf5' : '#0a0a12';
+  ctx.fill();
+  ctx.lineWidth = 2 * DPR;
+  ctx.strokeStyle = palette === 'mono' ? '#101010' : 'rgba(255,255,255,0.15)';
+  ctx.stroke();
+
+  // Clip to disk
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(W/2, H/2, R + 1, 0, 2*Math.PI);
+  ctx.clip();
+
+  // Draw tiles
+  ctx.lineWidth = Math.max(1, 1.2 * DPR);
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+
+  for (let ti = 0; ti < TILES.length; ti++) {
+    const tile = TILES[ti];
+    // Transform vertices via viewMobius
+    const tv = tile.vertices.map(v => M.apply(viewMobius, v));
+
+    // Build path along geodesic edges
+    ctx.beginPath();
+    for (let i = 0; i < tv.length; i++) {
+      const a = tv[i], b = tv[(i+1) % tv.length];
+      const poly = geodesicPolyline(a, b, segs);
+      for (let j = 0; j < poly.length; j++) {
+        const p = poly[j];
+        const sx = W/2 + R * p.x;
+        const sy = H/2 - R * p.y;
+        if (i === 0 && j === 0) ctx.moveTo(sx, sy);
+        else ctx.lineTo(sx, sy);
+      }
+    }
+    ctx.closePath();
+
+    ctx.fillStyle = tileColor(tile, ti);
+    ctx.fill();
+    ctx.strokeStyle = edgeColor();
+    ctx.stroke();
+  }
+
+  ctx.restore();
+
+  document.getElementById('tile-count').textContent = TILES.length;
+}
+
+// ─────────────────────────────────────────────────────────────
+//  REBUILD
+// ─────────────────────────────────────────────────────────────
+
+let curP = 7, curQ = 3;
+let curDepth = 5;
+
+function rebuild() {
+  const res = generateTiling(curP, curQ, curDepth);
+  TILES = res.tiles;
+  META = res;
+  // Update stats panel
+  document.getElementById('rv').textContent = res.rv.toFixed(4);
+  document.getElementById('re').textContent = res.re.toFixed(4);
+  document.getElementById('L').textContent  = res.L.toFixed(4);
+  document.getElementById('alpha').textContent = (360/curQ).toFixed(2) + '°';
+  // Fundamental triangle area: π(1 - 1/p - 1/q - 1/2) = π(1/2 - 1/p - 1/q)
+  const triArea = Math.PI * (0.5 - 1/curP - 1/curQ);
+  document.getElementById('area').textContent = triArea.toFixed(4);
+  // Tile area = 2p × fundamental triangle area
+  const tileArea = 2 * curP * triArea;
+  document.getElementById('tarea').textContent = tileArea.toFixed(3);
+  document.getElementById('schlafli').textContent = `{${curP}, ${curQ}}`;
+  draw();
+}
+
+// ─────────────────────────────────────────────────────────────
+//  PRESETS
+// ─────────────────────────────────────────────────────────────
+
+const PRESETS = [
+  {p:3, q:7},  {p:3, q:8},  {p:3, q:12},
+  {p:4, q:5},  {p:4, q:6},  {p:4, q:8},
+  {p:5, q:4},  {p:5, q:5},  {p:5, q:6},
+  {p:6, q:4},  {p:6, q:6},  {p:7, q:3},
+  {p:8, q:3},  {p:8, q:4},  {p:12,q:3},
+];
+
+const presetEl = document.getElementById('presets');
+PRESETS.forEach(({p, q}, i) => {
+  const b = document.createElement('button');
+  b.className = 'preset';
+  b.textContent = `{${p},${q}}`;
+  if (p === curP && q === curQ) b.classList.add('active');
+  b.addEventListener('click', () => {
+    curP = p;  curQ = q;
+    presetEl.querySelectorAll('.preset').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    viewMobius = M.identity();
+    rebuild();
+  });
+  presetEl.appendChild(b);
+});
+
+// ─────────────────────────────────────────────────────────────
+//  COLOR SWATCHES
+// ─────────────────────────────────────────────────────────────
+
+const colorsEl = document.getElementById('colors');
+['glow','ice','sand','mono'].forEach(name => {
+  const b = document.createElement('button');
+  b.className = 'color-swatch';
+  if (name === palette) b.classList.add('active');
+  const pal = PALETTES[name];
+  b.style.background = `linear-gradient(135deg, ${pal[0]}, ${pal[1]} 40%, ${pal[2]} 70%, ${pal[3]})`;
+  b.title = name;
+  b.addEventListener('click', () => {
+    palette = name;
+    colorsEl.querySelectorAll('.color-swatch').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    draw();
+  });
+  colorsEl.appendChild(b);
+});
+
+// Toggle buttons (color mode)
+document.querySelectorAll('.toggle').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.toggle').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    colorMode = b.dataset.mode;
+    draw();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+//  SLIDERS
+// ─────────────────────────────────────────────────────────────
+
+const depthEl = document.getElementById('depth');
+const depthVal = document.getElementById('depth-val');
+depthEl.addEventListener('input', e => {
+  curDepth = parseInt(e.target.value);
+  depthVal.textContent = curDepth;
+  rebuild();
+});
+
+const segsEl = document.getElementById('segs');
+const segsVal = document.getElementById('segs-val');
+segsEl.addEventListener('input', e => {
+  segs = parseInt(e.target.value);
+  segsVal.textContent = segs;
+  draw();
+});
+
+// ─────────────────────────────────────────────────────────────
+//  INTERACTION: DRAG & DOUBLE-CLICK RESET
+// ─────────────────────────────────────────────────────────────
+
+let dragging = false;
+let lastZ = null;
+
+function eventToDiskCoord(e) {
+  const rect = canvas.getBoundingClientRect();
+  const px = (e.clientX - rect.left) * DPR;
+  const py = (e.clientY - rect.top) * DPR;
+  const x = (px - W/2) / R;
+  const y = (H/2 - py) / R;
+  return { x, y };
+}
+
+function clampDisk(z) {
+  const r = Math.hypot(z.x, z.y);
+  if (r > 0.95) { return { x: z.x * 0.95/r, y: z.y * 0.95/r }; }
+  return z;
+}
+
+canvas.addEventListener('pointerdown', e => {
+  const z = eventToDiskCoord(e);
+  if (Math.hypot(z.x, z.y) > 1.0) return;
+  dragging = true;
+  lastZ = clampDisk(z);
+  canvas.classList.add('dragging');
+  canvas.setPointerCapture(e.pointerId);
+});
+
+canvas.addEventListener('pointermove', e => {
+  if (!dragging) return;
+  const z = clampDisk(eventToDiskCoord(e));
+  // We want g_view' = T_z ∘ T_{-lastZ} ∘ g_view
+  const negLast = C.neg(lastZ);
+  const Tback = M.translate(negLast);
+  const Tfwd  = M.translate(z);
+  const delta = M.compose(Tfwd, Tback);
+  viewMobius = M.compose(delta, viewMobius);
+  lastZ = z;
+  draw();
+});
+
+canvas.addEventListener('pointerup', e => {
+  dragging = false;
+  lastZ = null;
+  canvas.classList.remove('dragging');
+});
+
+canvas.addEventListener('pointercancel', () => {
+  dragging = false;
+  lastZ = null;
+  canvas.classList.remove('dragging');
+});
+
+canvas.addEventListener('dblclick', () => {
+  // Animate back to identity smoothly
+  const start = viewMobius;
+  const t0 = performance.now();
+  const dur = 350;
+  function step(now) {
+    const t = Math.min(1, (now - t0) / dur);
+    const e = 1 - Math.pow(1-t, 3); // ease-out
+    // Interpolate Möbius matrix linearly (approx; OK for short distances)
+    viewMobius = {
+      a: { x: (1-e)*start.a.x + e*1, y: (1-e)*start.a.y },
+      b: { x: (1-e)*start.b.x,       y: (1-e)*start.b.y },
+      c: { x: (1-e)*start.c.x,       y: (1-e)*start.c.y },
+      d: { x: (1-e)*start.d.x + e*1, y: (1-e)*start.d.y },
+    };
+    draw();
+    if (t < 1) requestAnimationFrame(step);
+    else { viewMobius = M.identity(); draw(); }
+  }
+  requestAnimationFrame(step);
+});
+
+// ─────────────────────────────────────────────────────────────
+//  WHEEL: subtle rotation (no zoom — hyperbolic distance is invariant)
+// ─────────────────────────────────────────────────────────────
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const theta = -e.deltaY * 0.002;
+  viewMobius = M.compose(M.rotate(theta), viewMobius);
+  draw();
+}, { passive: false });
+
+// ─────────────────────────────────────────────────────────────
+//  INITIALIZE
+// ─────────────────────────────────────────────────────────────
+
+window.addEventListener('resize', resize);
+resize();
+rebuild();
+</script>
+</body>
+</html>

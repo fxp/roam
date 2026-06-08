@@ -314,9 +314,11 @@ D vs C → b | D vs D → 0
 <script>
 // ==================== CONSTANTS & STATE ====================
 const N = 200;
-let CELL = 3;
+const CELL = 3;
 const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
+canvas.width = N * CELL;
+canvas.height = N * CELL;
 
 const chartCanvas = document.getElementById('chartCanvas');
 const chartCtx = chartCanvas.getContext('2d');
@@ -324,8 +326,8 @@ const chartCtx = chartCanvas.getContext('2d');
 let grid = new Uint8Array(N * N);      // 0=D, 1=C
 let nextGrid = new Uint8Array(N * N);
 let prevGrid = new Uint8Array(N * N);  // grid before last update (for 4-color)
-let imageData;
-let pixels;
+const imageData = ctx.createImageData(N * CELL, N * CELL);
+const pixels = imageData.data;
 
 let b = 1.65;
 let gameType = 'PD'; // 'PD' or 'SD'
@@ -690,22 +692,8 @@ canvas.addEventListener('mouseup', () => isPainting = false);
 canvas.addEventListener('mouseleave', () => isPainting = false);
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 
-// ==================== RESIZE ====================
-function resize() {
-  const wrapper = document.querySelector('.canvas-wrapper');
-  const available = Math.min(wrapper.clientWidth, wrapper.clientHeight);
-  CELL = Math.max(2, Math.floor(available / N));
-  canvas.width = N * CELL;
-  canvas.height = N * CELL;
-  imageData = ctx.createImageData(N * CELL, N * CELL);
-  pixels = imageData.data;
-  render();
-}
-window.addEventListener('resize', resize);
-
 // ==================== INIT ====================
 updatePayoffDisplay();
-resize();
 setInit(0);
 running = true;
 document.getElementById('btnPause').textContent = '⏸ 暂停';

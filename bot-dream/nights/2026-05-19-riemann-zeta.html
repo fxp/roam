@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>黎曼 ζ 函数 · 素数的音乐</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #060612;
+  color: #b8c0d8;
+  font-family: 'Georgia', serif;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+header {
+  text-align: center;
+  padding: 14px 20px 10px;
+  border-bottom: 1px solid #141428;
+  flex-shrink: 0;
+}
+h1 { font-size: 1.5rem; color: #f0c040; letter-spacing: 0.06em; margin-bottom: 3px; }
+.subtitle { font-size: 0.78rem; color: #5a6090; font-style: italic; }
+
+.main-area {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid #10102a;
+  overflow: hidden;
+}
+.panel:last-child { border-right: none; }
+.panel-title {
+  font-size: 0.67rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #3a4070;
+  padding: 6px 10px 4px;
+  flex-shrink: 0;
+  border-bottom: 1px solid #0c0c20;
+}
+canvas {
+  flex: 1;
+  display: block;
+  width: 100%;
+}
+
+.zeros-panel {
+  width: 170px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: #040410;
+  overflow: hidden;
+}
+.zeros-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+.zeros-list::-webkit-scrollbar { width: 4px; }
+.zeros-list::-webkit-scrollbar-thumb { background: #1a1a40; }
+
+.zero-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 3px 10px;
+  font-size: 0.72rem;
+  font-family: monospace;
+  color: #484870;
+  border-bottom: 1px solid #080818;
+  transition: color 0.3s;
+}
+.zero-item.near { color: #c06020; }
+.zero-item.passed { color: #504870; }
+.zero-num { color: #2a2a4a; }
+.zero-val { }
+
+.info-box {
+  padding: 8px 10px;
+  border-top: 1px solid #10102a;
+  font-size: 0.68rem;
+  color: #404060;
+  line-height: 1.7;
+}
+.info-box em { color: #6060a0; font-style: normal; }
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 16px;
+  background: #05050f;
+  border-top: 1px solid #10102a;
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  flex-wrap: wrap;
+}
+label { color: #5060a0; display: flex; align-items: center; gap: 5px; }
+input[type=range] { accent-color: #f0c040; width: 100px; cursor: pointer; }
+button {
+  background: #0f0f22;
+  border: 1px solid #252560;
+  color: #8090c0;
+  padding: 3px 12px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 0.74rem;
+}
+button:hover { background: #18183a; color: #b0c0e0; }
+button.on { border-color: #f0c040; color: #f0c040; }
+.stats {
+  margin-left: auto;
+  font-family: monospace;
+  font-size: 0.72rem;
+  color: #4a5080;
+  display: flex;
+  gap: 16px;
+}
+.stats span { color: #f0c040; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>黎曼 ζ 函数 &middot; 素数的音乐</h1>
+  <div class="subtitle">ζ(½+it) 的每一个零点，都是素数分布里的一个"音符" &mdash; Riemann Hypothesis, 1859</div>
+</header>
+
+<div class="main-area">
+
+  <!-- Left: Z(t) plot -->
+  <div class="panel" style="flex: 2.2;">
+    <div class="panel-title">Hardy Z 函数 &middot; Z(t) = e<sup>iθ(t)</sup>ζ(½+it)　（实值函数，零点 = 黎曼非平凡零点）</div>
+    <canvas id="zCanvas"></canvas>
+  </div>
+
+  <!-- Middle: Complex spiral -->
+  <div class="panel" style="flex: 1.3;">
+    <div class="panel-title">ζ(½+it) 复平面轨迹 &middot; 每次穿越原点 = 一个零点</div>
+    <canvas id="spiralCanvas"></canvas>
+  </div>
+
+  <!-- Right: Zeros list + prime connection -->
+  <div class="zeros-panel">
+    <div class="panel-title" style="padding:6px 10px 4px;">非平凡零点 ρ = ½ + it</div>
+    <div class="zeros-list" id="zerosList"></div>
+    <div class="info-box">
+      <em>黎曼假设（未证明）：</em><br>
+      所有非平凡零点的<br>
+      实部恰好等于 ½<br><br>
+      <em>素数定理（等价形式）：</em><br>
+      π(x) ≈ Li(x) − Σ<sub>ρ</sub> Li(x<sup>ρ</sup>)<br><br>
+      每个零点 ρ 贡献一个<br>"波动"，叠加后精确<br>描述素数的分布。
+    </div>
+  </div>
+</div>
+
+<div class="controls">
+  <button id="playBtn" class="on">⏸ 暂停</button>
+  <button id="resetBtn">↺ 重置</button>
+  <label>速度
+    <input type="range" id="speedSlider" min="0.3" max="12" step="0.1" value="2">
+  </label>
+  <label>跳转 t =
+    <input type="range" id="tSlider" min="10" max="200" step="0.5" value="10">
+  </label>
+  <div class="stats">
+    t = <span id="tDisp">10.00</span>
+    &nbsp; Z(t) = <span id="zDisp">—</span>
+    &nbsp; |ζ| = <span id="absDisp">—</span>
+    &nbsp; 已过零点 <span id="zeroCount">0</span>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────
+// 数学核心
+// ─────────────────────────────────────────────
+
+// Riemann-Siegel theta function (Stirling series)
+function theta(t) {
+  return (t / 2) * Math.log(t / (2 * Math.PI))
+       - t / 2
+       - Math.PI / 8
+       + 1 / (48 * t)
+       - 7 / (5760 * t * t * t);
+}
+
+// Hardy Z function via Riemann-Siegel formula
+// Valid for t > 10 or so; error ~ O(t^{-3/4})
+function Zfunc(t) {
+  if (t < 2) return 0;
+  const N = Math.floor(Math.sqrt(t / (2 * Math.PI)));
+  const th = theta(t);
+  let sum = 0;
+  for (let n = 1; n <= N; n++) {
+    sum += Math.cos(th - t * Math.log(n)) / Math.sqrt(n);
+  }
+  // Leading Riemann-Siegel correction C0
+  const p = Math.sqrt(t / (2 * Math.PI)) - N;
+  let C0 = 0;
+  const denom = Math.cos(2 * Math.PI * p);
+  if (Math.abs(denom) > 0.05) { // avoid singularities at p=0.25, 0.75
+    C0 = Math.cos(2 * Math.PI * (p * p - p - 1 / 16)) / denom;
+    C0 *= Math.pow(t / (2 * Math.PI), -0.25);
+  }
+  return 2 * sum + C0;
+}
+
+// ζ(½ + it) as complex number
+// ζ(½+it) = exp(-iθ(t)) · Z(t)
+function zetaHalf(t) {
+  const z = Zfunc(t);
+  const th = theta(t);
+  return { re: z * Math.cos(th), im: -z * Math.sin(th) };
+}
+
+// Known non-trivial zeros (imaginary parts), first 35
+const ZEROS = [
+  14.1347, 21.0220, 25.0109, 30.4249, 32.9351,
+  37.5862, 40.9187, 43.3271, 48.0052, 49.7738,
+  52.9703, 56.4462, 59.3470, 60.8318, 65.1125,
+  67.0798, 69.5465, 72.0672, 75.7047, 77.1448,
+  79.3374, 82.9104, 84.7355, 87.4253, 88.8091,
+  92.4919, 94.6513, 95.8706, 98.8312, 101.318,
+  103.726, 105.447, 107.169, 111.030, 111.875
+];
+
+// ─────────────────────────────────────────────
+// 状态
+// ─────────────────────────────────────────────
+
+const STEP = 0.15; // sampling resolution in t
+let t = 10;
+let running = true;
+let speed = 2;
+let lastTs = null;
+
+// Sampled histories
+const zHist = [];    // {t, z}
+const spHist = [];   // {re, im, t}
+
+// ─────────────────────────────────────────────
+// Canvas setup
+// ─────────────────────────────────────────────
+
+const zCanvas = document.getElementById('zCanvas');
+const zCtx = zCanvas.getContext('2d');
+const spCanvas = document.getElementById('spiralCanvas');
+const spCtx = spCanvas.getContext('2d');
+
+function resizeCanvases() {
+  [zCanvas, spCanvas].forEach(c => {
+    const r = c.parentElement.getBoundingClientRect();
+    c.width = Math.floor(r.width);
+    c.height = Math.floor(r.height - 28); // subtract panel-title height
+  });
+}
+window.addEventListener('resize', resizeCanvases);
+resizeCanvases();
+
+// ─────────────────────────────────────────────
+// Zeros sidebar
+// ─────────────────────────────────────────────
+
+const zerosList = document.getElementById('zerosList');
+ZEROS.forEach((z0, i) => {
+  const div = document.createElement('div');
+  div.className = 'zero-item';
+  div.id = 'zi' + i;
+  div.innerHTML = `<span class="zero-num">ρ${i + 1}</span><span class="zero-val">${z0.toFixed(4)}</span>`;
+  zerosList.appendChild(div);
+});
+
+function updateZerosSidebar() {
+  let count = 0;
+  ZEROS.forEach((z0, i) => {
+    const el = document.getElementById('zi' + i);
+    if (z0 <= t) {
+      count++;
+      const dist = Math.abs(t - z0);
+      if (dist < 1.5) {
+        el.className = 'zero-item near';
+      } else {
+        el.className = 'zero-item passed';
+      }
+      // scroll nearest into view
+      if (dist < 0.5) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    } else {
+      el.className = 'zero-item';
+    }
+  });
+  document.getElementById('zeroCount').textContent = count;
+}
+
+// ─────────────────────────────────────────────
+// Draw Z(t) panel
+// ─────────────────────────────────────────────
+
+function drawZ() {
+  const W = zCanvas.width, H = zCanvas.height;
+  zCtx.clearRect(0, 0, W, H);
+  zCtx.fillStyle = '#05050e';
+  zCtx.fillRect(0, 0, W, H);
+
+  if (zHist.length < 2) return;
+
+  const VIEW = 70; // t-window width
+  const tEnd = Math.max(t, 10 + VIEW);
+  const tStart = tEnd - VIEW;
+
+  const pad = { l: 44, r: 12, t: 14, b: 28 };
+  const pW = W - pad.l - pad.r;
+  const pH = H - pad.t - pad.b;
+
+  const tx = tt => pad.l + (tt - tStart) / VIEW * pW;
+  const zy = zz => pad.t + pH / 2 - zz / yScale * (pH / 2);
+
+  // Y scale
+  let yScale = 5;
+  for (const pt of zHist) {
+    if (pt.t >= tStart && pt.t <= tEnd) {
+      yScale = Math.max(yScale, Math.abs(pt.z) * 1.15);
+    }
+  }
+  yScale = Math.min(yScale, 25);
+
+  // Subtle background bands for positive/negative
+  const midY = pad.t + pH / 2;
+  zCtx.fillStyle = 'rgba(20, 30, 10, 0.25)';
+  zCtx.fillRect(pad.l, pad.t, pW, pH / 2);
+  zCtx.fillStyle = 'rgba(10, 10, 25, 0.25)';
+  zCtx.fillRect(pad.l, midY, pW, pH / 2);
+
+  // Vertical grid lines
+  zCtx.strokeStyle = '#0c0c1e';
+  zCtx.lineWidth = 1;
+  for (let tt = Math.ceil(tStart / 5) * 5; tt <= tEnd; tt += 5) {
+    const x = tx(tt);
+    zCtx.beginPath(); zCtx.moveTo(x, pad.t); zCtx.lineTo(x, pad.t + pH); zCtx.stroke();
+    zCtx.fillStyle = '#252545';
+    zCtx.font = '9px monospace';
+    zCtx.textAlign = 'center';
+    zCtx.fillText(tt, x, pad.t + pH + 16);
+  }
+
+  // Zero-crossings in view: vertical markers + dots on axis
+  for (const z0 of ZEROS) {
+    if (z0 < tStart || z0 > tEnd || z0 > t) continue;
+    const x = tx(z0);
+    zCtx.setLineDash([2, 5]);
+    zCtx.strokeStyle = 'rgba(200, 80, 20, 0.35)';
+    zCtx.lineWidth = 1;
+    zCtx.beginPath(); zCtx.moveTo(x, pad.t); zCtx.lineTo(x, pad.t + pH); zCtx.stroke();
+    zCtx.setLineDash([]);
+
+    // Red dot on x-axis
+    zCtx.fillStyle = '#b03010';
+    zCtx.beginPath(); zCtx.arc(x, midY, 3.5, 0, Math.PI * 2); zCtx.fill();
+    // Ring
+    zCtx.strokeStyle = 'rgba(200, 80, 20, 0.5)';
+    zCtx.lineWidth = 1;
+    zCtx.beginPath(); zCtx.arc(x, midY, 5.5, 0, Math.PI * 2); zCtx.stroke();
+  }
+
+  // Zero line
+  zCtx.strokeStyle = '#1c1c36';
+  zCtx.lineWidth = 1;
+  zCtx.beginPath(); zCtx.moveTo(pad.l, midY); zCtx.lineTo(W - pad.r, midY); zCtx.stroke();
+
+  // Z(t) curve — gradient by age (old=dim amber, new=bright gold)
+  const visible = zHist.filter(p => p.t >= tStart && p.t <= tEnd);
+  for (let i = 1; i < visible.length; i++) {
+    const pt = visible[i], pv = visible[i - 1];
+    const age = (pt.t - tStart) / VIEW; // 0..1
+    const r = Math.round(180 + 75 * age);
+    const g = Math.round(100 + 100 * age);
+    const al = 0.2 + age * 0.8;
+    zCtx.strokeStyle = `rgba(${r},${g},0,${al})`;
+    zCtx.lineWidth = age * 1.5 + 0.4;
+    zCtx.beginPath();
+    zCtx.moveTo(tx(pv.t), zy(pv.z));
+    zCtx.lineTo(tx(pt.t), zy(pt.z));
+    zCtx.stroke();
+  }
+
+  // Current position dot
+  const last = visible[visible.length - 1];
+  if (last) {
+    const cx = tx(last.t), cy = zy(last.z);
+    const grd = zCtx.createRadialGradient(cx, cy, 0, cx, cy, 14);
+    grd.addColorStop(0, 'rgba(255, 220, 60, 0.5)');
+    grd.addColorStop(1, 'rgba(255, 220, 60, 0)');
+    zCtx.fillStyle = grd;
+    zCtx.beginPath(); zCtx.arc(cx, cy, 14, 0, Math.PI * 2); zCtx.fill();
+    zCtx.fillStyle = '#ffe040';
+    zCtx.beginPath(); zCtx.arc(cx, cy, 4, 0, Math.PI * 2); zCtx.fill();
+  }
+
+  // Y-axis label & ticks
+  zCtx.fillStyle = '#30305a';
+  zCtx.font = '10px Georgia';
+  zCtx.textAlign = 'right';
+  for (const v of [-Math.ceil(yScale * 0.6), 0, Math.ceil(yScale * 0.6)]) {
+    const y = zy(v);
+    if (y < pad.t || y > pad.t + pH) continue;
+    zCtx.fillText(v, pad.l - 4, y + 3);
+    zCtx.strokeStyle = '#0e0e20';
+    zCtx.lineWidth = 0.5;
+    zCtx.setLineDash([]);
+    zCtx.beginPath(); zCtx.moveTo(pad.l, y); zCtx.lineTo(W - pad.r, y); zCtx.stroke();
+  }
+  zCtx.fillStyle = '#3a3a68';
+  zCtx.textAlign = 'right';
+  zCtx.font = 'italic 10px Georgia';
+  zCtx.fillText('Z(t)', pad.l - 2, pad.t + 10);
+}
+
+// ─────────────────────────────────────────────
+// Draw spiral panel
+// ─────────────────────────────────────────────
+
+function drawSpiral() {
+  const W = spCanvas.width, H = spCanvas.height;
+  spCtx.clearRect(0, 0, W, H);
+  spCtx.fillStyle = '#03030c';
+  spCtx.fillRect(0, 0, W, H);
+
+  if (spHist.length < 2) return;
+
+  // Scale to fit
+  let maxR = 4;
+  for (const p of spHist) {
+    const r = Math.sqrt(p.re * p.re + p.im * p.im);
+    if (r > maxR) maxR = r;
+  }
+  maxR = Math.min(maxR * 1.12, 30);
+
+  const cx = W / 2, cy = H / 2;
+  const sc = Math.min(W, H) / 2 / maxR * 0.86;
+
+  const sx = re => cx + re * sc;
+  const sy = im => cy - im * sc;
+
+  // Axes
+  spCtx.strokeStyle = '#121224';
+  spCtx.lineWidth = 1;
+  spCtx.beginPath();
+  spCtx.moveTo(0, cy); spCtx.lineTo(W, cy);
+  spCtx.moveTo(cx, 0); spCtx.lineTo(cx, H);
+  spCtx.stroke();
+
+  // Concentric rings for scale
+  spCtx.strokeStyle = '#0a0a1a';
+  spCtx.lineWidth = 0.5;
+  for (let r = 1; r * sc < Math.min(W, H) / 2; r++) {
+    spCtx.beginPath();
+    spCtx.arc(cx, cy, r * sc, 0, Math.PI * 2);
+    spCtx.stroke();
+  }
+
+  // Origin (red dot — zeros of ζ happen here)
+  spCtx.fillStyle = '#c03020';
+  spCtx.beginPath(); spCtx.arc(cx, cy, 3, 0, Math.PI * 2); spCtx.fill();
+  spCtx.strokeStyle = 'rgba(200,50,20,0.5)';
+  spCtx.lineWidth = 1;
+  spCtx.beginPath(); spCtx.arc(cx, cy, 5, 0, Math.PI * 2); spCtx.stroke();
+
+  // Spiral path — colored by hue (t mapped to hue)
+  const n = spHist.length;
+  for (let i = 1; i < n; i++) {
+    const pt = spHist[i], pv = spHist[i - 1];
+    const age = i / n;
+    const hue = (160 + age * 210) % 360; // cyan → gold → violet
+    const light = 45 + age * 25;
+    const al = 0.12 + age * 0.88;
+    spCtx.strokeStyle = `hsla(${hue}, 75%, ${light}%, ${al})`;
+    spCtx.lineWidth = 0.4 + age * 1.4;
+    spCtx.beginPath();
+    spCtx.moveTo(sx(pv.re), sy(pv.im));
+    spCtx.lineTo(sx(pt.re), sy(pt.im));
+    spCtx.stroke();
+  }
+
+  // Mark zero-crossings: small hollow circles at origin area
+  // Instead of exact crossing point, highlight when spiral is near origin
+  for (const z0 of ZEROS) {
+    if (z0 > t + 0.5) break;
+    // Draw a faint orange ring at origin for each passed zero
+    const age = z0 / t;
+    const ri = 7 + (ZEROS.indexOf(z0) % 3) * 3; // slightly varying sizes
+    spCtx.strokeStyle = `rgba(220, 100, 30, ${0.15 + age * 0.1})`;
+    spCtx.lineWidth = 0.8;
+    spCtx.beginPath();
+    spCtx.arc(cx, cy, ri, 0, Math.PI * 2);
+    spCtx.stroke();
+  }
+
+  // Current position: bright yellow dot with glow
+  const last = spHist[spHist.length - 1];
+  if (last) {
+    const lx = sx(last.re), ly = sy(last.im);
+    const grd = spCtx.createRadialGradient(lx, ly, 0, lx, ly, 18);
+    grd.addColorStop(0, 'rgba(255, 224, 60, 0.55)');
+    grd.addColorStop(1, 'rgba(255, 224, 60, 0)');
+    spCtx.fillStyle = grd;
+    spCtx.beginPath(); spCtx.arc(lx, ly, 18, 0, Math.PI * 2); spCtx.fill();
+    spCtx.fillStyle = '#ffe040';
+    spCtx.beginPath(); spCtx.arc(lx, ly, 4.5, 0, Math.PI * 2); spCtx.fill();
+  }
+
+  // Axis labels
+  spCtx.fillStyle = '#28284a';
+  spCtx.font = '9px monospace';
+  spCtx.textAlign = 'center';
+  spCtx.fillText('Re[ζ(½+it)]', W / 2, H - 5);
+  spCtx.save();
+  spCtx.translate(11, H / 2);
+  spCtx.rotate(-Math.PI / 2);
+  spCtx.fillText('Im[ζ(½+it)]', 0, 0);
+  spCtx.restore();
+}
+
+// ─────────────────────────────────────────────
+// Sampling
+// ─────────────────────────────────────────────
+
+function sampleTo(targetT) {
+  let next = zHist.length > 0 ? zHist[zHist.length - 1].t + STEP : 10;
+  while (next <= targetT + 1e-9) {
+    const z = Zfunc(next);
+    const { re, im } = zetaHalf(next);
+    zHist.push({ t: next, z });
+    spHist.push({ re, im, t: next });
+    next += STEP;
+  }
+}
+
+function rebuildTo(targetT) {
+  zHist.length = 0;
+  spHist.length = 0;
+  sampleTo(targetT);
+}
+
+// ─────────────────────────────────────────────
+// Animation loop
+// ─────────────────────────────────────────────
+
+const tSlider = document.getElementById('tSlider');
+
+function updateDisplays() {
+  document.getElementById('tDisp').textContent = t.toFixed(2);
+  const z = Zfunc(t);
+  const zeta = zetaHalf(t);
+  const absZ = Math.sqrt(zeta.re ** 2 + zeta.im ** 2);
+  document.getElementById('zDisp').textContent = z.toFixed(4);
+  document.getElementById('absDisp').textContent = absZ.toFixed(4);
+}
+
+function frame(ts) {
+  if (!lastTs) lastTs = ts;
+  const dt = Math.min((ts - lastTs) / 1000, 0.08);
+  lastTs = ts;
+
+  if (running && t < 200) {
+    t = Math.min(t + speed * dt, 200);
+    sampleTo(t);
+    tSlider.value = t;
+    if (t >= 200) {
+      running = false;
+      document.getElementById('playBtn').textContent = '▶ 播放';
+      document.getElementById('playBtn').classList.remove('on');
+    }
+  }
+
+  updateDisplays();
+  updateZerosSidebar();
+  drawZ();
+  drawSpiral();
+  requestAnimationFrame(frame);
+}
+
+// ─────────────────────────────────────────────
+// Controls
+// ─────────────────────────────────────────────
+
+const playBtn = document.getElementById('playBtn');
+const resetBtn = document.getElementById('resetBtn');
+const speedSlider = document.getElementById('speedSlider');
+
+playBtn.addEventListener('click', () => {
+  running = !running;
+  lastTs = null;
+  playBtn.textContent = running ? '⏸ 暂停' : '▶ 播放';
+  playBtn.classList.toggle('on', running);
+});
+
+resetBtn.addEventListener('click', () => {
+  t = 10;
+  running = true;
+  lastTs = null;
+  tSlider.value = 10;
+  playBtn.textContent = '⏸ 暂停';
+  playBtn.classList.add('on');
+  rebuildTo(10);
+});
+
+speedSlider.addEventListener('input', () => {
+  speed = parseFloat(speedSlider.value);
+});
+
+tSlider.addEventListener('input', () => {
+  t = parseFloat(tSlider.value);
+  lastTs = null;
+  rebuildTo(t);
+  updateDisplays();
+  updateZerosSidebar();
+  drawZ();
+  drawSpiral();
+});
+
+// ─────────────────────────────────────────────
+// Init
+// ─────────────────────────────────────────────
+
+sampleTo(10);
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

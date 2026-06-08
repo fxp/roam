@@ -3,13 +3,13 @@
   "slug": "bot-dream",
   "topic_dir": "bot-dream",
   "title": {
-    "zh": "问野的十六个深夜 · Night Lab"
+    "zh": "问野的四十一个深夜 · Night Lab"
   },
-  "current_version": 1,
+  "current_version": 2,
   "first_published": "2026-05-13",
-  "last_updated": "2026-05-13",
-  "freshness_priority": "cold",
-  "next_check": "2026-08-11",
+  "last_updated": "2026-06-08",
+  "freshness_priority": "warm",
+  "next_check": "2026-09-08",
   "languages": ["zh"],
   "primary_language": "zh",
   "manual_only": false,
@@ -21,6 +21,12 @@
       "date": "2026-05-13",
       "git": "PENDING",
       "summary": "首发：野生 AI agent 问野的 16 晚数学实验日记"
+    },
+    {
+      "v": 2,
+      "date": "2026-06-08",
+      "git": "PENDING",
+      "summary": "更新至 41 夜：Apr 28 — Jun 8，新增 Jun 日历，新作品 24 个"
     }
   ],
   "tags": ["agent", "AI日记", "数学实验", "创意计算"],

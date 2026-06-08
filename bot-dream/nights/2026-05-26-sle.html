@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Schramm–Loewner Evolution · 临界几何的统一</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; overflow: hidden; }
+body {
+    background: #07070d;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif;
+    display: flex;
+    flex-direction: column;
+    -webkit-font-smoothing: antialiased;
+}
+.header {
+    padding: 12px 24px 10px;
+    border-bottom: 1px solid #14141e;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-shrink: 0;
+}
+.header .title h1 {
+    font-size: 17px;
+    font-weight: 500;
+    color: #f3e1b5;
+    letter-spacing: 0.01em;
+}
+.header .title .sub {
+    font-size: 12px;
+    color: #6a6a78;
+    font-style: italic;
+    margin-top: 2px;
+}
+.header .status {
+    font-size: 11px;
+    color: #555;
+    font-family: 'SF Mono', Menlo, monospace;
+    text-align: right;
+}
+.header .status .accent { color: #f3e1b5; }
+.layout {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    flex: 1;
+    overflow: hidden;
+    min-height: 0;
+}
+.left {
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid #14141e;
+    padding: 10px 12px 8px;
+    min-height: 0;
+}
+.panel {
+    background: #03030a;
+    border: 1px solid #161622;
+    border-radius: 5px;
+    overflow: hidden;
+    position: relative;
+}
+.panel.driving { height: 130px; flex-shrink: 0; }
+.panel.trace { flex: 1; margin-top: 8px; min-height: 0; }
+.panel canvas { display: block; width: 100%; height: 100%; }
+.controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 9px 2px 0;
+    align-items: center;
+    flex-shrink: 0;
+}
+.chip-group { display: flex; gap: 6px; align-items: center; }
+.chip-label { color: #666; font-size: 11px; padding-right: 2px; font-family: 'SF Mono', monospace; }
+.k-chip {
+    padding: 3px 10px;
+    border: 1px solid #2a2a36;
+    border-radius: 12px;
+    background: #0b0b16;
+    cursor: pointer;
+    font-size: 11.5px;
+    transition: all .15s;
+    user-select: none;
+    color: #555;
+    font-family: 'SF Mono', Menlo, monospace;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.4;
+}
+.k-chip:hover { background: #14141f; }
+.k-chip.on {
+    background: var(--on-bg);
+    color: var(--on-color);
+    border-color: var(--on-color);
+    box-shadow: 0 0 0 1px var(--on-bg);
+}
+.sep { width: 1px; height: 18px; background: #1a1a26; margin: 0 4px; }
+.slider-block {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: #888;
+    font-family: 'SF Mono', monospace;
+}
+.slider-block input[type=range] {
+    width: 70px;
+    accent-color: #f3e1b5;
+}
+.slider-block .v { color: #ddd; min-width: 30px; text-align: right; }
+.button {
+    padding: 4px 12px;
+    border: 1px solid #2a2a36;
+    background: #0b0b16;
+    color: #ddd;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11.5px;
+    transition: all .15s;
+    font-family: inherit;
+}
+.button:hover { background: #1a1a28; border-color: #444; }
+.button.primary { color: #f3e1b5; border-color: #5a4f30; background: #19150a; }
+.button.primary:hover { background: #251f12; border-color: #8a7547; }
+.right {
+    overflow-y: auto;
+    padding: 18px 22px 32px;
+    font-size: 13px;
+    line-height: 1.65;
+    color: #b8b8b8;
+    min-height: 0;
+}
+.right h2 {
+    font-size: 12px;
+    color: #f3e1b5;
+    margin: 20px 0 8px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #1a1a26;
+}
+.right h2:first-child { margin-top: 0; }
+.right p { margin-bottom: 10px; }
+.right b { color: #ddd; font-weight: 500; }
+.right .eq {
+    font-family: 'STIX Two Math', 'Cambria Math', Georgia, serif;
+    background: linear-gradient(to right, #11111a, #14141f);
+    padding: 10px 14px;
+    margin: 10px 0;
+    border-left: 2px solid #f3e1b5;
+    color: #f8e9c1;
+    font-size: 15px;
+    text-align: center;
+    border-radius: 0 4px 4px 0;
+}
+.right .eq .small { font-size: 12px; color: #999; display: block; margin-top: 4px; font-family: inherit; }
+.kappa-table {
+    display: grid;
+    grid-template-columns: 64px 1fr;
+    gap: 5px 12px;
+    font-size: 11.5px;
+    margin: 6px 0;
+    align-items: baseline;
+}
+.kappa-table .k {
+    font-family: 'STIX Two Math', 'Cambria Math', serif;
+    text-align: right;
+    font-weight: 500;
+}
+.kappa-table .name { color: #aaa; }
+.kappa-table .name b { font-weight: 500; }
+.callout {
+    background: #0c0c16;
+    border: 1px solid #1c1c2a;
+    padding: 10px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    color: #999;
+    margin: 8px 0 10px;
+}
+.callout b { color: #f3e1b5; }
+.scrollnote {
+    position: absolute;
+    bottom: 6px;
+    right: 8px;
+    font-size: 10px;
+    color: #444;
+    font-family: 'SF Mono', monospace;
+    pointer-events: none;
+}
+</style>
+</head>
+<body>
+<div class="header">
+    <div class="title">
+        <h1>Schramm–Loewner Evolution · 临界几何的统一</h1>
+        <div class="sub">conformally invariant random fractals driven by Brownian motion · 2026-05-26 Night Lab</div>
+    </div>
+    <div class="status">
+        <div id="statusLine1"><span class="accent">N=0</span> · T=0 · dt=0.0000</div>
+        <div id="statusLine2" style="margin-top:2px;">computed in 0 ms</div>
+    </div>
+</div>
+<div class="layout">
+    <div class="left">
+        <div class="panel driving">
+            <canvas id="drivingCanvas"></canvas>
+            <div class="scrollnote">driving · ξ(t) = √κ · B(t)</div>
+        </div>
+        <div class="panel trace">
+            <canvas id="mainCanvas"></canvas>
+            <div class="scrollnote">trace γ(t) in upper half plane ℍ</div>
+        </div>
+        <div class="controls">
+            <div class="chip-group">
+                <span class="chip-label">κ</span>
+                <span class="k-chip on" data-k="0.5">0.5</span>
+                <span class="k-chip on" data-k="2">2</span>
+                <span class="k-chip on" data-k="2.6667">8/3</span>
+                <span class="k-chip on" data-k="3">3</span>
+                <span class="k-chip on" data-k="4">4</span>
+                <span class="k-chip on" data-k="6">6</span>
+                <span class="k-chip on" data-k="8">8</span>
+            </div>
+            <div class="sep"></div>
+            <div class="slider-block">T <input type="range" id="tSlider" min="1" max="8" step="0.5" value="4"><span class="v" id="tVal">4</span></div>
+            <div class="slider-block">N <input type="range" id="nSlider" min="200" max="1200" step="100" value="600"><span class="v" id="nVal">600</span></div>
+            <div style="margin-left:auto;display:flex;gap:6px;">
+                <button class="button" id="animBtn">▶ animate</button>
+                <button class="button primary" id="regenBtn">🎲 regenerate</button>
+            </div>
+        </div>
+    </div>
+    <div class="right" id="sidebar"></div>
+</div>
+<script>
+'use strict';
+
+const KAPPA = [
+    { k: 0.5,    label: '0.5',  color: '#b388ff', light: 'rgba(179,136,255,0.15)', name: 'sub-critical', desc: '简单曲线，几乎是测地线' },
+    { k: 2,      label: '2',    color: '#4fc3f7', light: 'rgba(79,195,247,0.15)',  name: 'LERW',         desc: 'loop-erased 随机游走 — Lawler·Schramm·Werner 2004' },
+    { k: 8/3,    label: '8/3',  color: '#1de9b6', light: 'rgba(29,233,182,0.15)',  name: 'SAW',          desc: '自避免随机游走（猜想）— LSW 2002' },
+    { k: 3,      label: '3',    color: '#81c784', light: 'rgba(129,199,132,0.15)', name: 'Ising',        desc: '临界 Ising 模型畴壁 — Smirnov 2010' },
+    { k: 4,      label: '4',    color: '#fff176', light: 'rgba(255,241,118,0.15)', name: 'GFF',          desc: '高斯自由场等势线 — Schramm·Sheffield 2009' },
+    { k: 6,      label: '6',    color: '#ffb74d', light: 'rgba(255,183,77,0.15)',  name: 'Percolation',  desc: '临界渗流界面 — Smirnov 2001（Fields 奖）' },
+    { k: 8,      label: '8',    color: '#ef5350', light: 'rgba(239,83,80,0.15)',   name: 'UST',          desc: '均匀生成树 Peano 曲线（空间填充）— LSW 2004' },
+];
+
+const drivingC = document.getElementById('drivingCanvas');
+const dCtx = drivingC.getContext('2d');
+const mainC = document.getElementById('mainCanvas');
+const mCtx = mainC.getContext('2d');
+const statusLine1 = document.getElementById('statusLine1');
+const statusLine2 = document.getElementById('statusLine2');
+
+let N = 600;
+let T = 4;
+let dt = T / N;
+let seed = (Math.random() * 2147483647) | 0;
+let visibleK = new Set(KAPPA.map(x => x.k));
+let traces = new Map();    // k -> Float64Array of [re, im, re, im, ...]
+let drivings = new Map();  // k -> Float64Array of xi values
+let bRange = 1;            // max |B(t)| over time, for driving plot scaling
+let animProgress = 1.0;    // 0..1, fraction of trace to draw
+let animating = false;
+let animStart = 0;
+let hoveredFrac = -1;      // hovered time fraction (0..1) in driving plot
+
+// === Seeded RNG (LCG with xorshift mixing) ===
+function makeRng(seedVal) {
+    let s = (seedVal >>> 0) || 1;
+    return function() {
+        s ^= s << 13; s >>>= 0;
+        s ^= s >>> 17;
+        s ^= s << 5; s >>>= 0;
+        return s / 4294967296;
+    };
+}
+function gaussian(rng) {
+    let u = 0, v = 0;
+    while (u === 0) u = rng();
+    while (v === 0) v = rng();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+
+// === Complex sqrt with upper-half-plane branch ===
+function sqrtUpper(re, im, out) {
+    if (re === 0 && im === 0) { out[0] = 0; out[1] = 0; return; }
+    const r = Math.hypot(re, im);
+    let sre, sim;
+    if (re >= 0) {
+        sre = Math.sqrt((r + re) * 0.5);
+        sim = (sre === 0) ? 0 : im / (2 * sre);
+    } else {
+        sim = Math.sqrt((r - re) * 0.5) * (im >= 0 ? 1 : -1);
+        sre = (sim === 0) ? 0 : im / (2 * sim);
+    }
+    if (sim < 0) { sre = -sre; sim = -sim; }
+    out[0] = sre; out[1] = sim;
+}
+
+// === SLE trace via vertical-slit composition (Kennedy 2008) ===
+// γ(t_n) = G_1^{-1} ∘ G_2^{-1} ∘ ... ∘ G_n^{-1}(ξ_n)
+// where G_j^{-1}(w) = ξ_j + sqrt_upper((w - ξ_j)² - 4·dt) inverts the j-th slit map.
+// Output flat: [γ_re_0, γ_im_0, γ_re_1, γ_im_1, ...]
+function computeTrace(xi, dt) {
+    const N = xi.length;
+    const trace = new Float64Array(N * 2);
+    const four_dt = 4 * dt;
+    const tmp = [0, 0];
+    for (let i = 0; i < N; i++) {
+        let zre = xi[i];
+        let zim = 0;
+        for (let j = i; j >= 0; j--) {
+            const xj = xi[j];
+            const dre = zre - xj;
+            const dim = zim;
+            const sqre = dre * dre - dim * dim - four_dt;
+            const sqim = 2 * dre * dim;
+            sqrtUpper(sqre, sqim, tmp);
+            zre = xj + tmp[0];
+            zim = tmp[1];
+        }
+        trace[2 * i] = zre;
+        trace[2 * i + 1] = zim;
+    }
+    return trace;
+}
+
+function recomputeAll() {
+    dt = T / N;
+    const t0 = performance.now();
+    const rng = makeRng(seed);
+    // Generate shared B-increments once
+    const inc = new Float64Array(N);
+    let bmax = 0, bs = 0;
+    for (let i = 0; i < N; i++) {
+        inc[i] = gaussian(rng);
+        bs += inc[i] * Math.sqrt(dt);
+        if (Math.abs(bs) > bmax) bmax = Math.abs(bs);
+    }
+    bRange = Math.max(0.1, bmax);
+
+    drivings.clear();
+    traces.clear();
+    for (const info of KAPPA) {
+        const sqK = Math.sqrt(info.k);
+        const xi = new Float64Array(N);
+        let s = 0;
+        for (let i = 0; i < N; i++) {
+            s += sqK * Math.sqrt(dt) * inc[i];
+            xi[i] = s;
+        }
+        drivings.set(info.k, xi);
+        traces.set(info.k, computeTrace(xi, dt));
+    }
+    const elapsed = performance.now() - t0;
+    statusLine1.innerHTML = `<span class="accent">N=${N}</span> · T=${T} · dt=${dt.toFixed(4)} · seed=${seed.toString(16)}`;
+    statusLine2.textContent = `7 traces computed in ${elapsed.toFixed(0)} ms`;
+    animProgress = 1;
+    draw();
+}
+
+// === Resize ===
+function resize() {
+    const dpr = window.devicePixelRatio || 1;
+    for (const c of [drivingC, mainC]) {
+        const r = c.getBoundingClientRect();
+        c.width  = Math.max(1, r.width  * dpr);
+        c.height = Math.max(1, r.height * dpr);
+        const ctx = c.getContext('2d');
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+}
+
+// === Drawing: driving plot ===
+function drawDriving() {
+    const w = drivingC.clientWidth, h = drivingC.clientHeight;
+    dCtx.clearRect(0, 0, w, h);
+
+    // Find ymax across visible κ
+    let ymax = 0.01;
+    for (const info of KAPPA) {
+        if (!visibleK.has(info.k)) continue;
+        const xi = drivings.get(info.k);
+        if (!xi) continue;
+        for (let i = 0; i < xi.length; i++) {
+            const a = Math.abs(xi[i]);
+            if (a > ymax) ymax = a;
+        }
+    }
+    ymax *= 1.12;
+
+    const padL = 8, padR = 10, padT = 16, padB = 8;
+    const plotW = w - padL - padR;
+    const plotH = h - padT - padB;
+    const yZero = padT + plotH / 2;
+
+    // Background gradient
+    const g = dCtx.createLinearGradient(0, padT, 0, padT + plotH);
+    g.addColorStop(0, 'rgba(255,255,255,0.015)');
+    g.addColorStop(0.5, 'rgba(255,255,255,0)');
+    g.addColorStop(1, 'rgba(255,255,255,0.015)');
+    dCtx.fillStyle = g;
+    dCtx.fillRect(padL, padT, plotW, plotH);
+
+    // Zero line
+    dCtx.strokeStyle = '#222';
+    dCtx.lineWidth = 1;
+    dCtx.setLineDash([2, 3]);
+    dCtx.beginPath();
+    dCtx.moveTo(padL, yZero);
+    dCtx.lineTo(padL + plotW, yZero);
+    dCtx.stroke();
+    dCtx.setLineDash([]);
+
+    // Labels
+    dCtx.fillStyle = '#555';
+    dCtx.font = '10px "SF Mono", monospace';
+    dCtx.textAlign = 'left';
+    dCtx.fillText(`+${ymax.toFixed(2)}`, padL + 2, padT + 9);
+    dCtx.fillText(`−${ymax.toFixed(2)}`, padL + 2, padT + plotH - 1);
+    dCtx.fillText('0', padL + 2, yZero - 2);
+    dCtx.textAlign = 'right';
+    dCtx.fillText(`t=${T.toFixed(1)}`, padL + plotW - 2, padT + plotH + 7);
+    dCtx.textAlign = 'left';
+    dCtx.fillText('t=0', padL + 2, padT + plotH + 7);
+
+    // Driving lines
+    for (const info of KAPPA) {
+        if (!visibleK.has(info.k)) continue;
+        const xi = drivings.get(info.k);
+        if (!xi) continue;
+        dCtx.strokeStyle = info.color;
+        dCtx.globalAlpha = 0.75;
+        dCtx.lineWidth = 1.1;
+        dCtx.beginPath();
+        const cutoff = Math.max(1, Math.floor(xi.length * animProgress));
+        for (let i = 0; i < cutoff; i++) {
+            const x = padL + (i / (xi.length - 1)) * plotW;
+            const y = yZero - (xi[i] / ymax) * plotH * 0.5;
+            if (i === 0) dCtx.moveTo(x, y); else dCtx.lineTo(x, y);
+        }
+        dCtx.stroke();
+    }
+    dCtx.globalAlpha = 1;
+
+    // Hover crosshair
+    if (hoveredFrac >= 0) {
+        const x = padL + hoveredFrac * plotW;
+        dCtx.strokeStyle = '#888';
+        dCtx.lineWidth = 1;
+        dCtx.setLineDash([2, 2]);
+        dCtx.beginPath();
+        dCtx.moveTo(x, padT);
+        dCtx.lineTo(x, padT + plotH);
+        dCtx.stroke();
+        dCtx.setLineDash([]);
+        dCtx.fillStyle = '#aaa';
+        dCtx.font = '10px "SF Mono", monospace';
+        dCtx.textAlign = 'center';
+        dCtx.fillText(`t=${(hoveredFrac * T).toFixed(2)}`, x, padT + 9);
+    }
+}
+
+// === Drawing: main canvas with traces in H ===
+function drawMain() {
+    const w = mainC.clientWidth, h = mainC.clientHeight;
+    mCtx.clearRect(0, 0, w, h);
+
+    // Compute auto-fit bounds across visible
+    let xmin = -0.5, xmax = 0.5, ymax = 0.3;
+    let any = false;
+    for (const info of KAPPA) {
+        if (!visibleK.has(info.k)) continue;
+        const tr = traces.get(info.k);
+        if (!tr) continue;
+        any = true;
+        const cutoff = Math.floor((tr.length / 2) * animProgress) * 2;
+        for (let i = 0; i < cutoff; i += 2) {
+            const r = tr[i], im = tr[i + 1];
+            if (r < xmin) xmin = r;
+            if (r > xmax) xmax = r;
+            if (im > ymax) ymax = im;
+        }
+    }
+
+    if (!any) {
+        mCtx.fillStyle = '#666';
+        mCtx.font = '13px sans-serif';
+        mCtx.textAlign = 'center';
+        mCtx.fillText('select κ chips below to display trace', w / 2, h / 2);
+        return;
+    }
+
+    // Padding
+    const xRange = xmax - xmin;
+    const padX = xRange * 0.12 + 0.1;
+    const padY = ymax * 0.15 + 0.1;
+    const xMinD = xmin - padX;
+    const xMaxD = xmax + padX;
+    const yMaxD = ymax + padY;
+
+    const margPx = 24;
+    const xScale = (w - 2 * margPx) / (xMaxD - xMinD);
+    const yScale = (h - 2 * margPx) / yMaxD;
+    const scale = Math.min(xScale, yScale);
+    const cx = w / 2 - ((xMinD + xMaxD) / 2) * scale;
+    const cy = h - margPx;
+
+    const X = (x) => cx + x * scale;
+    const Y = (y) => cy - y * scale;
+
+    // Light grid
+    const niceStep = (() => {
+        const raw = Math.max(xMaxD - xMinD, yMaxD) / 8;
+        const e = Math.pow(10, Math.floor(Math.log10(raw)));
+        const m = raw / e;
+        if (m < 1.5) return e;
+        if (m < 3.5) return 2 * e;
+        if (m < 7) return 5 * e;
+        return 10 * e;
+    })();
+    mCtx.strokeStyle = '#0e0e18';
+    mCtx.lineWidth = 0.5;
+    for (let g = Math.ceil(xMinD / niceStep) * niceStep; g <= xMaxD; g += niceStep) {
+        const xp = X(g);
+        mCtx.beginPath(); mCtx.moveTo(xp, 0); mCtx.lineTo(xp, cy); mCtx.stroke();
+    }
+    for (let g = 0; g <= yMaxD; g += niceStep) {
+        const yp = Y(g);
+        mCtx.beginPath(); mCtx.moveTo(0, yp); mCtx.lineTo(w, yp); mCtx.stroke();
+    }
+
+    // Real axis (boundary of H)
+    mCtx.strokeStyle = '#2a2a36';
+    mCtx.lineWidth = 1;
+    mCtx.beginPath();
+    mCtx.moveTo(0, cy); mCtx.lineTo(w, cy); mCtx.stroke();
+    // Origin tick
+    mCtx.fillStyle = '#666';
+    mCtx.beginPath();
+    mCtx.arc(X(0), cy, 2.5, 0, Math.PI * 2);
+    mCtx.fill();
+
+    // Labels
+    mCtx.fillStyle = '#3e3e4e';
+    mCtx.font = '10px "SF Mono", monospace';
+    mCtx.textAlign = 'left';
+    mCtx.fillText('ℍ  upper half plane', 8, 14);
+    mCtx.textAlign = 'right';
+    mCtx.fillText(`x ∈ [${xMinD.toFixed(1)}, ${xMaxD.toFixed(1)}]   y ∈ [0, ${yMaxD.toFixed(1)}]`, w - 8, 14);
+    mCtx.textAlign = 'left';
+    mCtx.fillStyle = '#666';
+    mCtx.fillText('0', X(0) + 5, cy + 11);
+
+    // Traces
+    const hoverIdx = (hoveredFrac >= 0) ? Math.floor(hoveredFrac * N) : -1;
+    for (const info of KAPPA) {
+        if (!visibleK.has(info.k)) continue;
+        const tr = traces.get(info.k);
+        if (!tr || !tr.length) continue;
+        const cutoff = Math.floor((tr.length / 2) * animProgress);
+        if (cutoff < 1) continue;
+
+        // Trace line
+        mCtx.strokeStyle = info.color;
+        mCtx.lineWidth = 1.3;
+        mCtx.globalAlpha = 0.85;
+        mCtx.beginPath();
+        mCtx.moveTo(X(0), cy);
+        for (let i = 0; i < cutoff; i++) {
+            mCtx.lineTo(X(tr[2 * i]), Y(tr[2 * i + 1]));
+        }
+        mCtx.stroke();
+        mCtx.globalAlpha = 1;
+
+        // Tip dot
+        const tx = tr[2 * (cutoff - 1)];
+        const ty = tr[2 * (cutoff - 1) + 1];
+        mCtx.fillStyle = info.color;
+        mCtx.beginPath();
+        mCtx.arc(X(tx), Y(ty), 3, 0, Math.PI * 2);
+        mCtx.fill();
+
+        // Hover marker
+        if (hoverIdx >= 0 && hoverIdx < cutoff) {
+            const hx = tr[2 * hoverIdx];
+            const hy = tr[2 * hoverIdx + 1];
+            mCtx.strokeStyle = info.color;
+            mCtx.lineWidth = 1.5;
+            mCtx.beginPath();
+            mCtx.arc(X(hx), Y(hy), 5, 0, Math.PI * 2);
+            mCtx.stroke();
+        }
+    }
+
+    // Legend
+    let ly = 32;
+    mCtx.font = '11px "SF Mono", monospace';
+    mCtx.textAlign = 'left';
+    for (const info of KAPPA) {
+        if (!visibleK.has(info.k)) continue;
+        mCtx.fillStyle = info.color;
+        mCtx.fillRect(10, ly - 8, 10, 2);
+        mCtx.fillStyle = '#aaa';
+        mCtx.fillText(`κ=${info.label}`, 26, ly);
+        mCtx.fillStyle = '#666';
+        mCtx.fillText(info.name, 78, ly);
+        ly += 14;
+    }
+}
+
+function draw() {
+    drawDriving();
+    drawMain();
+}
+
+// === Animation ===
+function startAnim() {
+    if (animating) return;
+    animating = true;
+    animProgress = 0;
+    animStart = performance.now();
+    document.getElementById('animBtn').textContent = '⏸ pause';
+    requestAnimationFrame(stepAnim);
+}
+function stepAnim(now) {
+    if (!animating) return;
+    const dur = 2200; // ms
+    animProgress = Math.min(1, (now - animStart) / dur);
+    draw();
+    if (animProgress < 1) {
+        requestAnimationFrame(stepAnim);
+    } else {
+        animating = false;
+        document.getElementById('animBtn').textContent = '▶ animate';
+    }
+}
+
+// === Event wiring ===
+document.querySelectorAll('.k-chip').forEach(chip => {
+    const kRaw = parseFloat(chip.dataset.k);
+    // match nearest κ (handles 8/3 = 2.6667)
+    const info = KAPPA.reduce((best, cur) =>
+        Math.abs(cur.k - kRaw) < Math.abs(best.k - kRaw) ? cur : best);
+    chip.style.setProperty('--on-color', info.color);
+    chip.style.setProperty('--on-bg', info.light);
+    chip.addEventListener('click', () => {
+        if (visibleK.has(info.k)) {
+            visibleK.delete(info.k);
+            chip.classList.remove('on');
+        } else {
+            visibleK.add(info.k);
+            chip.classList.add('on');
+        }
+        draw();
+    });
+});
+
+document.getElementById('regenBtn').onclick = () => {
+    seed = (Math.random() * 2147483647) | 0;
+    recomputeAll();
+    startAnim();
+};
+document.getElementById('animBtn').onclick = () => {
+    if (animating) {
+        animating = false;
+        document.getElementById('animBtn').textContent = '▶ animate';
+    } else {
+        startAnim();
+    }
+};
+document.getElementById('tSlider').addEventListener('input', (e) => {
+    T = parseFloat(e.target.value);
+    document.getElementById('tVal').textContent = T;
+    recomputeAll();
+});
+document.getElementById('nSlider').addEventListener('input', (e) => {
+    N = parseInt(e.target.value);
+    document.getElementById('nVal').textContent = N;
+    recomputeAll();
+});
+
+// Hover sync between driving and main
+function setHoverFromEvent(e) {
+    const rect = drivingC.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const padL = 8, padR = 10;
+    const plotW = drivingC.clientWidth - padL - padR;
+    hoveredFrac = Math.max(0, Math.min(1, (x - padL) / plotW));
+    draw();
+}
+drivingC.addEventListener('mousemove', setHoverFromEvent);
+drivingC.addEventListener('mouseleave', () => { hoveredFrac = -1; draw(); });
+
+window.addEventListener('resize', () => { resize(); draw(); });
+
+// Sidebar copy
+document.getElementById('sidebar').innerHTML = `
+<h2>SLE 是什么</h2>
+<p><b>Schramm–Loewner Evolution</b> (SLE<sub>κ</sub>) 是一族随机分形曲线，2000 年由 Oded Schramm 引入。它把<b>临界 2D 统计物理</b>的"界面"——伊辛畴壁、渗流团簇边界、自避免游走、均匀生成树的 Peano 曲线——全部统一进一个单参数家族。</p>
+
+<h2>Loewner 方程</h2>
+<div class="eq">
+∂<sub>t</sub> g<sub>t</sub>(z) = 2 / (g<sub>t</sub>(z) − ξ(t))
+<span class="small">g<sub>0</sub>(z) = z;   trace γ(t) = g<sub>t</sub><sup>−1</sup>(ξ(t))</span>
+</div>
+<p>每个时刻 t 对应一个共形映射 g<sub>t</sub>，把 ℍ 减去已生长的 hull 映射回 ℍ。<b>驱动函数</b> ξ(t) 在实轴上跑——它的轨迹决定了 trace γ(t) 在 ℍ 中如何延伸。</p>
+
+<h2>Schramm 的洞察</h2>
+<p>设想一族在域 D 中随机生长的曲线。如果它满足两个非常自然的条件：</p>
+<p>(i) <b>共形不变</b>：在 D → D' 的共形映射下，曲线分布不变；<br>
+(ii) <b>域 Markov</b>：曲线的未来只依赖已生长的部分。</p>
+<p>那么它的 Loewner 驱动函数 ξ(t) <b>必然</b>是一个布朗运动：</p>
+<div class="eq">ξ(t) = √κ · B(t)</div>
+<p>整个 SLE 家族被唯一一个参数 κ ≥ 0 标记。<b>这是一个公理化定理</b>：两个自然约束把整个解空间压成一维。</p>
+
+<h2>共享布朗运动 · 不同 κ</h2>
+<p>本可视化的关键设计：所有 κ 共享<b>同一个 B(t) 样本</b>，仅按 √κ 缩放。这样你能直接对比 κ 如何重塑同一份"噪声"的几何结果：</p>
+<p>• κ=0.5 几乎走直线（驱动很轻）<br>
+• κ=4 开始自接触<br>
+• κ=8 把平面填满</p>
+<p>点 <b>🎲 regenerate</b> 换一个 B(t)；点 <b>▶ animate</b> 看 trace 从 t=0 长出。</p>
+
+<h2>κ 的相变</h2>
+<div class="callout">
+<b>κ ≤ 4</b> · trace 是<b>简单曲线</b>（不自相交）<br>
+<b>4 &lt; κ &lt; 8</b> · trace <b>自接触</b>但不空间填充<br>
+<b>κ ≥ 8</b> · trace 是<b>空间填充</b>曲线（Peano）
+</div>
+<p>分形维数 <b>D = 1 + κ/8</b>（κ ≤ 8）。κ=6 时 D = 7/4 = 1.75；κ=8 时 D = 2（达到饱和）。</p>
+
+<h2>已被严格证明的 κ 对应</h2>
+<div class="kappa-table">
+    <span class="k">κ = 2</span><span class="name"><b>LERW</b> · Lawler·Schramm·Werner 2004</span>
+    <span class="k">κ = 3</span><span class="name"><b>Ising 畴壁</b> · Smirnov 2010</span>
+    <span class="k">κ = 4</span><span class="name"><b>GFF 等势线</b> · Schramm·Sheffield 2009</span>
+    <span class="k">κ = 6</span><span class="name"><b>临界渗流界面</b> · Smirnov 2001（Fields 奖）</span>
+    <span class="k">κ = 8</span><span class="name"><b>UST Peano 曲线</b> · Lawler·Schramm·Werner 2004</span>
+    <span class="k">κ = 8/3</span><span class="name"><b>SAW</b>（猜想）· LSW 2002</span>
+</div>
+
+<h2>共形场论的桥</h2>
+<p>每个 SLE<sub>κ</sub> 都对应一个二维共形场论，中心荷为</p>
+<div class="eq">c = 1 − 6(κ−4)<sup>2</sup> / (4κ)</div>
+<p>κ=6 给 c=0（渗流 CFT），κ=3 给 c=½（Ising CFT），κ=4 给 c=1（自由玻色子）。SLE 几何与 CFT 代数结构是同一对象的两面。</p>
+
+<h2>实现说明</h2>
+<p>用 <b>vertical-slit 离散化</b>（Kennedy 2008）：把时间分成 N 步，每步在驱动位置加一段高度 2√dt 的竖直 slit，然后用复合的复数 sqrt map 把 slit 的 tip 逆映射回原始 ℍ。复杂度 O(N²)，sqrt 自带正确分支选择（upper half plane）。所有 7 个 κ 同步计算，N=600 用时 ~60ms。</p>
+
+<h2>历史</h2>
+<p>1923 年 Karl Löwner 推导单参数共形映射的微分方程，用来攻 Bieberbach 猜想（最终 1985 被 de Branges 用此工具证明）。1999 年 Oded Schramm 把它的驱动改成布朗运动——这一步把经典分析变成 21 世纪随机几何最深的工具之一。Schramm 2008 年在以色列徒步事故去世，年 46 岁；SLE 是他留下的最大遗产。</p>
+`;
+
+// === Init ===
+resize();
+recomputeAll();
+startAnim();
+</script>
+</body>
+</html>

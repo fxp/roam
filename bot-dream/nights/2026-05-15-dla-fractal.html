@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>扩散限制凝聚 · DLA</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #06060e;
+  color: #aab;
+  font: 13px/1.6 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+#canvas-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #06060e;
+}
+
+canvas {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  cursor: crosshair;
+}
+
+#panel {
+  width: 240px;
+  min-width: 240px;
+  background: #0b0b18;
+  border-left: 1px solid #1a1a2e;
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+}
+
+h1 {
+  font-size: 15px;
+  color: #e8d8ff;
+  letter-spacing: 0.04em;
+  font-weight: normal;
+}
+
+.subtitle { font-size: 10px; color: #555; margin-top: -10px; letter-spacing: 0.06em; }
+
+.section-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #444;
+  margin-bottom: 2px;
+}
+
+.presets {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+
+.preset-btn {
+  background: #111120;
+  border: 1px solid #222238;
+  color: #8888bb;
+  border-radius: 3px;
+  padding: 7px 4px;
+  font: 11px/1.4 inherit;
+  cursor: pointer;
+  transition: all 0.12s;
+  text-align: center;
+}
+
+.preset-btn:hover { background: #181830; color: #b0b0dd; border-color: #333355; }
+.preset-btn.active {
+  background: #1e1840;
+  border-color: #6655cc;
+  color: #ccc0ff;
+}
+
+.ctrl { display: flex; flex-direction: column; gap: 4px; }
+
+.ctrl label {
+  font-size: 11px;
+  color: #6678a0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ctrl input[type=range] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 3px;
+  background: #181830;
+  border-radius: 2px;
+  outline: none;
+}
+
+.ctrl input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #7060d0;
+  cursor: pointer;
+}
+
+.val { font-size: 11px; color: #9080cc; min-width: 38px; text-align: right; }
+
+.btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+
+.btn {
+  background: #111120;
+  border: 1px solid #222238;
+  color: #8888bb;
+  border-radius: 3px;
+  padding: 8px 6px;
+  font: 12px/1 inherit;
+  cursor: pointer;
+  width: 100%;
+  transition: all 0.12s;
+}
+
+.btn:hover { background: #181830; color: #c0c0e0; }
+
+hr { border: none; border-top: 1px solid #161625; }
+
+/* Stats box */
+#stats {
+  background: #0d0d20;
+  border: 1px solid #1a1a30;
+  border-radius: 3px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #506080;
+}
+
+.stat-row span:last-child { color: #9090d0; }
+
+/* Fractal dim mini-chart */
+#dim-chart {
+  width: 100%;
+  height: 60px;
+  background: #0a0a18;
+  border: 1px solid #1a1a28;
+  border-radius: 2px;
+  margin-top: 4px;
+}
+
+.info-box {
+  background: #0d0d1e;
+  border: 1px solid #181828;
+  border-radius: 3px;
+  padding: 10px 12px;
+  font-size: 11px;
+  color: #556080;
+  line-height: 1.9;
+}
+
+.info-box em { color: #8878cc; font-style: normal; }
+.info-box code { color: #7090a0; font-size: 10px; }
+
+#fps-line { font-size: 10px; color: #333345; text-align: right; }
+</style>
+</head>
+<body>
+
+<div id="canvas-wrap">
+  <canvas id="c"></canvas>
+</div>
+
+<div id="panel">
+  <h1>扩散限制凝聚</h1>
+  <p class="subtitle">DIFFUSION-LIMITED AGGREGATION · 2026-05-15</p>
+
+  <hr>
+
+  <div>
+    <div class="section-label">种子形状</div>
+    <div class="presets">
+      <button class="preset-btn active" data-seed="point">点种子</button>
+      <button class="preset-btn" data-seed="line">线种子</button>
+      <button class="preset-btn" data-seed="circle">圆环种子</button>
+      <button class="preset-btn" data-seed="dust">尘粒种子</button>
+    </div>
+  </div>
+
+  <hr>
+
+  <div>
+    <div class="section-label">参数</div>
+
+    <div class="ctrl">
+      <label>粘附概率 <span class="val" id="v-stick">1.00</span></label>
+      <input type="range" id="s-stick" min="0.1" max="1.0" step="0.05" value="1.0">
+    </div>
+
+    <div class="ctrl">
+      <label>粒子/帧 <span class="val" id="v-rate">12</span></label>
+      <input type="range" id="s-rate" min="1" max="40" step="1" value="12">
+    </div>
+
+    <div class="ctrl">
+      <label>色彩方案 <span class="val" id="v-cmap">热焰</span></label>
+      <input type="range" id="s-cmap" min="0" max="3" step="1" value="0">
+    </div>
+  </div>
+
+  <hr>
+
+  <div class="btn-row">
+    <button class="btn" id="btn-reset">重置</button>
+    <button class="btn" id="btn-pause">暂停</button>
+  </div>
+
+  <hr>
+
+  <div>
+    <div class="section-label">实时统计</div>
+    <div id="stats">
+      <div class="stat-row"><span>粒子数 N</span><span id="st-n">1</span></div>
+      <div class="stat-row"><span>最大半径</span><span id="st-r">0</span></div>
+      <div class="stat-row"><span>分形维数 D</span><span id="st-d">—</span></div>
+    </div>
+    <canvas id="dim-chart"></canvas>
+  </div>
+
+  <hr>
+
+  <div class="info-box">
+    <em>扩散限制凝聚</em> 是 Witten &amp; Sander 于 1981 年提出的模型。<br><br>
+    随机游走粒子一旦触碰聚集体就停止。<br>
+    突出的尖端比凹陷处更易被触碰，<br>
+    导致自我强化的分支生长。<br><br>
+    <code>D ≈ 1.71</code> — 与雪花、闪电、<br>
+    矿物晶体共享同一个分形维数。
+  </div>
+
+  <div id="fps-line"></div>
+</div>
+
+<script>
+// ─── Constants & State ───────────────────────────────────────────────────────
+const W = 560, H = 560;
+const CX = W >> 1, CY = H >> 1;
+const MAX_N = 20000;        // pre-allocated
+
+const canvas = document.getElementById('c');
+canvas.width = W;
+canvas.height = H;
+const ctx = canvas.getContext('2d');
+
+// Display scaling
+function resizeCanvas() {
+  const wrap = document.getElementById('canvas-wrap');
+  const ww = wrap.clientWidth - 8, wh = wrap.clientHeight - 8;
+  const scale = Math.min(ww / W, wh / H);
+  const s = Math.max(0.5, scale);
+  canvas.style.width  = (W * s) + 'px';
+  canvas.style.height = (H * s) + 'px';
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// Grid
+const grid     = new Uint8Array(W * H);   // 1 = occupied
+const arrival  = new Int32Array(W * H).fill(-1);
+let   N        = 0;          // particles stuck
+let   maxR     = 0;          // max radius of stuck particle
+let   sumR2    = 0;          // for fractal dim
+
+// Parameters
+let stickiness  = 1.0;
+let ratePerFrame = 12;
+let cmapIndex   = 0;
+let paused      = false;
+let currentSeed = 'point';
+
+// ─── Color maps ───────────────────────────────────────────────────────────────
+const CMAPS = ['热焰', '等离子', '荧光', '极光'];
+
+function cmapHot(t) {        // black → red → orange → yellow → white
+  const r = Math.min(1, t * 3.0);
+  const g = Math.max(0, Math.min(1, t * 3.0 - 1.0));
+  const b = Math.max(0, Math.min(1, t * 3.0 - 2.0));
+  return [r, g, b];
+}
+
+function cmapPlasma(t) {     // deep blue → purple → magenta → orange → yellow
+  const r = Math.max(0, Math.min(1,  0.0504 + t*(2.701 - t*1.741)));
+  const g = Math.max(0, Math.min(1,  0.0298 - t*(0.198 - t*1.372)));
+  const b = Math.max(0, Math.min(1,  0.5272 + t*(1.128 - t*2.820 + t*t*1.612)));
+  return [r, g, b];
+}
+
+function cmapFluor(t) {      // black → deep blue → cyan → bright green → white
+  const r = Math.max(0, Math.min(1, t > 0.75 ? (t - 0.75) * 4 : 0));
+  const g = Math.max(0, Math.min(1, t > 0.5  ? (t - 0.5) * 2 : 0));
+  const b = Math.max(0, Math.min(1, t < 0.5  ?  t * 2 : 2 - t * 2));
+  return [r, g, b];
+}
+
+function cmapAurora(t) {     // dark → teal → green → violet → white
+  const h = (150 + t * 250) % 360;
+  const s = 0.9, l = 0.15 + t * 0.5;
+  return hslToRgb(h / 360, s, l);
+}
+
+const CMAP_FNS = [cmapHot, cmapPlasma, cmapFluor, cmapAurora];
+
+function hslToRgb(h, s, l) {
+  let r, g, b;
+  if (s === 0) { r = g = b = l; }
+  else {
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    const hue2rgb = (p, q, t) => {
+      if (t < 0) t += 1; if (t > 1) t -= 1;
+      if (t < 1/6) return p + (q - p) * 6 * t;
+      if (t < 1/2) return q;
+      if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+      return p;
+    };
+    r = hue2rgb(p, q, h + 1/3);
+    g = hue2rgb(p, q, h);
+    b = hue2rgb(p, q, h - 1/3);
+  }
+  return [r, g, b];
+}
+
+function cellColor(arrivalIdx) {
+  const t = Math.min(arrivalIdx / MAX_N, 1.0);
+  const [r, g, b] = CMAP_FNS[cmapIndex](t);
+  const ri = Math.round(r * 255);
+  const gi = Math.round(g * 255);
+  const bi = Math.round(b * 255);
+  return `rgb(${ri},${gi},${bi})`;
+}
+
+// ─── Grid helpers ─────────────────────────────────────────────────────────────
+function idx(x, y) { return y * W + x; }
+
+function addCell(x, y) {
+  if (x < 0 || x >= W || y < 0 || y >= H) return;
+  if (grid[idx(x, y)]) return;
+  grid[idx(x, y)] = 1;
+  arrival[idx(x, y)] = N;
+  N++;
+  const dx = x - CX, dy = y - CY;
+  const r = Math.sqrt(dx * dx + dy * dy);
+  if (r > maxR) maxR = r;
+  sumR2 += dx * dx + dy * dy;
+  // Draw cell
+  ctx.fillStyle = cellColor(N - 1);
+  ctx.fillRect(x, y, 1, 1);
+}
+
+function isAdjacentToGrid(x, y) {
+  return (
+    (x > 0     && grid[idx(x-1, y)]) ||
+    (x < W-1   && grid[idx(x+1, y)]) ||
+    (y > 0     && grid[idx(x, y-1)]) ||
+    (y < H-1   && grid[idx(x, y+1)])
+  );
+}
+
+// ─── Seed initialization ──────────────────────────────────────────────────────
+function clearCanvas() {
+  ctx.fillStyle = '#06060e';
+  ctx.fillRect(0, 0, W, H);
+}
+
+function initSeed(mode) {
+  grid.fill(0);
+  arrival.fill(-1);
+  N = 0; maxR = 3; sumR2 = 0;
+  clearCanvas();
+  dimHistory = [];
+
+  if (mode === 'point') {
+    addCell(CX, CY);
+
+  } else if (mode === 'line') {
+    for (let x = CX - 15; x <= CX + 15; x++) addCell(x, CY);
+
+  } else if (mode === 'circle') {
+    const R0 = 20;
+    for (let a = 0; a < 360; a++) {
+      const x = Math.round(CX + R0 * Math.cos(a * Math.PI / 180));
+      const y = Math.round(CY + R0 * Math.sin(a * Math.PI / 180));
+      addCell(x, y);
+    }
+    maxR = R0 + 2;
+
+  } else if (mode === 'dust') {
+    // 5 random seeds in a small area
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * 2 * Math.PI;
+      const r = 12 + Math.random() * 8;
+      addCell(Math.round(CX + r * Math.cos(a)), Math.round(CY + r * Math.sin(a)));
+    }
+    addCell(CX, CY);
+    maxR = 22;
+  }
+
+  updateStats();
+}
+
+// ─── DLA particle walk ────────────────────────────────────────────────────────
+function spawnParticle() {
+  const theta = Math.random() * 2 * Math.PI;
+  const r = maxR + 25;
+  return [
+    Math.round(CX + r * Math.cos(theta)),
+    Math.round(CY + r * Math.sin(theta))
+  ];
+}
+
+function walkAndStick() {
+  let [x, y] = spawnParticle();
+  const killR = maxR + 75;
+
+  for (let iter = 0; iter < 15000; iter++) {
+    // Large-step optimization: jump closer to aggregate when far away
+    const dx = x - CX, dy = y - CY;
+    const d = Math.sqrt(dx * dx + dy * dy);
+    const step = Math.max(1, Math.floor(d - maxR - 2));
+
+    if (step > 1) {
+      // Large jump in random direction
+      const a = Math.random() * 2 * Math.PI;
+      x = Math.round(x + step * Math.cos(a));
+      y = Math.round(y + step * Math.sin(a));
+    } else {
+      // Unit step (4-connected)
+      const dir = (Math.random() * 4) | 0;
+      if      (dir === 0) x++;
+      else if (dir === 1) x--;
+      else if (dir === 2) y++;
+      else                y--;
+    }
+
+    // Kill if out of bounds or too far
+    if (x < 1 || x >= W-1 || y < 1 || y >= H-1) return false;
+    const dist2 = (x - CX) ** 2 + (y - CY) ** 2;
+    if (dist2 > killR * killR) return false;
+
+    // Adjacency check + stickiness
+    if (isAdjacentToGrid(x, y) && !grid[idx(x, y)]) {
+      if (Math.random() < stickiness) {
+        addCell(x, y);
+        return true;
+      }
+    }
+  }
+  return false; // iteration limit
+}
+
+// ─── Fractal dimension estimate ───────────────────────────────────────────────
+// Count particles in concentric shells to estimate D via N(r) ~ r^D
+let dimHistory = [];   // [{N, r_g}]
+
+function estimateDim() {
+  if (N < 50) return null;
+  // Use radius of gyration
+  const r_g = Math.sqrt(sumR2 / N);
+  dimHistory.push({ N, r_g });
+
+  // Fit log-log slope over last 10 data points (or all if fewer)
+  const pts = dimHistory.length;
+  if (pts < 5) return null;
+  const start = Math.max(0, pts - 20);
+  let sumX = 0, sumY = 0, sumXX = 0, sumXY = 0;
+  let cnt = 0;
+  for (let i = start; i < pts; i++) {
+    const lx = Math.log(dimHistory[i].r_g);
+    const ly = Math.log(dimHistory[i].N);
+    sumX += lx; sumY += ly; sumXX += lx * lx; sumXY += lx * ly;
+    cnt++;
+  }
+  const D = (cnt * sumXY - sumX * sumY) / (cnt * sumXX - sumX * sumX);
+  return isFinite(D) ? D : null;
+}
+
+function drawDimChart() {
+  const dc = document.getElementById('dim-chart');
+  const dctx = dc.getContext('2d');
+  dc.width = dc.clientWidth || 208;
+  dc.height = 60;
+  const dw = dc.width, dh = dc.height;
+  dctx.fillStyle = '#0a0a18';
+  dctx.fillRect(0, 0, dw, dh);
+
+  if (dimHistory.length < 3) return;
+
+  // Draw reference line D=1.71
+  dctx.strokeStyle = '#2a2a50';
+  dctx.lineWidth = 1;
+  dctx.setLineDash([3, 4]);
+  const refY = dh * (1 - (1.71 - 1.2) / (2.1 - 1.2));
+  dctx.beginPath();
+  dctx.moveTo(0, refY);
+  dctx.lineTo(dw, refY);
+  dctx.stroke();
+  dctx.setLineDash([]);
+
+  // Plot D history
+  const pts = dimHistory.slice(-40);
+  let Dvals = [];
+  for (let i = 4; i < pts.length; i++) {
+    // local slope between i-4 and i
+    const lx1 = Math.log(pts[i-4].r_g), ly1 = Math.log(pts[i-4].N);
+    const lx2 = Math.log(pts[i].r_g),   ly2 = Math.log(pts[i].N);
+    const slope = (lx2 > lx1) ? (ly2 - ly1) / (lx2 - lx1) : 1.71;
+    Dvals.push(slope);
+  }
+  if (Dvals.length < 2) return;
+
+  dctx.strokeStyle = '#9070d0';
+  dctx.lineWidth = 1.5;
+  dctx.beginPath();
+  for (let i = 0; i < Dvals.length; i++) {
+    const px = (i / (Dvals.length - 1)) * dw;
+    const py = dh * (1 - (Dvals[i] - 1.2) / (2.1 - 1.2));
+    if (i === 0) dctx.moveTo(px, py);
+    else dctx.lineTo(px, py);
+  }
+  dctx.stroke();
+
+  // Label
+  dctx.fillStyle = '#444460';
+  dctx.font = '9px monospace';
+  dctx.fillText('D=1.71 ─ ─ ─', 3, refY - 3);
+}
+
+// ─── Stats update ─────────────────────────────────────────────────────────────
+function updateStats() {
+  document.getElementById('st-n').textContent = N.toLocaleString();
+  document.getElementById('st-r').textContent = maxR.toFixed(1);
+
+  if (N > 50 && N % 80 === 0) {
+    const D = estimateDim();
+    if (D !== null) {
+      document.getElementById('st-d').textContent = D.toFixed(3);
+      drawDimChart();
+    }
+  }
+}
+
+// ─── Animation loop ───────────────────────────────────────────────────────────
+let fpsFrames = 0, fpsTime = 0;
+let particleQueue = 0; // fractional accumulation
+
+function loop(ts) {
+  requestAnimationFrame(loop);
+  if (paused) return;
+
+  let stuck = 0;
+  for (let i = 0; i < ratePerFrame; i++) {
+    if (N >= MAX_N) { paused = true; break; }
+    if (walkAndStick()) stuck++;
+  }
+
+  if (stuck > 0) updateStats();
+
+  // FPS
+  fpsFrames++;
+  if (ts - fpsTime >= 1000) {
+    document.getElementById('fps-line').textContent =
+      `${fpsFrames} fps · ${N} stuck · ${ratePerFrame}/frame`;
+    fpsFrames = 0;
+    fpsTime = ts;
+  }
+}
+
+// ─── Mouse interaction: paint seed material ───────────────────────────────────
+canvas.addEventListener('click', e => {
+  const rect = canvas.getBoundingClientRect();
+  const sx = canvas.width  / rect.width;
+  const sy = canvas.height / rect.height;
+  const mx = Math.round((e.clientX - rect.left) * sx);
+  const my = Math.round((e.clientY - rect.top)  * sy);
+
+  // Paint a small blob at click position
+  for (let dy = -4; dy <= 4; dy++) {
+    for (let dx = -4; dx <= 4; dx++) {
+      if (dx*dx + dy*dy <= 16) {
+        addCell(mx + dx, my + dy);
+      }
+    }
+  }
+  updateStats();
+});
+
+// ─── UI bindings ──────────────────────────────────────────────────────────────
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    currentSeed = btn.dataset.seed;
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    initSeed(currentSeed);
+  });
+});
+
+function bindSlider(id, key, fmt, setter) {
+  const sl = document.getElementById('s-' + id);
+  const vd = document.getElementById('v-' + id);
+  sl.addEventListener('input', () => {
+    const v = parseFloat(sl.value);
+    setter(v);
+    vd.textContent = fmt(v);
+  });
+}
+
+bindSlider('stick', 'stickiness', v => v.toFixed(2), v => { stickiness = v; });
+bindSlider('rate',  'rate',       v => v.toFixed(0), v => { ratePerFrame = v; });
+bindSlider('cmap',  'cmap',       v => CMAPS[Math.round(v)], v => {
+  cmapIndex = Math.round(v);
+  // Redraw all cells with new colormap
+  clearCanvas();
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const a = arrival[y * W + x];
+      if (a >= 0) {
+        ctx.fillStyle = cellColor(a);
+        ctx.fillRect(x, y, 1, 1);
+      }
+    }
+  }
+});
+
+document.getElementById('btn-reset').addEventListener('click', () => {
+  initSeed(currentSeed);
+});
+
+document.getElementById('btn-pause').addEventListener('click', function() {
+  paused = !paused;
+  this.textContent = paused ? '继续' : '暂停';
+});
+
+// ─── Boot ─────────────────────────────────────────────────────────────────────
+initSeed('point');
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

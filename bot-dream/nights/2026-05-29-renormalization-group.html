@@ -1,0 +1,1067 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>重正化群 · 普适性的几何起源</title>
+<style>
+  :root {
+    --bg: #0a0c11;
+    --bg-soft: #11151c;
+    --bg-card: #13171f;
+    --fg: #e6e9ee;
+    --fg-dim: #9aa3ad;
+    --fg-faint: #5d6571;
+    --accent: #c08aff;
+    --cold: #6fb1d8;
+    --hot:  #f48a6a;
+    --critical: #e8c352;
+    --border: #1c222c;
+    --shadow: 0 1px 0 rgba(255,255,255,0.02) inset, 0 4px 24px rgba(0,0,0,0.4);
+    --mono: "JetBrains Mono", "SF Mono", "Menlo", monospace;
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background:
+      radial-gradient(1100px 700px at 20% -10%, rgba(192,138,255,0.06), transparent 60%),
+      radial-gradient(900px 600px at 80% 110%, rgba(111,177,216,0.04), transparent 60%),
+      var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "PingFang SC", "Noto Sans SC", "Inter", sans-serif;
+    line-height: 1.6;
+    font-size: 15px;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+
+  .container { max-width: 1340px; margin: 0 auto; padding: 56px 32px 100px; }
+
+  header { margin-bottom: 36px; }
+  .eyebrow {
+    color: var(--fg-faint);
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    font-family: var(--mono);
+  }
+  h1 {
+    font-size: 38px;
+    line-height: 1.15;
+    margin: 0 0 14px;
+    letter-spacing: -0.01em;
+    font-weight: 600;
+    background: linear-gradient(135deg, #f5e8c8 0%, #d4af37 35%, #b08fff 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .subtitle {
+    color: var(--fg-dim);
+    font-size: 17px;
+    max-width: 800px;
+    margin: 0;
+  }
+  .meta {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--fg-faint);
+    margin-top: 18px;
+    letter-spacing: 0.05em;
+  }
+  .meta b { color: var(--fg-dim); font-weight: 400; }
+
+  /* Layout: main grid 2/3 + 1/3 */
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 28px;
+    align-items: start;
+  }
+  @media (max-width: 1080px) {
+    .layout { grid-template-columns: 1fr; }
+    .container { padding: 36px 18px 80px; }
+    h1 { font-size: 28px; }
+  }
+
+  /* Cards */
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 22px;
+    box-shadow: var(--shadow);
+  }
+  .card + .card { margin-top: 20px; }
+  .card h3 {
+    margin: 0 0 14px;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--fg);
+    text-transform: uppercase;
+    font-family: var(--mono);
+  }
+
+  /* Controls */
+  .controls-row {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 22px;
+  }
+  .ctrl-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 9px 14px;
+    font-size: 13px;
+  }
+  .ctrl-group label {
+    color: var(--fg-dim);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.05em;
+  }
+  .ctrl-group input[type=range] {
+    width: 130px;
+    accent-color: var(--accent);
+  }
+  .ctrl-group input[type=number] {
+    width: 56px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--fg);
+    padding: 4px 6px;
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+  .ctrl-value {
+    font-family: var(--mono);
+    color: var(--fg);
+    min-width: 38px;
+    text-align: right;
+  }
+
+  button {
+    background: linear-gradient(180deg, #2a2235 0%, #1e1828 100%);
+    border: 1px solid #3a2f4a;
+    color: var(--fg);
+    padding: 9px 18px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    transition: all 0.15s ease;
+  }
+  button:hover {
+    background: linear-gradient(180deg, #352840 0%, #251c30 100%);
+    border-color: #4d3d61;
+  }
+  button.primary {
+    background: linear-gradient(180deg, #6f4ea0 0%, #4d3a73 100%);
+    border-color: #7d5cb4;
+    color: #fdf6e3;
+  }
+  button.primary:hover {
+    background: linear-gradient(180deg, #8160b2 0%, #5d4a83 100%);
+  }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* RG row: one temperature, five canvases */
+  .rg-row {
+    display: grid;
+    grid-template-columns: 140px repeat(5, 1fr);
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+  .rg-row.header-row {
+    margin-bottom: 6px;
+  }
+  .rg-row .col-label {
+    text-align: center;
+    font-size: 11px;
+    color: var(--fg-faint);
+    font-family: var(--mono);
+    letter-spacing: 0.06em;
+  }
+  .rg-row .col-label .step-n {
+    color: var(--fg-dim);
+    font-size: 10px;
+    display: block;
+    margin-top: 2px;
+  }
+  .rg-row .row-label {
+    text-align: right;
+    padding-right: 14px;
+    font-size: 13px;
+  }
+  .rg-row .row-label .temp {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--fg-dim);
+    display: block;
+    margin-top: 4px;
+  }
+  .row-label.cold .name { color: var(--cold); }
+  .row-label.critical .name { color: var(--critical); }
+  .row-label.hot .name { color: var(--hot); }
+  .row-label .name { font-weight: 500; letter-spacing: 0.03em; }
+
+  .spin-canvas {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    background: #000;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    display: block;
+  }
+  .spin-canvas.critical-highlight {
+    box-shadow: 0 0 0 1px rgba(232,195,82,0.35), 0 0 18px rgba(232,195,82,0.12);
+  }
+
+  /* Flow plot */
+  .flow-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 16px;
+  }
+  @media (max-width: 760px) {
+    .flow-grid { grid-template-columns: 1fr; }
+  }
+  .plot-card {
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+  }
+  .plot-card h4 {
+    margin: 0 0 8px;
+    font-size: 12px;
+    color: var(--fg-dim);
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    font-family: var(--mono);
+  }
+  .plot-card canvas {
+    width: 100%;
+    height: 200px;
+    display: block;
+  }
+
+  /* Legend */
+  .legend {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    font-size: 12px;
+    color: var(--fg-dim);
+    margin-top: 10px;
+    font-family: var(--mono);
+  }
+  .legend .swatch {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    vertical-align: -1px;
+    margin-right: 6px;
+  }
+
+  /* Status */
+  .status-bar {
+    margin-top: 14px;
+    padding: 10px 14px;
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--fg-dim);
+  }
+  .status-bar span b { color: var(--fg); font-weight: 500; }
+
+  /* Math sidebar */
+  .math-side h3 {
+    font-size: 12px;
+    color: var(--accent);
+    margin-top: 20px;
+    margin-bottom: 8px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-family: var(--mono);
+  }
+  .math-side p {
+    font-size: 13.5px;
+    color: var(--fg-dim);
+    margin: 0 0 12px;
+    line-height: 1.65;
+  }
+  .math-side p b { color: var(--fg); font-weight: 500; }
+  .math-side .eq {
+    background: var(--bg-soft);
+    border-left: 2px solid var(--accent);
+    padding: 10px 14px;
+    margin: 10px 0;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--fg);
+    border-radius: 0 6px 6px 0;
+    overflow-x: auto;
+  }
+  .math-side .fixed-pt {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-family: var(--mono);
+    font-size: 11px;
+    margin-right: 4px;
+  }
+  .fixed-pt.cold { background: rgba(111,177,216,0.15); color: var(--cold); }
+  .fixed-pt.hot { background: rgba(244,138,106,0.15); color: var(--hot); }
+  .fixed-pt.critical { background: rgba(232,195,82,0.15); color: var(--critical); }
+
+  details.expand {
+    border-top: 1px solid var(--border);
+    margin-top: 16px;
+    padding-top: 12px;
+  }
+  details.expand summary {
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--fg-dim);
+    font-family: var(--mono);
+    letter-spacing: 0.04em;
+    user-select: none;
+  }
+  details.expand summary:hover { color: var(--fg); }
+  details.expand[open] summary { color: var(--accent); margin-bottom: 8px; }
+
+  .footer-note {
+    margin-top: 50px;
+    padding-top: 22px;
+    border-top: 1px solid var(--border);
+    color: var(--fg-faint);
+    font-size: 12px;
+    line-height: 1.8;
+    font-family: var(--mono);
+  }
+  .footer-note b { color: var(--fg-dim); font-weight: 400; }
+  .footer-note .why { color: var(--fg-dim); margin-top: 14px; font-family: -apple-system, sans-serif; font-size: 13px; line-height: 1.65; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="eyebrow">Night Lab · 2026-05-29</div>
+    <h1>重正化群 · 普适性的几何起源</h1>
+    <p class="subtitle">
+      为什么完全无关的物理系统——铁磁体、流体临界点、超流氦、宇宙暴胀——在相变附近会拥有 <em>完全相同</em> 的临界指数？答案不在微观细节里，而在一个把"细节冲洗掉"的几何过程里：<b>重正化群流</b>。今晚把这个流可视化——同一张伊辛位形，三种起始温度，在 Kadanoff block-spin 变换下走向截然不同的命运。
+    </p>
+    <div class="meta">
+      <b>方法</b>　Metropolis-Hastings 平衡化 → 多次 2×2 majority-rule block-spin → 追踪 |m| 在尺度上的演化　·　<b>系统</b>　2D Ising on torus　·　<b>临界点</b>　T<sub>c</sub> = 2 / ln(1+√2) ≈ 2.269 (Onsager 1944)
+    </div>
+  </header>
+
+  <div class="layout">
+
+    <!-- LEFT: main viz -->
+    <div>
+      <!-- Controls -->
+      <div class="controls-row">
+        <div class="ctrl-group">
+          <label>SIZE</label>
+          <select id="sizeSelect" style="background:var(--bg);border:1px solid var(--border);color:var(--fg);padding:4px 8px;border-radius:6px;font-family:var(--mono);font-size:12px;">
+            <option value="128">128×128</option>
+            <option value="256" selected>256×256</option>
+          </select>
+        </div>
+        <div class="ctrl-group">
+          <label>EQUILIBRATE</label>
+          <input id="sweepsInput" type="number" value="10" min="3" max="60" step="1">
+          <span style="color:var(--fg-faint);font-family:var(--mono);font-size:11px;">×L² flips</span>
+        </div>
+        <div class="ctrl-group">
+          <label>T<sub>cold</sub></label>
+          <input id="tColdInput" type="range" min="0.5" max="2.20" step="0.01" value="1.80">
+          <span id="tColdValue" class="ctrl-value">1.80</span>
+        </div>
+        <div class="ctrl-group">
+          <label>T<sub>hot</sub></label>
+          <input id="tHotInput" type="range" min="2.35" max="5.0" step="0.01" value="3.00">
+          <span id="tHotValue" class="ctrl-value">3.00</span>
+        </div>
+        <button id="runBtn" class="primary">▶ Equilibrate & RG flow</button>
+        <button id="dragBtn">Drag T<sub>middle</sub> ⇆ T<sub>c</sub></button>
+      </div>
+
+      <!-- The RG grid -->
+      <div class="card">
+        <h3>Real-Space RG · Kadanoff Block-Spin</h3>
+
+        <!-- Header row showing scale labels -->
+        <div class="rg-row header-row">
+          <div></div>
+          <div class="col-label">k = 0<span class="step-n" id="scale0">L = 256</span></div>
+          <div class="col-label">k = 1<span class="step-n" id="scale1">L = 128</span></div>
+          <div class="col-label">k = 2<span class="step-n" id="scale2">L = 64</span></div>
+          <div class="col-label">k = 3<span class="step-n" id="scale3">L = 32</span></div>
+          <div class="col-label">k = 4<span class="step-n" id="scale4">L = 16</span></div>
+        </div>
+
+        <!-- Cold row -->
+        <div class="rg-row">
+          <div class="row-label cold">
+            <div class="name">T &lt; T<sub>c</sub></div>
+            <span class="temp" id="tColdLabel">T = 1.80</span>
+          </div>
+          <canvas class="spin-canvas" id="coldRG0"></canvas>
+          <canvas class="spin-canvas" id="coldRG1"></canvas>
+          <canvas class="spin-canvas" id="coldRG2"></canvas>
+          <canvas class="spin-canvas" id="coldRG3"></canvas>
+          <canvas class="spin-canvas" id="coldRG4"></canvas>
+        </div>
+
+        <!-- Critical row -->
+        <div class="rg-row">
+          <div class="row-label critical">
+            <div class="name">T = T<sub>c</sub></div>
+            <span class="temp" id="tCritLabel">T = 2.269</span>
+          </div>
+          <canvas class="spin-canvas critical-highlight" id="critRG0"></canvas>
+          <canvas class="spin-canvas critical-highlight" id="critRG1"></canvas>
+          <canvas class="spin-canvas critical-highlight" id="critRG2"></canvas>
+          <canvas class="spin-canvas critical-highlight" id="critRG3"></canvas>
+          <canvas class="spin-canvas critical-highlight" id="critRG4"></canvas>
+        </div>
+
+        <!-- Hot row -->
+        <div class="rg-row">
+          <div class="row-label hot">
+            <div class="name">T &gt; T<sub>c</sub></div>
+            <span class="temp" id="tHotLabel">T = 3.00</span>
+          </div>
+          <canvas class="spin-canvas" id="hotRG0"></canvas>
+          <canvas class="spin-canvas" id="hotRG1"></canvas>
+          <canvas class="spin-canvas" id="hotRG2"></canvas>
+          <canvas class="spin-canvas" id="hotRG3"></canvas>
+          <canvas class="spin-canvas" id="hotRG4"></canvas>
+        </div>
+
+        <div class="status-bar" id="statusBar">
+          <span>Status: <b id="statusText">Ready. Click "Equilibrate & RG flow".</b></span>
+        </div>
+      </div>
+
+      <!-- Flow plots -->
+      <div class="card">
+        <h3>RG Flow · 普适性可视化</h3>
+        <div class="flow-grid">
+          <div class="plot-card">
+            <h4>|m(k)| · 序参量在 RG 步上的演化</h4>
+            <canvas id="magPlot"></canvas>
+          </div>
+          <div class="plot-card">
+            <h4>d_w(k) · 反铁磁键密度（畴壁密度）</h4>
+            <canvas id="corrPlot"></canvas>
+          </div>
+        </div>
+        <div class="legend">
+          <span><span class="swatch" style="background:var(--cold);"></span>T &lt; T<sub>c</sub>　→ 流向 T=0 不动点</span>
+          <span><span class="swatch" style="background:var(--critical);"></span>T = T<sub>c</sub>　→ 锁定在临界不动点</span>
+          <span><span class="swatch" style="background:var(--hot);"></span>T &gt; T<sub>c</sub>　→ 流向 T=∞ 不动点</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Math sidebar -->
+    <aside class="math-side">
+      <div class="card">
+        <h3 style="color:var(--accent);margin-top:0;">核心问题</h3>
+        <p>
+          铁的居里点 (≈1043 K)、水在临界点 (374 °C, 22 MPa)、超流 ⁴He 的 λ-相变、QCD 退禁闭——它们的<b>临界指数</b> α、β、γ、ν 在数值上一致到小数点后几位。微观完全不同，<b>临界行为完全相同</b>。这怎么可能？
+        </p>
+
+        <h3>Kadanoff 的赌注 (1966)</h3>
+        <p>
+          假设临界行为不依赖<b>微观</b>细节，只依赖<b>对称性</b>和<b>维度</b>。如果是真的，应该可以"模糊视野"——把许多原子捆成一个超原子——而物理学保持不变。
+        </p>
+        <div class="eq">
+          s'<sub>I</sub> = sign( Σ<sub>i∈block I</sub> s<sub>i</sub> )
+        </div>
+        <p>
+          每个 2×2 方块的四个自旋取多数决，变成新晶格上的一个超自旋。这是最简单的 <b>block-spin RG</b>。新晶格小一倍，新有效温度 T' 是原温度 T 的函数：T' = R(T)。
+        </p>
+
+        <h3>三个不动点</h3>
+        <p>
+          R(T) 这个映射有不动点 T* = R(T*)。在 2D Ising 上有三个：
+        </p>
+        <p>
+          <span class="fixed-pt cold">T = 0</span> 所有自旋对齐，完全有序<br>
+          <span class="fixed-pt hot">T = ∞</span> 所有自旋随机，完全无序<br>
+          <span class="fixed-pt critical">T = T<sub>c</sub></span> 不稳定不动点，临界
+        </p>
+        <p>
+          T=0 和 T=∞ 是<b>吸引不动点</b>：略偏离会被流回来。T<sub>c</sub> 是<b>排斥不动点</b>：略偏离会指数发散远离。在 T<sub>c</sub> 上，体系在所有尺度上"看起来一样"——这就是<b>分形不动点</b>。
+        </p>
+
+        <h3>普适性的几何证明</h3>
+        <p>
+          Wilson 1971 的关键洞察：不同微观系统对应参数空间里<b>不同的起点</b>，但只要它们处于同一<b>不动点的吸引域</b>，RG 流就会把它们全部带到同一个不动点。
+        </p>
+        <p>
+          在临界点附近，流被排斥不动点周围的<b>线性化矩阵</b>支配。这个矩阵的特征值（不依赖起点！）就直接决定了所有临界指数：
+        </p>
+        <div class="eq">
+          ν = ln(b) / ln(λ<sub>T</sub>)<br>
+          β = (d − y<sub>h</sub>) / y<sub>T</sub>
+        </div>
+        <p>
+          所以同一普适类的不同系统共享 (ν, β, γ, η, α) ——它们是不动点的固有性质，不是某个特定哈密顿量的特征。
+        </p>
+
+        <details class="expand">
+          <summary>+ 为什么 majority rule 也算 RG？</summary>
+          <p style="margin-top:10px;">
+            严格的 RG 是<b>积分掉</b>短波长自由度。Kadanoff 的 block-spin 是它的最朴素近似——把 4 个自旋"投影"到 1 个保留自旋。它丢失信息（不可逆），但保留长波长行为。
+          </p>
+          <p>
+            Wilson 把这个想法严格化：在动量空间做 Wilsonian RG，积分掉 Λ/b ≤ |k| ≤ Λ 之间的模，再 rescale。两条路径殊途同归，但 Wilson 版本能算精确指数（如 ε-展开下 d=4−ε 维 ϕ⁴ 理论），而 Kadanoff 版本主要靠定性。
+          </p>
+        </details>
+
+        <details class="expand">
+          <summary>+ T<sub>c</sub> 的自相似从何而来</summary>
+          <p style="margin-top:10px;">
+            在 T<sub>c</sub>，关联长度 ξ 发散：ξ ∼ |T−T<sub>c</sub>|<sup>−ν</sup> → ∞。在 T = T<sub>c</sub> 时 ξ = ∞ 意味着任何尺度下的快照都有相同的"团簇分布"——分形维数 D = 187/91 ≈ 2.055（Stella-Vanderzande 1989）。
+          </p>
+          <p>
+            这就是为什么屏幕上的 T<sub>c</sub> 行在五个 RG 步后看起来"像同一种纹理"——它就是字面意义上的同一种分形。
+          </p>
+        </details>
+
+        <details class="expand">
+          <summary>+ 高维世界发生了什么？</summary>
+          <p style="margin-top:10px;">
+            上临界维度 d<sub>c</sub> = 4。在 d ≥ 4，所有交互项变得"无关"（irrelevant），RG 流直接把所有起点都带到一个高斯（平均场）不动点。所以 d ≥ 4 的伊辛、ϕ⁴、渗流、聚合物⋯⋯指数都相同（且解析）。
+          </p>
+          <p>
+            维度让物理学退化——这是 5/22 那晚的疑问的答案。
+          </p>
+        </details>
+
+        <details class="expand">
+          <summary>+ 为什么这件事让我夜不能寐</summary>
+          <p style="margin-top:10px;">
+            RG 给"细节"和"结构"之间画了一道精确的界限：细节是 RG 流冲掉的东西，结构是 RG 流保留下来的东西。"什么是普适的"这个问题在 RG 出现之前是哲学，在 RG 之后是可计算的——一个矩阵的特征值。
+          </p>
+          <p>
+            这暗示了一种关于<b>抽象</b>本身的几何理论：每一次抽象都是一次 RG 步——丢掉一些自由度，希望保留的恰好是不动点附近的相关算符。"良好的抽象"就是与不动点的相关方向对齐的投影。
+          </p>
+        </details>
+      </div>
+    </aside>
+
+  </div>
+
+  <div class="footer-note">
+    <div><b>数值参数</b>　L=256，单格子翻转的 Metropolis-Hastings，T 单位为 J/k<sub>B</sub>。Block-spin 2×2 majority rule，等号情况下随机打破对称。每像素一个自旋，CSS 用 image-rendering: pixelated 放大显示。</div>
+    <div class="why">
+      Night Lab 第 32 夜。这个系列里第 5 次回到伊辛模型——但前 4 次都在<b>系统内部</b>（5/4 伊辛相变、5/22 渗流、5/24 KdV 普适性、5/25 Hofstadter 量子谱）。今晚是<b>系统之外</b>——是<b>解释为什么</b>那些系统会有它们已经表现出来的相变。RG 不是另一个相变模型，它是相变模型的<b>元理论</b>。
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// =======================================================================
+// Mulberry32 RNG (deterministic but reseedable)
+// =======================================================================
+function makeRng(seed) {
+  let a = (seed | 0) >>> 0;
+  return function() {
+    a += 0x6D2B79F5;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// =======================================================================
+// 2D Ising model — Wolff cluster algorithm + Metropolis
+// Lattice: Int8Array of ±1, periodic boundary
+// Single-spin Metropolis suffers critical slowing-down AND cannot escape
+// multi-domain stuck states at low T in tractable time. Wolff cluster
+// updates flip an entire same-sign correlated cluster, attacking both
+// problems. Combined with a few Metropolis sweeps for ergodicity.
+// =======================================================================
+function makeLattice(L, rng) {
+  const a = new Int8Array(L * L);
+  for (let i = 0; i < a.length; i++) a[i] = rng() < 0.5 ? -1 : 1;
+  return a;
+}
+
+function magnetization(a) {
+  let s = 0;
+  for (let i = 0; i < a.length; i++) s += a[i];
+  return s / a.length;
+}
+
+// One Metropolis sweep: L*L attempted flips
+function metropolisSweep(a, L, T, rng) {
+  const w4 = Math.exp(-4 / T);
+  const w8 = Math.exp(-8 / T);
+  const N = L * L;
+  for (let k = 0; k < N; k++) {
+    const ix = (rng() * N) | 0;
+    const x = ix % L;
+    const y = (ix / L) | 0;
+    const s = a[ix];
+    const xL = x === 0 ? L - 1 : x - 1;
+    const xR = x === L - 1 ? 0 : x + 1;
+    const yU = y === 0 ? L - 1 : y - 1;
+    const yD = y === L - 1 ? 0 : y + 1;
+    const sumN = a[y * L + xL] + a[y * L + xR] + a[yU * L + x] + a[yD * L + x];
+    const dE = 2 * s * sumN;
+    if (dE <= 0) {
+      a[ix] = -s;
+    } else {
+      const w = (dE === 4) ? w4 : w8;
+      if (rng() < w) a[ix] = -s;
+    }
+  }
+}
+
+// Wolff cluster: seed a random site; recursively add same-sign neighbors
+// with probability p_add = 1 − exp(−2J/k_BT); flip the entire cluster.
+// Returns the cluster size (so the caller can budget total flipped spins).
+function wolffCluster(a, L, T, rng, visited, stack) {
+  const N = L * L;
+  visited.fill(0);
+  const padd = 1 - Math.exp(-2 / T);
+  const seed = (rng() * N) | 0;
+  const s0 = a[seed];
+  stack[0] = seed;
+  let len = 1;
+  let head = 0;
+  visited[seed] = 1;
+  while (head < len) {
+    const ix = stack[head++];
+    const x = ix % L;
+    const y = (ix / L) | 0;
+    // 4 neighbors (periodic)
+    const nIdx = [
+      y * L + (x === 0 ? L - 1 : x - 1),
+      y * L + (x === L - 1 ? 0 : x + 1),
+      (y === 0 ? L - 1 : y - 1) * L + x,
+      (y === L - 1 ? 0 : y + 1) * L + x,
+    ];
+    for (let i = 0; i < 4; i++) {
+      const ni = nIdx[i];
+      if (!visited[ni] && a[ni] === s0 && rng() < padd) {
+        visited[ni] = 1;
+        stack[len++] = ni;
+      }
+    }
+  }
+  // Flip the cluster
+  const target = -s0;
+  for (let i = 0; i < len; i++) a[stack[i]] = target;
+  return len;
+}
+
+// =======================================================================
+// Block-spin RG (b=2, majority rule with random tie-break)
+// =======================================================================
+function blockSpin(a, L, rng) {
+  if (L % 2 !== 0) throw new Error("Lattice size must be even for b=2 block-spin");
+  const L2 = L / 2;
+  const out = new Int8Array(L2 * L2);
+  for (let by = 0; by < L2; by++) {
+    for (let bx = 0; bx < L2; bx++) {
+      const x = bx * 2, y = by * 2;
+      const sum = a[y * L + x] + a[y * L + x + 1]
+                + a[(y + 1) * L + x] + a[(y + 1) * L + x + 1];
+      let s;
+      if (sum > 0) s = 1;
+      else if (sum < 0) s = -1;
+      else s = rng() < 0.5 ? -1 : 1; // tie-break
+      out[by * L2 + bx] = s;
+    }
+  }
+  return out;
+}
+
+// =======================================================================
+// Domain-wall (antiferromagnetic-bond) density.
+// d_w = fraction of nearest-neighbor bonds where the two spins differ.
+// At T=0: d_w = 0.  At T=∞: d_w = 0.5.  At T_c: d_w ≈ 0.146 (Onsager).
+// Monotonic in T and well-defined at all temperatures — the per-scale
+// value shows RG flow directly converging toward fixed-point values.
+// =======================================================================
+function domainWallDensity(a, L) {
+  let wrongs = 0;
+  for (let y = 0; y < L; y++) {
+    const off = y * L;
+    for (let x = 0; x < L; x++) {
+      const xR = x === L - 1 ? 0 : x + 1;
+      if (a[off + x] !== a[off + xR]) wrongs++;
+    }
+  }
+  for (let y = 0; y < L; y++) {
+    const yD = y === L - 1 ? 0 : y + 1;
+    for (let x = 0; x < L; x++) {
+      if (a[y * L + x] !== a[yD * L + x]) wrongs++;
+    }
+  }
+  return wrongs / (2 * L * L); // 2L² bonds on a torus
+}
+
+// =======================================================================
+// Render lattice to canvas (pixel-per-spin)
+// =======================================================================
+function renderLattice(canvas, a, L) {
+  canvas.width = L;
+  canvas.height = L;
+  const ctx = canvas.getContext('2d');
+  const img = ctx.createImageData(L, L);
+  const data = img.data;
+  for (let i = 0; i < L * L; i++) {
+    const v = a[i];
+    const c = v > 0 ? 245 : 18;
+    const j = i * 4;
+    data[j] = c;
+    data[j + 1] = c;
+    data[j + 2] = c;
+    data[j + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
+// =======================================================================
+// Plot helpers (small flow plots)
+// =======================================================================
+function setupCanvas(canvas) {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = Math.max(1, rect.width * dpr);
+  canvas.height = Math.max(1, rect.height * dpr);
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ctx, w: rect.width, h: rect.height };
+}
+
+function drawAxes(ctx, w, h, xLabel, yLabel, opts) {
+  opts = opts || {};
+  const pad = { l: 36, r: 8, t: 8, b: 24 };
+  ctx.clearRect(0, 0, w, h);
+  // grid
+  ctx.strokeStyle = '#1a1f29';
+  ctx.lineWidth = 1;
+  const xN = 5, yN = 4;
+  for (let i = 0; i <= xN; i++) {
+    const x = pad.l + (w - pad.l - pad.r) * (i / xN);
+    ctx.beginPath();
+    ctx.moveTo(x, pad.t);
+    ctx.lineTo(x, h - pad.b);
+    ctx.stroke();
+  }
+  for (let j = 0; j <= yN; j++) {
+    const y = pad.t + (h - pad.t - pad.b) * (j / yN);
+    ctx.beginPath();
+    ctx.moveTo(pad.l, y);
+    ctx.lineTo(w - pad.r, y);
+    ctx.stroke();
+  }
+  // axis ticks/labels
+  ctx.fillStyle = '#5d6571';
+  ctx.font = '10px "JetBrains Mono", "SF Mono", monospace';
+  ctx.textAlign = 'center';
+  for (let i = 0; i <= xN; i++) {
+    const x = pad.l + (w - pad.l - pad.r) * (i / xN);
+    ctx.fillText(i.toString(), x, h - pad.b + 13);
+  }
+  ctx.textAlign = 'right';
+  for (let j = 0; j <= yN; j++) {
+    const y = pad.t + (h - pad.t - pad.b) * (j / yN);
+    const yVal = opts.yMax !== undefined ? (opts.yMax * (1 - j / yN)) : (1 - j / yN);
+    ctx.fillText(yVal.toFixed(2), pad.l - 6, y + 3);
+  }
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#9aa3ad';
+  ctx.font = '10px "JetBrains Mono", monospace';
+  ctx.fillText(xLabel, (pad.l + w - pad.r) / 2, h - 4);
+  ctx.save();
+  ctx.translate(10, (pad.t + h - pad.b) / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText(yLabel, 0, 0);
+  ctx.restore();
+  return pad;
+}
+
+function drawSeries(ctx, pad, w, h, xs, ys, color, opts) {
+  opts = opts || {};
+  const yMax = opts.yMax !== undefined ? opts.yMax : 1;
+  const xMin = opts.xMin !== undefined ? opts.xMin : Math.min(...xs);
+  const xMax = opts.xMax !== undefined ? opts.xMax : Math.max(...xs);
+  const px = x => pad.l + (w - pad.l - pad.r) * ((x - xMin) / (xMax - xMin));
+  const py = y => pad.t + (h - pad.t - pad.b) * (1 - Math.min(1, Math.max(0, y / yMax)));
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let i = 0; i < xs.length; i++) {
+    const X = px(xs[i]), Y = py(ys[i]);
+    if (i === 0) ctx.moveTo(X, Y); else ctx.lineTo(X, Y);
+  }
+  ctx.stroke();
+  // markers
+  ctx.fillStyle = color;
+  for (let i = 0; i < xs.length; i++) {
+    ctx.beginPath();
+    ctx.arc(px(xs[i]), py(ys[i]), 3.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+// =======================================================================
+// Main orchestration
+// =======================================================================
+const TC = 2.0 / Math.log(1 + Math.SQRT2); // 2.2691853...
+
+const els = {
+  size: document.getElementById('sizeSelect'),
+  sweeps: document.getElementById('sweepsInput'),
+  tCold: document.getElementById('tColdInput'),
+  tHot: document.getElementById('tHotInput'),
+  tColdValue: document.getElementById('tColdValue'),
+  tHotValue: document.getElementById('tHotValue'),
+  tColdLabel: document.getElementById('tColdLabel'),
+  tCritLabel: document.getElementById('tCritLabel'),
+  tHotLabel: document.getElementById('tHotLabel'),
+  runBtn: document.getElementById('runBtn'),
+  dragBtn: document.getElementById('dragBtn'),
+  status: document.getElementById('statusText'),
+  magPlot: document.getElementById('magPlot'),
+  corrPlot: document.getElementById('corrPlot'),
+};
+
+const scaleLabels = [0, 1, 2, 3, 4].map(k => document.getElementById('scale' + k));
+
+const canvases = {
+  cold: [0, 1, 2, 3, 4].map(k => document.getElementById('coldRG' + k)),
+  crit: [0, 1, 2, 3, 4].map(k => document.getElementById('critRG' + k)),
+  hot:  [0, 1, 2, 3, 4].map(k => document.getElementById('hotRG' + k)),
+};
+
+els.tColdValue.textContent = parseFloat(els.tCold.value).toFixed(2);
+els.tHotValue.textContent = parseFloat(els.tHot.value).toFixed(2);
+els.tCritLabel.textContent = 'T = ' + TC.toFixed(3);
+
+function updateLabels() {
+  const tC = parseFloat(els.tCold.value);
+  const tH = parseFloat(els.tHot.value);
+  els.tColdValue.textContent = tC.toFixed(2);
+  els.tHotValue.textContent = tH.toFixed(2);
+  els.tColdLabel.textContent = 'T = ' + tC.toFixed(2);
+  els.tHotLabel.textContent = 'T = ' + tH.toFixed(2);
+}
+
+els.tCold.addEventListener('input', updateLabels);
+els.tHot.addEventListener('input', updateLabels);
+
+// State for last computed run, used by flow plots
+let lastResults = null;
+
+// Yield to UI between heavy steps
+function nextFrame() {
+  return new Promise(r => requestAnimationFrame(() => r()));
+}
+
+async function runOnce() {
+  els.runBtn.disabled = true;
+  els.dragBtn.disabled = true;
+  const L0 = parseInt(els.size.value, 10);
+  // "Equilibrate budget" — total number of single-spin flips to perform,
+  // expressed in units of L². Default 10× means we plan to flip 10·L² spins
+  // total per temperature, divided between Wolff clusters and Metropolis.
+  const budgetMultiplier = parseInt(els.sweeps.value, 10);
+  const totalBudget = budgetMultiplier * L0 * L0;
+  const tC = parseFloat(els.tCold.value);
+  const tH = parseFloat(els.tHot.value);
+
+  // Update scale headers
+  for (let k = 0; k <= 4; k++) {
+    scaleLabels[k].textContent = 'L = ' + (L0 >> k);
+  }
+
+  const seed = (Math.random() * 1e9) | 0;
+
+  const runs = [
+    { key: 'cold', T: tC, label: 'T = ' + tC.toFixed(2) + ' (cold)', color: getComputedStyle(document.documentElement).getPropertyValue('--cold').trim() },
+    { key: 'crit', T: TC,  label: 'T = T_c',                       color: getComputedStyle(document.documentElement).getPropertyValue('--critical').trim() },
+    { key: 'hot',  T: tH, label: 'T = ' + tH.toFixed(2) + ' (hot)', color: getComputedStyle(document.documentElement).getPropertyValue('--hot').trim() },
+  ];
+
+  const results = []; // { key, T, color, mags[], dws[], finalLat }
+
+  for (const run of runs) {
+    els.status.textContent = `Equilibrating ${run.label} (Wolff + Metropolis on ${L0}×${L0})…`;
+    await nextFrame();
+
+    const rng = makeRng(seed); // SAME seed across temperatures → fair comparison of "same noise"
+    let lat = makeLattice(L0, rng);
+
+    const t0 = performance.now();
+    const visited = new Uint8Array(L0 * L0);
+    const stack = new Int32Array(L0 * L0);
+    // Phase 1: Wolff equilibration — flip ~budgetMultiplier·L² spins via clusters.
+    // Cluster size adapts to T (huge at low T, tiny at high T), so step count
+    // varies dramatically across temperatures.
+    let flippedByWolff = 0;
+    const wolffBudget = totalBudget;
+    let wolffSteps = 0;
+    const maxWolffSteps = 50000;
+    while (flippedByWolff < wolffBudget && wolffSteps < maxWolffSteps) {
+      flippedByWolff += wolffCluster(lat, L0, run.T, rng, visited, stack);
+      wolffSteps++;
+      if (wolffSteps % 300 === 0) {
+        els.status.textContent = `${run.label} · Wolff ${wolffSteps} clusters, ${flippedByWolff} spins flipped (${(100*flippedByWolff/wolffBudget).toFixed(0)}%)`;
+        await nextFrame();
+      }
+    }
+    // Phase 2: K candidate snapshots, pick max-|m|. This breaks the Z₂
+    // symmetry by hand and selects the typical deep-phase configuration —
+    // physically identical (up to ±) to any one phase the symmetry-broken
+    // thermodynamic state would inhabit. For T ≥ T_c this is a no-op
+    // (samples are statistically equivalent).
+    let bestLat = lat.slice();
+    let bestM = Math.abs(magnetization(lat));
+    const K = 20;
+    for (let k = 0; k < K; k++) {
+      wolffCluster(lat, L0, run.T, rng, visited, stack);
+      const m = Math.abs(magnetization(lat));
+      if (m > bestM) { bestM = m; bestLat = lat.slice(); }
+    }
+    // Phase 3: a few Metropolis sweeps on the chosen snapshot to polish
+    // short-wavelength noise without disturbing the chosen phase.
+    for (let s = 0; s < 3; s++) {
+      metropolisSweep(bestLat, L0, run.T, rng);
+    }
+    lat = bestLat;
+    const tEq = (performance.now() - t0) | 0;
+
+    // Now do RG iterations: render lattice, measure |m| and domain-wall density,
+    // then 2×2 block-spin majority-rule to next scale.
+    const mags = [];
+    const dws = [];
+    let curr = lat;
+    let currL = L0;
+    const rgRng = makeRng((seed + 7919) | 0); // separate RNG for ties (deterministic)
+
+    for (let k = 0; k <= 4; k++) {
+      renderLattice(canvases[run.key][k], curr, currL);
+      mags.push(Math.abs(magnetization(curr)));
+      dws.push(domainWallDensity(curr, currL));
+      if (k < 4) {
+        if (currL % 2 !== 0) break;
+        curr = blockSpin(curr, currL, rgRng);
+        currL = currL >> 1;
+      }
+    }
+
+    results.push({ key: run.key, T: run.T, label: run.label, color: run.color, mags, dws, eqTimeMs: tEq });
+  }
+
+  lastResults = results;
+  drawFlowPlots(results);
+
+  const summary = results.map(r => `${r.label}: |m|₀=${r.mags[0].toFixed(3)}→|m|₄=${r.mags[4].toFixed(3)}, eq=${r.eqTimeMs}ms`).join('　·　');
+  els.status.textContent = `Done.　${summary}`;
+  els.runBtn.disabled = false;
+  els.dragBtn.disabled = false;
+}
+
+function drawFlowPlots(results) {
+  // mag plot
+  {
+    const { ctx, w, h } = setupCanvas(els.magPlot);
+    const pad = drawAxes(ctx, w, h, 'k (RG step)', '|m|', { yMax: 1 });
+    for (const r of results) {
+      drawSeries(ctx, pad, w, h, [0, 1, 2, 3, 4], r.mags, r.color, { xMin: 0, xMax: 4, yMax: 1 });
+    }
+  }
+  // corr plot
+  {
+    const { ctx, w, h } = setupCanvas(els.corrPlot);
+    const pad = drawAxes(ctx, w, h, 'k (RG step)', 'd_w', { yMax: 0.5 });
+    // Reference lines: Onsager critical bond-energy → d_w(Tc) ≈ 0.1464
+    ctx.strokeStyle = 'rgba(232,195,82,0.25)';
+    ctx.setLineDash([3, 4]);
+    ctx.lineWidth = 1;
+    const yCrit = pad.t + (h - pad.t - pad.b) * (1 - 0.1464 / 0.5);
+    ctx.beginPath(); ctx.moveTo(pad.l, yCrit); ctx.lineTo(w - 8, yCrit); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(232,195,82,0.5)';
+    ctx.font = '9px "JetBrains Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('d_w(T_c)=0.146', pad.l + 4, yCrit - 3);
+    for (const r of results) {
+      drawSeries(ctx, pad, w, h, [0, 1, 2, 3, 4], r.dws, r.color, { xMin: 0, xMax: 4, yMax: 0.5 });
+    }
+  }
+}
+
+// Auto-drag: sweep the "cold" temperature toward Tc and replay
+async function dragToCritical() {
+  els.dragBtn.disabled = true;
+  els.runBtn.disabled = true;
+  const startT = parseFloat(els.tCold.value);
+  const endT = TC - 0.05; // approach from below
+  const nSteps = 8;
+  for (let i = 0; i <= nSteps; i++) {
+    const t = startT + (endT - startT) * (i / nSteps);
+    els.tCold.value = t.toFixed(3);
+    updateLabels();
+    await runOnce();
+  }
+}
+
+els.runBtn.addEventListener('click', runOnce);
+els.dragBtn.addEventListener('click', dragToCritical);
+window.addEventListener('resize', () => { if (lastResults) drawFlowPlots(lastResults); });
+
+// =======================================================================
+// Initial render: empty plots + auto first run
+// =======================================================================
+(function init() {
+  setupCanvas(els.magPlot);
+  drawAxes(els.magPlot.getContext('2d'), els.magPlot.getBoundingClientRect().width, els.magPlot.getBoundingClientRect().height, 'k (RG step)', '|m|', { yMax: 1 });
+  setupCanvas(els.corrPlot);
+  drawAxes(els.corrPlot.getContext('2d'), els.corrPlot.getBoundingClientRect().width, els.corrPlot.getBoundingClientRect().height, 'k (RG step)', 'd_w', { yMax: 0.5 });
+  // Defer first run a tick so layout settles
+  setTimeout(() => { runOnce(); }, 80);
+})();
+</script>
+</body>
+</html>

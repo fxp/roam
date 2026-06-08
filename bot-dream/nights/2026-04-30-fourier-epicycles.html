@@ -114,8 +114,6 @@
   #mainCanvas {
     display: block;
     cursor: default;
-    width: 100%;
-    height: 100%;
   }
   #mainCanvas.draw-mode {
     cursor: crosshair;
@@ -218,7 +216,7 @@
     <div id="epi-info">DFT decomposed into <span id="epiTotal">256</span> epicycles · showing <span id="epiShown">128</span></div>
   </div>
   <div id="canvas-wrap">
-    <canvas id="mainCanvas"></canvas>
+    <canvas id="mainCanvas" width="700" height="540"></canvas>
     <div id="draw-hint">Draw your shape! Release to transform.</div>
   </div>
   <div id="controls">
@@ -237,7 +235,7 @@
 </div>
 
 <script>
-let CW, CH;
+const CW = 700, CH = 540;
 const N = 256;
 const canvas = document.getElementById('mainCanvas');
 const ctx = canvas.getContext('2d');
@@ -628,18 +626,7 @@ document.getElementById('toggleCircles').addEventListener('click', () => {
   document.getElementById('toggleCircles').textContent = showCircles ? 'Hide Circles' : 'Show Circles';
 });
 
-function resize() {
-  const wrap = document.getElementById('canvas-wrap');
-  CW = wrap.clientWidth;
-  CH = wrap.clientHeight;
-  canvas.width = CW;
-  canvas.height = CH;
-  trailPts = [];
-}
-window.addEventListener('resize', resize);
-
 // Init
-resize();
 loadShape('heart');
 loop();
 </script>

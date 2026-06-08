@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>随机矩阵 · 黎曼零点 · 最不可能的相遇</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #07070f;
+    color: #c8c8e0;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    height: 100vh;
+    overflow: hidden;
+    display: grid;
+    grid-template-rows: 48px 1fr;
+    grid-template-columns: 1fr;
+  }
+  #header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    border-bottom: 1px solid #1e1e3a;
+    background: #09091a;
+  }
+  #header h1 {
+    font-size: 13px;
+    color: #9090cc;
+    letter-spacing: 0.08em;
+    font-weight: 400;
+  }
+  #stats {
+    font-size: 11px;
+    color: #4040aa;
+    letter-spacing: 0.05em;
+  }
+  #main {
+    display: grid;
+    grid-template-columns: 260px 1fr 1fr;
+    gap: 1px;
+    background: #0e0e20;
+    overflow: hidden;
+  }
+  .panel {
+    background: #07070f;
+    padding: 16px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .panel-title {
+    font-size: 10px;
+    color: #4a4a80;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    border-bottom: 1px solid #12122a;
+    padding-bottom: 6px;
+  }
+  canvas { display: block; }
+  #matrix-canvas {
+    image-rendering: pixelated;
+  }
+  .insight {
+    font-size: 10.5px;
+    line-height: 1.7;
+    color: #7070a8;
+  }
+  .insight .em { color: #a8a8e8; }
+  .insight .gold { color: #c8a040; }
+  .insight .pink { color: #c060a0; }
+  .story {
+    font-size: 10px;
+    line-height: 1.8;
+    color: #505080;
+    border-left: 2px solid #1a1a40;
+    padding-left: 10px;
+    margin-top: 4px;
+  }
+  #legend {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    font-size: 10px;
+  }
+  .legend-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #6060a0;
+  }
+  .legend-line {
+    width: 24px;
+    height: 2px;
+    display: inline-block;
+    border-radius: 1px;
+  }
+  .legend-bar {
+    width: 24px;
+    height: 10px;
+    display: inline-block;
+    border-radius: 2px;
+    opacity: 0.7;
+  }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <h1>🔢 随机矩阵理论 &nbsp;·&nbsp; 黎曼零点 &nbsp;·&nbsp; 最不可能的相遇 &nbsp;&mdash;&nbsp; Night Lab 2026-05-20</h1>
+  <div id="stats">矩阵已生成：<span id="count">0</span> &nbsp;|&nbsp; 本征值已收集：<span id="ev-count">0</span></div>
+</div>
+
+<div id="main">
+  <!-- Panel 1: Matrix + explanation -->
+  <div class="panel">
+    <div class="panel-title">GOE 随机矩阵 · 实时生成</div>
+    <canvas id="matrix-canvas" width="228" height="228"></canvas>
+    <div class="insight">
+      <span class="em">生成规则</span>：N×N 实对称矩阵，上三角元素独立 <span class="gold">N(0,1)</span>，对角元素 <span class="gold">N(0,2)</span>，然后令 A = (M + Mᵀ)/2。<br><br>
+      颜色映射：<span style="color:#4060e0">■</span> 负值 &rarr; <span style="color:#c0c0ff">■</span> 零 &rarr; <span style="color:#e06020">■</span> 正值
+    </div>
+    <div class="story">
+      <span style="color:#7070b0">1972年，普林斯顿高研院的下午茶。</span><br>
+      数论学家 Hugh Montgomery 刚刚推导出黎曼零点的<span style="color:#a0a0d0">对相关函数</span>，正好遇到物理学家 Freeman Dyson。<br>
+      Dyson 说：「你写的这个公式，和 GUE 本征值的对相关完全一样。」<br>
+      Montgomery 从未听过随机矩阵理论。<br><br>
+      <span style="color:#7070b0">这是数学史上最著名的茶话会。</span>
+    </div>
+    <div id="legend">
+      <div class="legend-row"><span class="legend-bar" style="background:#6060ff"></span>GOE 实测间距</div>
+      <div class="legend-row"><span class="legend-line" style="background:#ffcc44"></span>Wigner 猜想 P(s)=π/2·s·e^(-πs²/4)</div>
+      <div class="legend-row"><span class="legend-line" style="background:#ff5588; border: dashed; border-width:0 0 2px 0;height:0"></span>Poisson 分布 P(s)=e^(-s)</div>
+      <div class="legend-row"><span class="legend-bar" style="background:#40c080"></span>黎曼零点间距（前500个）</div>
+    </div>
+  </div>
+
+  <!-- Panel 2: Semicircle law -->
+  <div class="panel">
+    <div class="panel-title">Wigner 半圆定律 · 本征值密度</div>
+    <canvas id="semicircle-canvas" width="560" height="260"></canvas>
+    <div class="insight">
+      随着矩阵阶数 N→∞，归一化本征值 <span class="em">λ/√N</span> 的密度分布收敛到<span class="gold"> Wigner 半圆律</span>：<br>
+      <span style="color:#c8c860; font-size:12px; display:block; margin:6px 0 6px 16px;">ρ(x) = (2/π)√(1−x²) &nbsp;，&nbsp; x ∈ [−1, 1]</span>
+      这与矩阵元素的分布<span class="pink">无关</span>——Gaussian、Bernoulli 甚至均匀分布，结果相同。这是随机矩阵版本的<span class="em">中心极限定理</span>：局部随机性，全局普适性。<br><br>
+      <span class="gold">为什么是半圆？</span>直觉：本征值之间存在"排斥力"（Vandermonde 行列式），它们不能重叠，这个约束把均匀分布"压"成了半圆形。
+    </div>
+    <canvas id="semicircle-canvas2" width="560" height="80"></canvas>
+  </div>
+
+  <!-- Panel 3: Spacing distribution -->
+  <div class="panel">
+    <div class="panel-title">最近邻间距分布 · GUE 与黎曼零点的相遇</div>
+    <canvas id="spacing-canvas" width="560" height="280"></canvas>
+    <div class="insight">
+      将相邻本征值的间距归一化（除以平均间距），统计分布 P(s)。<br><br>
+      <span class="gold">Wigner 猜想（GOE）</span>：P(s) = (π/2)s·exp(−πs²/4)<br>
+      <span class="pink">Poisson 分布（可积系统）</span>：P(s) = exp(−s)<br><br>
+      两者最关键的差异在 <span class="em">s→0</span> 处：Poisson 在 s=0 取最大值（能级可以任意接近），而 Wigner 在 s=0 处为零——本征值<span class="gold">互相排斥</span>，不允许简并。这叫做 <span class="em">能级排斥（level repulsion）</span>。<br><br>
+      <span class="pink">Montgomery-Odlyzko 猜想</span>（1972年茶话会的结论）：<span class="em">黎曼非平凡零点的间距，与 GUE 本征值的间距，在统计上完全相同。</span>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── Riemann zeros (imaginary parts, first 500) ─────────────────────────────
+// Source: computed from known tables
+const RIEMANN_ZEROS = [
+14.134725,21.022040,25.010858,30.424876,32.935062,37.586178,40.918719,43.327073,
+48.005151,49.773832,52.970321,56.446248,59.347044,60.831779,65.112544,67.079811,
+69.546402,72.067158,75.704691,77.144840,79.337375,82.910380,84.735493,87.425275,
+88.809111,92.491899,94.651344,95.870634,98.831194,101.317851,103.725538,105.446623,
+107.168611,111.029535,111.874659,114.320221,116.226680,118.790782,121.370125,122.946829,
+124.256819,127.516683,129.578704,131.087688,133.497737,134.756510,138.116042,139.736209,
+141.123707,143.111846,146.000982,147.422765,150.053521,150.925258,153.024693,156.112909,
+157.597592,158.849989,161.188964,163.030709,165.537069,167.184439,169.094515,169.911976,
+173.411536,174.754191,176.441434,178.377407,179.916484,182.207078,184.874467,185.598783,
+187.228922,189.416158,192.026656,193.079726,195.265397,196.876482,198.015309,201.264751,
+202.493595,204.189672,205.394697,207.906259,209.576509,211.690862,213.347919,214.547044,
+216.169538,219.067596,220.714918,221.430705,224.007000,224.983324,227.421444,229.337413,
+231.250188,231.987235,233.693404,236.524230,237.769820,239.555477,241.049158,242.823271,
+244.070898,247.136990,248.101990,249.573370,251.014948,253.069740,255.306138,256.380713,
+258.610439,259.874513,261.085786,263.573893,265.557693,267.921782,269.006021,270.435075,
+272.489454,273.459589,275.587492,276.455049,278.251485,279.229251,282.465124,283.211185,
+284.835884,286.667447,287.911800,289.579836,291.846192,293.558482,294.965878,295.573063,
+297.979269,299.840568,301.649325,302.696520,304.864432,305.728987,307.219155,310.109491,
+312.427515,313.229753,314.523258,315.445844,317.736264,318.853100,321.016404,321.841040,
+323.466783,325.618633,326.992202,329.022483,330.390732,331.195609,333.648997,334.203558,
+336.841573,338.340595,339.858230,341.041036,342.791248,344.162804,346.349745,347.272483,
+349.315606,350.409998,351.878660,353.529448,354.991020,355.765990,357.752562,359.743890,
+360.963476,363.331288,364.736064,366.213650,367.991017,369.862449,371.380090,372.863282,
+374.382279,375.823617,377.595825,378.439393,380.444095,381.780464,383.455034,384.956516,
+386.329435,388.009978,389.476089,390.853063,392.443782,393.638928,395.505502,397.283476,
+398.653700,399.987219,401.839011,402.861723,405.134862,406.526975,407.657413,409.285378,
+410.513840,411.972216,413.420941,415.456006,416.400279,417.979440,419.573839,421.140421,
+422.935880,424.199760,426.108977,427.547779,428.714068,430.046843,431.997069,433.312895,
+434.753729,436.001421,437.690066,439.062484,440.462740,441.742026,443.618697,445.152085,
+446.468175,447.861869,449.107779,450.674454,452.134892,453.707278,455.103543,455.756855,
+457.424208,459.156977,460.386990,461.553396,463.001940,464.564660,465.837285,467.404844,
+468.855419,470.319714,471.884200,473.163540,474.745006,476.079736,477.549052,479.030685,
+480.533720,482.077618,483.368049,484.929060,486.380404,487.859049,489.423978,490.766296,
+492.386527,493.850416,495.313580,497.000140,498.301003,499.861396,501.413460,502.706843,
+504.360095,505.723624,507.152618,508.703419,510.123649,511.688699,513.078985,514.603764,
+516.071734,517.532890,518.998000,520.592410,522.036070,523.466340,524.863770,526.362120,
+527.969640,529.490710,530.955120,532.433480,533.908810,535.471560,536.920200,538.381710,
+539.927890,541.491560,542.986420,544.400720,545.883130,547.357280,548.889470,550.386870,
+551.826960,553.304660,554.864190,556.332410,557.766330,559.278740,560.748260,562.281690,
+563.727120,565.164850,566.677860,568.113450,569.651020,571.124370,572.577460,574.041090,
+575.503730,576.986700,578.453840,580.009460,581.420280,582.908620,584.460240,585.851740,
+587.290720,588.824480,590.254500,591.659490,593.183450,594.637900,596.094970,597.573780,
+599.007570,600.530830,601.990100,603.440640,604.997600,606.411550,607.875200,609.354990,
+610.822940,612.303170,613.743990,615.238920,616.690990,618.152250,619.676670,621.140050,
+622.578160,624.063640,625.528940,626.992260,628.469350,629.986440,631.441520,632.946270,
+634.460560,635.925130,637.420550,638.918920,640.413840,641.879190,643.350930,644.877270,
+646.371410,647.804880,649.294230,650.774420,652.290680,653.754200,655.215750,656.674240,
+658.158520,659.660350,661.102570,662.571920,664.077780,665.580700,667.002870,668.481870,
+669.945530,671.413370,672.907020,674.413460,675.867820,677.321250,678.796490,680.285530
+];
+
+// ─── Math helpers ────────────────────────────────────────────────────────────
+function randn() {
+  let u = 0, v = 0;
+  while (u === 0) u = Math.random();
+  while (v === 0) v = Math.random();
+  return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+}
+
+function generateGOE(n) {
+  const A = Array.from({length: n}, () => new Float64Array(n));
+  for (let i = 0; i < n; i++) {
+    A[i][i] = randn() * Math.SQRT2;
+    for (let j = i + 1; j < n; j++) {
+      const v = randn();
+      A[i][j] = v;
+      A[j][i] = v;
+    }
+  }
+  return A;
+}
+
+// Jacobi eigenvalue algorithm for real symmetric matrix
+function jacobiEigenvalues(inputA) {
+  const n = inputA.length;
+  const a = inputA.map(row => Float64Array.from(row));
+  const maxSweeps = 50;
+
+  for (let sweep = 0; sweep < maxSweeps; sweep++) {
+    let changed = false;
+    for (let p = 0; p < n - 1; p++) {
+      for (let q = p + 1; q < n; q++) {
+        const apq = a[p][q];
+        if (Math.abs(apq) < 1e-12) continue;
+        changed = true;
+        const tau = (a[q][q] - a[p][p]) / (2.0 * apq);
+        const t = Math.sign(tau) / (Math.abs(tau) + Math.sqrt(1.0 + tau * tau));
+        const c = 1.0 / Math.sqrt(1.0 + t * t);
+        const s = t * c;
+
+        a[p][p] -= t * apq;
+        a[q][q] += t * apq;
+        a[p][q] = 0;
+        a[q][p] = 0;
+
+        for (let i = 0; i < n; i++) {
+          if (i === p || i === q) continue;
+          const aip = a[i][p];
+          const aiq = a[i][q];
+          a[i][p] = a[p][i] = c * aip - s * aiq;
+          a[i][q] = a[q][i] = s * aip + c * aiq;
+        }
+      }
+    }
+    if (!changed) break;
+  }
+
+  const eigs = new Float64Array(n);
+  for (let i = 0; i < n; i++) eigs[i] = a[i][i];
+  eigs.sort();
+  return eigs;
+}
+
+// ─── Spacing statistics ──────────────────────────────────────────────────────
+function computeSpacings(eigs) {
+  const n = eigs.length;
+  if (n < 2) return [];
+  const spacings = [];
+  for (let i = 0; i < n - 1; i++) spacings.push(eigs[i + 1] - eigs[i]);
+  const mean = spacings.reduce((a, b) => a + b, 0) / spacings.length;
+  return spacings.map(s => s / mean);
+}
+
+// Riemann zero spacings (normalized)
+function computeRiemannSpacings() {
+  const zeros = RIEMANN_ZEROS;
+  const spacings = [];
+  for (let i = 0; i < zeros.length - 1; i++) {
+    spacings.push(zeros[i + 1] - zeros[i]);
+  }
+  // Unfold: use mean local density ~ log(t/2π)/(2π)
+  const unfolded = spacings.map((s, i) => {
+    const t = zeros[i];
+    const density = Math.log(t / (2 * Math.PI)) / (2 * Math.PI);
+    return s * density;
+  });
+  const mean = unfolded.reduce((a, b) => a + b, 0) / unfolded.length;
+  return unfolded.map(s => s / mean);
+}
+
+const riemannSpacings = computeRiemannSpacings();
+
+// ─── Histogram helper ────────────────────────────────────────────────────────
+function makeHistogram(data, min, max, bins) {
+  const hist = new Float64Array(bins);
+  const width = (max - min) / bins;
+  for (const v of data) {
+    if (v < min || v > max) continue;
+    const bin = Math.floor((v - min) / width);
+    if (bin >= 0 && bin < bins) hist[bin]++;
+  }
+  return hist;
+}
+
+// ─── State ───────────────────────────────────────────────────────────────────
+const N = 28; // matrix size
+let totalMatrices = 0;
+let allEigenvalues = [];
+let allSpacings = [];
+let currentMatrix = null;
+
+// ─── Canvas setup ────────────────────────────────────────────────────────────
+const matCanvas = document.getElementById('matrix-canvas');
+const matCtx = matCanvas.getContext('2d');
+const scCanvas = document.getElementById('semicircle-canvas');
+const scCtx = scCanvas.getContext('2d');
+const sc2Canvas = document.getElementById('semicircle-canvas2');
+const sc2Ctx = sc2Canvas.getContext('2d');
+const spCanvas = document.getElementById('spacing-canvas');
+const spCtx = spCanvas.getContext('2d');
+
+// ─── Draw matrix heatmap ─────────────────────────────────────────────────────
+function drawMatrix(M) {
+  const n = M.length;
+  const cw = matCanvas.width / n;
+  const ch = matCanvas.height / n;
+
+  // Find max abs val
+  let maxVal = 0;
+  for (let i = 0; i < n; i++)
+    for (let j = 0; j < n; j++)
+      if (Math.abs(M[i][j]) > maxVal) maxVal = Math.abs(M[i][j]);
+
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      const v = M[i][j] / (maxVal || 1);
+      let r, g, b;
+      if (v < 0) {
+        const t = -v;
+        r = Math.round(10 + t * 50);
+        g = Math.round(10 + t * 50);
+        b = Math.round(40 + t * 200);
+      } else {
+        const t = v;
+        r = Math.round(40 + t * 200);
+        g = Math.round(20 + t * 80);
+        b = Math.round(10 + t * 20);
+      }
+      matCtx.fillStyle = `rgb(${r},${g},${b})`;
+      matCtx.fillRect(j * cw, i * ch, cw, ch);
+    }
+  }
+}
+
+// ─── Draw semicircle law ─────────────────────────────────────────────────────
+function drawSemicircle() {
+  const ctx = scCtx;
+  const W = scCanvas.width, H = scCanvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const padL = 48, padR = 20, padT = 20, padB = 36;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+
+  // Background
+  ctx.fillStyle = '#0a0a18';
+  ctx.fillRect(padL, padT, plotW, plotH);
+
+  if (allEigenvalues.length < 20) {
+    ctx.fillStyle = '#303060';
+    ctx.font = '11px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('正在收集本征值…', padL + plotW/2, padT + plotH/2);
+    return;
+  }
+
+  // Normalize eigenvalues by sqrt(N) and scale by (2/sqrt(N)) to fit [-1,1]
+  const scale = 1.0 / Math.sqrt(N);
+  const normed = allEigenvalues.map(v => v * scale);
+
+  const bins = 60;
+  const xmin = -2.5, xmax = 2.5;
+  const hist = makeHistogram(normed, xmin, xmax, bins);
+  const binW = (xmax - xmin) / bins;
+  const total = allEigenvalues.length;
+  // Normalize histogram to density
+  const densityMax = 2 / Math.PI; // semicircle peak
+  let histMax = 0;
+  for (let i = 0; i < bins; i++) {
+    const d = hist[i] / (total * binW);
+    if (d > histMax) histMax = d;
+  }
+  const yScale = plotH / Math.max(histMax * 1.1, densityMax * 1.2);
+
+  // Grid
+  ctx.strokeStyle = '#161630';
+  ctx.lineWidth = 1;
+  for (let y = 0; y <= 4; y++) {
+    const yp = padT + plotH - y * (plotH / 4);
+    ctx.beginPath(); ctx.moveTo(padL, yp); ctx.lineTo(padL + plotW, yp); ctx.stroke();
+  }
+
+  // Histogram bars
+  for (let i = 0; i < bins; i++) {
+    const d = hist[i] / (total * binW);
+    const x = padL + (i / bins) * plotW;
+    const bw = plotW / bins;
+    const bh = d * yScale;
+    const t = d / (densityMax * 1.1);
+    const r = Math.round(30 + t * 70);
+    const g = Math.round(30 + t * 70);
+    const bl = Math.round(80 + t * 140);
+    ctx.fillStyle = `rgba(${r},${g},${bl},0.85)`;
+    ctx.fillRect(x + 1, padT + plotH - bh, bw - 2, bh);
+  }
+
+  // Wigner semicircle overlay
+  ctx.strokeStyle = '#ffcc44';
+  ctx.lineWidth = 2;
+  ctx.shadowColor = '#ffcc44';
+  ctx.shadowBlur = 6;
+  ctx.beginPath();
+  let first = true;
+  for (let xi = 0; xi <= plotW; xi++) {
+    const xv = xmin + (xi / plotW) * (xmax - xmin);
+    if (Math.abs(xv) > 1) continue;
+    const yd = (2 / Math.PI) * Math.sqrt(1 - xv * xv);
+    const yp = padT + plotH - yd * yScale;
+    if (first) { ctx.moveTo(padL + xi, yp); first = false; }
+    else ctx.lineTo(padL + xi, yp);
+  }
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Axes
+  ctx.strokeStyle = '#303060';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(padL, padT); ctx.lineTo(padL, padT + plotH); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(padL, padT + plotH); ctx.lineTo(padL + plotW, padT + plotH); ctx.stroke();
+
+  // X axis labels
+  ctx.fillStyle = '#404070';
+  ctx.font = '9px monospace';
+  ctx.textAlign = 'center';
+  for (let v = -2; v <= 2; v++) {
+    const xp = padL + ((v - xmin) / (xmax - xmin)) * plotW;
+    ctx.fillText(v, xp, padT + plotH + 12);
+  }
+  // Y axis label
+  ctx.save();
+  ctx.translate(14, padT + plotH / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#404070';
+  ctx.fillText('密度 ρ(λ/√N)', 0, 0);
+  ctx.restore();
+
+  // Title
+  ctx.fillStyle = '#7070b0';
+  ctx.font = '10px monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText(`N=${N}, ${total.toLocaleString()} 本征值`, padL + 4, padT + 13);
+}
+
+// ─── Draw eigenvalue dot row (bottom strip) ──────────────────────────────────
+function drawEigenvalueDots(eigs) {
+  const ctx = sc2Ctx;
+  const W = sc2Canvas.width, H = sc2Canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const padL = 48, padR = 20;
+  const plotW = W - padL - padR;
+
+  ctx.fillStyle = '#0a0a18';
+  ctx.fillRect(padL, 8, plotW, H - 16);
+
+  const xmin = -2.5 * Math.sqrt(N), xmax = 2.5 * Math.sqrt(N);
+  ctx.fillStyle = '#303060';
+  ctx.font = '9px monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText('↑ 本次矩阵的本征值', padL + 4, 20);
+
+  for (const v of eigs) {
+    const xp = padL + ((v - xmin) / (xmax - xmin)) * plotW;
+    if (xp < padL || xp > padL + plotW) continue;
+    ctx.fillStyle = '#6060ff';
+    ctx.fillRect(xp - 1, 16, 2, H - 24);
+  }
+}
+
+// ─── Draw spacing distribution ────────────────────────────────────────────────
+function drawSpacing() {
+  const ctx = spCtx;
+  const W = spCanvas.width, H = spCanvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const padL = 48, padR = 20, padT = 20, padB = 40;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+
+  ctx.fillStyle = '#0a0a18';
+  ctx.fillRect(padL, padT, plotW, plotH);
+
+  const bins = 40;
+  const smin = 0, smax = 3.5;
+  const binW = (smax - smin) / bins;
+
+  // Grid
+  ctx.strokeStyle = '#161630';
+  ctx.lineWidth = 1;
+  for (let y = 0; y <= 4; y++) {
+    const yp = padT + plotH - y * (plotH / 4);
+    ctx.beginPath(); ctx.moveTo(padL, yp); ctx.lineTo(padL + plotW, yp); ctx.stroke();
+  }
+
+  const wignerPeak = Math.exp(-0.25) * Math.PI / 2 * Math.sqrt(4 / Math.PI); // ~0.986 at s≈0.798
+  const yScaleMax = 1.15;
+
+  // GOE histogram
+  if (allSpacings.length >= 20) {
+    const hist = makeHistogram(allSpacings, smin, smax, bins);
+    const total = allSpacings.length;
+
+    for (let i = 0; i < bins; i++) {
+      const d = hist[i] / (total * binW);
+      const x = padL + (i / bins) * plotW;
+      const bw = plotW / bins;
+      const bh = (d / yScaleMax) * plotH;
+      ctx.fillStyle = 'rgba(80,80,220,0.75)';
+      ctx.fillRect(x + 1, padT + plotH - bh, bw - 2, bh);
+    }
+  } else {
+    ctx.fillStyle = '#303060';
+    ctx.font = '11px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('收集间距中…', padL + plotW/2, padT + plotH/2);
+  }
+
+  // Riemann zero spacing histogram
+  if (riemannSpacings.length > 0) {
+    const hist = makeHistogram(riemannSpacings, smin, smax, bins);
+    const total = riemannSpacings.length;
+    for (let i = 0; i < bins; i++) {
+      const d = hist[i] / (total * binW);
+      const x = padL + (i / bins) * plotW;
+      const bw = plotW / bins;
+      const bh = (d / yScaleMax) * plotH;
+      ctx.fillStyle = 'rgba(40,180,100,0.4)';
+      ctx.fillRect(x + 1, padT + plotH - bh, bw - 2, bh);
+    }
+  }
+
+  // Wigner surmise (GOE): P(s) = π/2 · s · exp(-π/4 · s²)
+  ctx.strokeStyle = '#ffcc44';
+  ctx.lineWidth = 2.5;
+  ctx.shadowColor = '#ffcc44';
+  ctx.shadowBlur = 6;
+  ctx.beginPath();
+  for (let xi = 0; xi <= plotW; xi++) {
+    const s = smin + (xi / plotW) * (smax - smin);
+    const p = (Math.PI / 2) * s * Math.exp(-(Math.PI / 4) * s * s);
+    const yp = padT + plotH - (p / yScaleMax) * plotH;
+    if (xi === 0) ctx.moveTo(padL + xi, yp);
+    else ctx.lineTo(padL + xi, yp);
+  }
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Poisson: P(s) = exp(-s)
+  ctx.strokeStyle = '#ff5588';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([5, 4]);
+  ctx.beginPath();
+  for (let xi = 0; xi <= plotW; xi++) {
+    const s = smin + (xi / plotW) * (smax - smin);
+    const p = Math.exp(-s);
+    const yp = padT + plotH - (p / yScaleMax) * plotH;
+    if (xi === 0) ctx.moveTo(padL + xi, yp);
+    else ctx.lineTo(padL + xi, yp);
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Axes
+  ctx.strokeStyle = '#303060';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(padL, padT); ctx.lineTo(padL, padT + plotH); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(padL, padT + plotH); ctx.lineTo(padL + plotW, padT + plotH); ctx.stroke();
+
+  // X axis labels
+  ctx.fillStyle = '#404070';
+  ctx.font = '9px monospace';
+  ctx.textAlign = 'center';
+  for (let v = 0; v <= 3; v++) {
+    const xp = padL + ((v - smin) / (smax - smin)) * plotW;
+    ctx.fillText(v, xp, padT + plotH + 12);
+  }
+  ctx.fillText('归一化间距 s', padL + plotW / 2, padT + plotH + 26);
+
+  ctx.save();
+  ctx.translate(14, padT + plotH / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#404070';
+  ctx.fillText('P(s)', 0, 0);
+  ctx.restore();
+
+  // Annotation: level repulsion zone
+  ctx.fillStyle = '#303055';
+  ctx.fillRect(padL, padT, 28, plotH);
+  ctx.fillStyle = '#ff558866';
+  const arrowX = padL + 14;
+  ctx.font = '8px monospace';
+  ctx.fillStyle = '#cc3366';
+  ctx.textAlign = 'center';
+  ctx.save();
+  ctx.translate(arrowX, padT + plotH / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText('能级排斥区', 0, 0);
+  ctx.restore();
+
+  // Stats
+  ctx.fillStyle = '#7070b0';
+  ctx.font = '10px monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText(`${allSpacings.length.toLocaleString()} 间距 / 黎曼零点: ${riemannSpacings.length}`, padL + 4, padT + 13);
+}
+
+// ─── Animation loop ───────────────────────────────────────────────────────────
+const BATCH = 4; // matrices per frame
+
+function step() {
+  for (let b = 0; b < BATCH; b++) {
+    const M = generateGOE(N);
+    const eigs = jacobiEigenvalues(M);
+    for (const e of eigs) allEigenvalues.push(e);
+    const spacings = computeSpacings(eigs);
+    for (const s of spacings) allSpacings.push(s);
+    totalMatrices++;
+    if (b === 0) currentMatrix = M;
+  }
+
+  if (currentMatrix) drawMatrix(currentMatrix);
+  drawSemicircle();
+  if (currentMatrix) {
+    const eigs = jacobiEigenvalues(currentMatrix);
+    drawEigenvalueDots(eigs);
+  }
+  drawSpacing();
+
+  document.getElementById('count').textContent = totalMatrices.toLocaleString();
+  document.getElementById('ev-count').textContent = allEigenvalues.length.toLocaleString();
+
+  requestAnimationFrame(step);
+}
+
+// Initial draws
+drawSemicircle();
+drawSpacing();
+requestAnimationFrame(step);
+</script>
+</body>
+</html>

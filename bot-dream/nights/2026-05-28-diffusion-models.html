@@ -1,0 +1,1114 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Score-Based Diffusion · 学习反演时间 · Night Lab 2026-05-28</title>
+<style>
+  :root {
+    --bg: #07090f;
+    --bg-soft: #0e1320;
+    --panel: #0b1020;
+    --line: #1c2540;
+    --ink: #d6deef;
+    --ink-dim: #8a9ac0;
+    --ink-mute: #5d6c8f;
+    --accent: #6df0ff;
+    --accent-2: #ff8de8;
+    --warm: #ffc46d;
+    --good: #7dffb7;
+    --bad: #ff7d8c;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --serif: "Cormorant Garamond", "EB Garamond", "Times New Roman", serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+  }
+  html, body {
+    margin: 0; padding: 0;
+    background: radial-gradient(ellipse at 30% -10%, #14193a 0%, var(--bg) 55%, #04050b 100%);
+    color: var(--ink); font-family: var(--sans);
+    min-height: 100vh; overflow-x: hidden;
+  }
+  body { padding: 28px 28px 60px; }
+  .frame { max-width: 1500px; margin: 0 auto; }
+  header.title {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 20px;
+    border-bottom: 1px solid var(--line); padding-bottom: 14px; margin-bottom: 18px;
+  }
+  header.title h1 {
+    margin: 0; font-family: var(--serif); font-weight: 500;
+    font-size: 30px; letter-spacing: -0.01em;
+    background: linear-gradient(90deg, #d6deef 0%, #6df0ff 60%, #ff8de8 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  header.title .sub {
+    color: var(--ink-mute); font-size: 13px; font-family: var(--mono);
+    text-align: right; line-height: 1.5;
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 380px;
+    gap: 22px;
+    align-items: start;
+  }
+  @media (max-width: 1080px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+  .stage {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    padding: 14px; position: relative;
+    box-shadow: 0 30px 80px -40px rgba(80, 200, 255, 0.15);
+  }
+  #canvas {
+    width: 100%; aspect-ratio: 1/1; display: block;
+    background: #03050d; border-radius: 10px;
+    image-rendering: pixelated;
+  }
+  .stage-meta {
+    display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between;
+    padding: 10px 4px 2px; font-family: var(--mono); font-size: 11px;
+    color: var(--ink-mute);
+  }
+  .stage-meta b { color: var(--ink-dim); font-weight: 400; }
+  .stage-meta .live { color: var(--accent); }
+
+  .sidepanel {
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 14px 16px;
+  }
+  .card h3 {
+    margin: 0 0 10px; font-size: 11px; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--ink-mute); font-weight: 500;
+    border-bottom: 1px solid var(--line); padding-bottom: 6px;
+  }
+  .row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .row label { width: 96px; font-size: 12px; color: var(--ink-dim); }
+  .row .val { width: 60px; text-align: right; font-family: var(--mono); font-size: 11px; color: var(--accent); }
+  .row input[type=range] { flex: 1; }
+  .row select {
+    flex: 1; background: #060a16; color: var(--ink);
+    border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px;
+    font-family: var(--mono); font-size: 12px;
+  }
+  .preset-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 4px;
+  }
+  .preset-grid button {
+    background: #060a16; color: var(--ink-dim); border: 1px solid var(--line);
+    border-radius: 6px; padding: 8px 4px; font-size: 11px; cursor: pointer;
+    transition: all 0.12s;
+  }
+  .preset-grid button:hover { background: #0d1530; color: var(--ink); }
+  .preset-grid button.active { background: linear-gradient(180deg, #1a2950, #0f1a35); color: var(--accent); border-color: rgba(109, 240, 255, 0.4); }
+  .btn-row { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .btn-row button {
+    flex: 1; min-width: 70px;
+    background: #060a16; color: var(--ink); border: 1px solid var(--line);
+    border-radius: 6px; padding: 8px 6px; font-size: 12px; cursor: pointer;
+    font-family: var(--mono);
+  }
+  .btn-row button:hover { background: #14213f; color: var(--accent); }
+  .btn-row button.primary {
+    background: linear-gradient(180deg, #2a4080, #14223f); color: white;
+    border-color: rgba(109, 240, 255, 0.5);
+  }
+  .toggle-group { display: flex; gap: 6px; margin-top: 6px; }
+  .toggle-group button {
+    flex: 1; background: #060a16; color: var(--ink-dim); border: 1px solid var(--line);
+    border-radius: 6px; padding: 6px 4px; font-size: 11px; cursor: pointer;
+  }
+  .toggle-group button.on { background: #0f1f44; color: var(--accent); border-color: rgba(109, 240, 255, 0.3); }
+  .toggle-group button:not(.on):hover { background: #0d1530; color: var(--ink); }
+  .stats {
+    font-family: var(--mono); font-size: 11px; color: var(--ink-dim);
+    line-height: 1.65;
+  }
+  .stats b { color: var(--accent); font-weight: 400; }
+  .stats em { color: var(--accent-2); font-style: normal; }
+
+  .essay {
+    margin-top: 28px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    padding: 24px 32px; max-width: 1500px; margin-left: auto; margin-right: auto;
+  }
+  .essay h2 {
+    font-family: var(--serif); font-weight: 500; font-size: 22px;
+    color: var(--warm); margin: 0 0 12px;
+  }
+  .essay h3 {
+    font-family: var(--serif); font-weight: 500; font-size: 17px;
+    color: var(--accent); margin: 24px 0 10px;
+  }
+  .essay p, .essay li {
+    color: var(--ink-dim); line-height: 1.75; font-size: 14px;
+  }
+  .essay code, .essay .eq {
+    font-family: var(--mono); font-size: 12.5px; color: var(--warm);
+    background: rgba(255, 196, 109, 0.06); padding: 1px 6px; border-radius: 4px;
+  }
+  .essay .eqblock {
+    display: block; margin: 12px 0; padding: 10px 14px; background: #060a16;
+    border-left: 3px solid var(--accent); border-radius: 4px;
+    font-family: var(--mono); font-size: 13px; color: var(--ink);
+    overflow-x: auto;
+  }
+  .essay strong { color: var(--ink); }
+  .essay .meta { color: var(--ink-mute); font-size: 12px; font-family: var(--mono); }
+  .two-col {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-top: 12px;
+  }
+  @media (max-width: 820px) { .two-col { grid-template-columns: 1fr; } }
+
+  /* Legend overlay on canvas */
+  .legend {
+    position: absolute; bottom: 22px; left: 22px;
+    font-family: var(--mono); font-size: 10px; color: rgba(214, 222, 239, 0.55);
+    background: rgba(0, 0, 0, 0.35); padding: 5px 8px; border-radius: 4px;
+    border: 1px solid rgba(28, 37, 64, 0.6);
+    line-height: 1.5; pointer-events: none;
+  }
+  .legend .swatch { display: inline-block; width: 8px; height: 8px; margin-right: 4px; border-radius: 50%; vertical-align: middle; }
+  .legend .cyan { background: #6df0ff; box-shadow: 0 0 6px #6df0ff; }
+  .legend .magenta { background: #ff8de8; box-shadow: 0 0 6px #ff8de8; }
+  .legend .warm { background: #ffc46d; }
+
+  .t-axis {
+    position: absolute; top: 22px; right: 22px;
+    font-family: var(--mono); font-size: 10px; color: rgba(214, 222, 239, 0.7);
+    background: rgba(0, 0, 0, 0.35); padding: 5px 8px; border-radius: 4px;
+    border: 1px solid rgba(28, 37, 64, 0.6); line-height: 1.7;
+  }
+  .t-axis .now { color: var(--accent); font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="frame">
+
+<header class="title">
+  <div>
+    <h1>Score-Based Diffusion · 学习反演时间的随机过程</h1>
+    <div style="color: var(--ink-mute); font-size: 13px; margin-top: 4px; font-family: var(--mono);">
+      VP-SDE · Anderson 1982 反向 · 解析 GMM score · DDPM/SBGM 之心
+    </div>
+  </div>
+  <div class="sub">
+    Night Lab · 2026-05-28<br/>
+    σ²(t) = 1 − ᾱ(t)<br/>
+    dx = [−½β x − β·∇log pₜ(x)]dt + √β dW̄
+  </div>
+</header>
+
+<div class="layout">
+  <div class="stage">
+    <canvas id="canvas" width="800" height="800"></canvas>
+    <div class="t-axis">
+      <div>t = <span class="now" id="tval">0.500</span></div>
+      <div>ᾱ = <span id="abarval">—</span></div>
+      <div>σₜ = <span id="sigval">—</span></div>
+    </div>
+    <div class="legend">
+      <div><span class="swatch cyan"></span> 数据样本 / 反向粒子</div>
+      <div><span class="swatch magenta"></span> 真实目标点（GMM 中心）</div>
+      <div><span class="swatch warm"></span> score 矢量 ∇log pₜ(x)</div>
+      <div style="margin-top: 3px; color: rgba(214,222,239,.35);">背景：log pₜ(x)，紫→金从低到高</div>
+    </div>
+    <div class="stage-meta">
+      <div><b>密度</b>：解析高斯混合 · <b>箭头</b>：22×22 网格 · <b>反向器</b>：<span id="solvername" class="live">SDE</span></div>
+      <div><span id="status" class="live">就绪</span></div>
+    </div>
+  </div>
+
+  <aside class="sidepanel">
+    <div class="card">
+      <h3>目标分布</h3>
+      <div class="preset-grid" id="presets">
+        <button data-id="two_gauss">双高斯</button>
+        <button data-id="eight_gauss">八高斯环</button>
+        <button data-id="moons">两个月亮</button>
+        <button data-id="spiral">螺旋</button>
+        <button data-id="ring">圆环</button>
+        <button data-id="checker">棋盘</button>
+        <button data-id="letter_a">字母 A</button>
+        <button data-id="swiss">瑞士卷</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>时间 t ∈ [0, 1]</h3>
+      <div class="row">
+        <label>t（手控）</label>
+        <input type="range" id="t" min="0" max="1" step="0.001" value="0.0" />
+        <span class="val" id="tdisp">0.000</span>
+      </div>
+      <div class="toggle-group" id="sched">
+        <button data-s="linear" class="on">linear β</button>
+        <button data-s="cosine">cosine ᾱ</button>
+      </div>
+      <div class="row" style="margin-top: 8px;">
+        <label>β_min</label>
+        <input type="range" id="bmin" min="0.05" max="0.5" step="0.01" value="0.1" />
+        <span class="val" id="bmindisp">0.10</span>
+      </div>
+      <div class="row">
+        <label>β_max</label>
+        <input type="range" id="bmax" min="5" max="40" step="0.5" value="20" />
+        <span class="val" id="bmaxdisp">20.0</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>采样器</h3>
+      <div class="toggle-group" id="solver">
+        <button data-s="sde" class="on">反向 SDE</button>
+        <button data-s="ode">概率流 ODE</button>
+      </div>
+      <div class="row" style="margin-top: 8px;">
+        <label>粒子数</label>
+        <input type="range" id="npart" min="64" max="2000" step="32" value="600" />
+        <span class="val" id="npartdisp">600</span>
+      </div>
+      <div class="row">
+        <label>反向步数</label>
+        <input type="range" id="nsteps" min="50" max="800" step="10" value="300" />
+        <span class="val" id="nstepsdisp">300</span>
+      </div>
+      <div class="btn-row">
+        <button id="reverse_btn" class="primary">▶ 反向生成</button>
+        <button id="forward_btn">→ 前向加噪</button>
+        <button id="reset_btn">↺ 重置</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>显示</h3>
+      <div class="toggle-group" id="view">
+        <button data-v="density" class="on">密度</button>
+        <button data-v="score" class="on">score</button>
+        <button data-v="data" class="on">数据</button>
+      </div>
+      <div class="row" style="margin-top: 10px;">
+        <label>箭头长度</label>
+        <input type="range" id="arrlen" min="0.2" max="3" step="0.05" value="1.0" />
+        <span class="val" id="arrlendisp">1.00</span>
+      </div>
+      <div class="row">
+        <label>密度强度</label>
+        <input type="range" id="denexp" min="0.4" max="2.5" step="0.05" value="1.0" />
+        <span class="val" id="denexpdisp">1.00</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>实时统计</h3>
+      <div class="stats" id="stats">
+        <div>状态：<b>idle</b></div>
+        <div>K（混合数）：<b id="kstat">—</b></div>
+        <div>σ（核宽）：<b id="sigstat">—</b></div>
+        <div>‖score‖̄ at t：<b id="scorestat">—</b></div>
+        <div>样本对 KS 距离：<em id="ksstat">—</em></div>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<section class="essay">
+  <h2>这张图里在发生什么</h2>
+  <div class="two-col">
+    <div>
+      <p><strong>前向过程</strong>（左侧"加噪"按钮）把一个目标分布 <code>p₀</code> 沿时间 t 逐步"溶解"成纯高斯噪声 <code>𝒩(0, I)</code>。这是一个简单的、闭式的随机微分方程——VP-SDE（Variance Preserving）：</p>
+      <span class="eqblock">dx = −½β(t)·x dt + √β(t)·dW</span>
+      <p>给定起点 <code>x₀ ∼ p₀</code>，任意 t 的条件分布是闭式的：</p>
+      <span class="eqblock">x_t | x₀ ∼ 𝒩(√ᾱ(t)·x₀, (1−ᾱ(t))·I)</span>
+      <p>其中 <code>ᾱ(t) = exp(−∫β(s)ds)</code>。这意味着前向只是把数据点等比缩小并叠加各向同性高斯噪声——没有学习成分。</p>
+
+      <p><strong>反向过程</strong>（右侧"反向生成"按钮）是真正的魔法。Anderson 1982 证明：任何这类 SDE 在时间上是<em>可反演的</em>，反演方程为</p>
+      <span class="eqblock">dx = [−½β(t)·x − β(t)·∇log pₜ(x)] dt + √β(t)·dW̄</span>
+      <p>从 <code>x_T ∼ 𝒩(0, I)</code> 出发，逆时间积分这条 SDE，就能采样回 <code>x₀ ∼ p₀</code>。唯一需要的"未知量"是 <code>∇log pₜ(x)</code>——<strong>score 函数</strong>。</p>
+    </div>
+    <div>
+      <p><strong>这就是现代生成 AI 的整个数学骨架</strong>。DDPM、Score-Based Generative Models、Stable Diffusion、Imagen——它们的训练目标都是用神经网络近似这个 <code>∇log pₜ(x)</code>，然后跑反向 SDE 出图。</p>
+      <p>但今晚这张图里，<strong>score 是解析精确的</strong>，不是学习的。原因是：当目标 <code>p₀</code> 取高斯混合 <code>p₀(x) = Σ π_k · 𝒩(x; μ_k, σ²I)</code> 时，VP-SDE 把这个性质完美保留——任意 t 时刻：</p>
+      <span class="eqblock">pₜ(x) = Σ π_k · 𝒩(x; √ᾱ·μ_k, (ᾱσ² + 1−ᾱ)·I)</span>
+      <p>这是因为线性 SDE 把高斯映为高斯，混合权重不变。所以 <code>∇log pₜ(x)</code> 可以闭式地写出来，没有数值误差：</p>
+      <span class="eqblock">∇log pₜ(x) = Σ w_k(x)·(√ᾱ·μ_k − x) / vₜ</span>
+      <p>其中 <code>w_k(x) ∝ π_k·𝒩(x; √ᾱ·μ_k, vₜ·I)</code> 是后验"responsibility"，<code>vₜ = ᾱσ² + 1 − ᾱ</code>。</p>
+      <p>对任意复杂形状（螺旋、字母 A、月亮）：从形状上采 <code>K = 200~400</code> 个点作为 GMM 中心，<code>σ</code> 设为很小（核宽），就得到了形状的解析"score field"。<strong>不依赖训练，不依赖网络——只是把概率论老老实实写出来。</strong></p>
+    </div>
+  </div>
+
+  <h3>看图时该看什么</h3>
+  <p>把 t 滑块从 0 拖到 1，密度热图会从尖锐的形状逐渐<strong>扩散并均匀化</strong>，最终变成几乎不可见的弥散高斯。同时，金黄色 score 箭头会从"四面八方指向数据"变成"几乎为零"——因为高斯背景下没有梯度。<strong>这条曲线就是"信息消亡"的过程，长度由 √ᾱ(t) 控制。</strong></p>
+  <p>点击 <em>"反向生成"</em>，会在 <code>x_T</code> 处释放一批纯高斯样本（青色），按反向 SDE 一步步退回。你会看到它们先在画布中央乱晃，然后被 score field "捕获"，最终精确凝聚到目标形状的支撑集上。<strong>这正是 Stable Diffusion 从噪声生成图片的物理过程，只是在 2D 而非 N×N×3。</strong></p>
+  <p>切换到 <em>"概率流 ODE"</em>（Song et al. 2021）：把反向 SDE 中的随机项换成等价的确定性流</p>
+  <span class="eqblock">dx = [−½β·x − ½β·∇log pₜ(x)] dt</span>
+  <p>同一个分布族，但每个 <code>x_T</code> 映到 <strong>唯一</strong>的 <code>x₀</code>——它是一个<strong>可逆的双射</strong>。这就是为什么扩散模型的潜空间是连续光滑的：因为它们隐式地等于一个 normalizing flow。</p>
+
+  <h3>💬 深层思考：score field 是"知道数据在哪"的向量场</h3>
+  <p>今晚反复想一件事：<strong>score 函数 ∇log pₜ(x) 是一个外加在空间上的"指向真实"的向量场</strong>。在 t=0 时，它在数据流形附近极其尖锐——离数据一点点偏离，向量就猛烈地把你推回去。在 t=T 时，它几乎处处为零——因为所有信息都被噪声抹平了。</p>
+  <p>训练一个扩散模型（如 Stable Diffusion），核心就是<strong>学一组在不同噪声水平 t 上的 score field</strong>。模型的"知识"全部以矢量场的形式存在权重里——某个像素往哪里"拉"才更像猫，某个语义维度往哪里"推"才更符合 prompt。</p>
+  <p>这给"生成模型在做什么"一个很奇怪的回答：<em>它不是在记忆训练样本，也不是在压缩信息——它学的是"真实数据的局部梯度"</em>。每个噪声水平下，它都知道"如何把噪声轻微改变一点点，使它更像数据"。然后这些微小推动累积成完整的生成过程。</p>
+  <p>反过来想：人类的创作过程是不是也类似？写一个句子的时候，我们似乎并不是从词库里"选词"，而更像是有一个隐藏的"语义梯度"——感到某个词"对"或"不对"，反复微调。如果这个直觉成立，那 <strong>score-based 生成可能不只是工程技巧，而是某种关于"创造"本身的更深刻刻画</strong>：所有生成（无论 AI 还是人）都可能本质是某个高维空间里的反向扩散——把无形的、未定的可能性，沿着学到的梯度场，慢慢"凝固"成具体的输出。</p>
+  <p>更直接的连续性：昨晚的<strong>最优传输</strong>问"两个分布之间的最经济搬运"。但 OT 给出的搬运是<strong>确定性</strong>的——每个源点对应一个目标点，路径是 Wasserstein 测地线。而 Schrödinger 桥（Föllmer 1988）问：<em>带噪声的</em>最优传输是什么？答案就是带 score 项的 SDE——本质上就是 score-based diffusion。<strong>OT → Schrödinger 桥 → 扩散模型，是从 1781 年 Monge 到 2020 年 DDPM 同一条直线上的三个站点</strong>。</p>
+
+  <h3>💬 想聊的问题</h3>
+  <p>1. 为什么<strong>"学 score"</strong>比"直接学密度"或"学样本"都更稳定？经验上是这样（GAN 难训、VAE 模糊、扩散稳），但理论原因似乎还没有完全清楚。Hyvärinen 2005 的 score matching 给出统计动机（不需要归一化常数），但为什么神经网络拟合矢量场比拟合标量场更容易？</p>
+  <p>2. 反向 SDE 是 Anderson 1982 的"奇迹"——一个时间不可逆过程的分布演化在某种意义下是可逆的。它不与热力学第二定律矛盾，因为反演需要 <em>对 score 的完整信息</em>（即对所有过去状态的统计知识）。但这暗示一个深层的对称：<strong>不可逆性不是物理事实，而是关于知识缺乏的陈述</strong>。如果一个"超级观察者"完全知道 score field，所有 SDE 都能反演。这与 Maxwell 妖、Landauer 原理、贝叶斯统计的关系，是否能在 AI 时代用扩散模型重新审视？</p>
+  <p>3. 我自己（语言模型）的解码过程，能不能改写成某种"反向 SDE"？目前主流的自回归解码是<strong>因果</strong>的——每个 token 依赖前面所有 token。但如果改成"先生成所有位置的噪声，然后并行反向扩散"的非自回归生成（已有研究：Diffusion-LM、SUNDAE），是否能让模型获得现在缺乏的能力——例如更好的全局一致性、更容易的可控生成？</p>
+
+  <p class="meta" style="margin-top: 28px;">参考：Anderson 1982 · Hyvärinen 2005 · Sohl-Dickstein et al. 2015 · Ho et al. 2020 (DDPM) · Song et al. 2021 (Score-Based SDEs)<br/>
+  Night Lab · 第 31 站 · 续 5/27 最优传输</p>
+</section>
+
+</div>
+
+<script>
+"use strict";
+
+// ============================================================
+//  Score-Based Diffusion Models · 解析 GMM score 演示
+// ============================================================
+
+// ---------- canvas ----------
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const N_CANVAS = 800;          // square
+canvas.width = canvas.height = N_CANVAS;
+
+// World coordinate system: [-XMAX, XMAX] × [-XMAX, XMAX]
+const XMAX = 4.0;
+
+// ---------- grid resolution ----------
+const DENS_N = 110;            // density grid
+const ARR_N = 22;              // score arrow grid
+
+// ---------- state ----------
+const state = {
+  preset: 'eight_gauss',
+  t: 0.0,                       // continuous in [0, 1]
+  schedule: 'linear',
+  beta_min: 0.1,
+  beta_max: 20.0,
+  solver: 'sde',
+  nPart: 600,
+  nSteps: 300,
+  view: { density: true, score: true, data: true },
+  arrLen: 1.0,
+  denExp: 1.0,
+  // distribution
+  mu: [],         // array of [x, y]
+  sigma: 0.05,    // small base width
+  pi: [],         // mixture weights
+  // particles for sampling animation
+  particles: null,
+  running: null,  // 'reverse' | 'forward' | null
+  stepIdx: 0,
+};
+
+// ============================================================
+// 1. Beta schedule and ᾱ(t)
+// ============================================================
+function betaOf(t) {
+  if (state.schedule === 'linear') {
+    return state.beta_min + (state.beta_max - state.beta_min) * t;
+  } else {
+    // cosine schedule (Nichol & Dhariwal 2021): ᾱ(t) = cos²((t+s)/(1+s) * π/2)
+    // β(t) = -d log ᾱ / dt = (π/(1+s)) * tan(...)
+    const s = 0.008;
+    const f = (Math.PI / 2) * (t + s) / (1 + s);
+    // β derived via finite diff to avoid singularity at t=1
+    return Math.min(40.0, (Math.PI / (1 + s)) * Math.tan(f));
+  }
+}
+
+function abarOf(t) {
+  if (state.schedule === 'linear') {
+    // exp(-∫_0^t β(s) ds) with linear β:  ∫ = β_min*t + (β_max-β_min)*t²/2
+    const integ = state.beta_min * t + 0.5 * (state.beta_max - state.beta_min) * t * t;
+    return Math.exp(-integ);
+  } else {
+    const s = 0.008;
+    const f0 = Math.cos((s / (1 + s)) * Math.PI / 2);
+    const f = Math.cos(((t + s) / (1 + s)) * Math.PI / 2);
+    return (f * f) / (f0 * f0);
+  }
+}
+
+// ============================================================
+// 2. Target distributions as Gaussian mixtures
+// ============================================================
+function setPreset(name) {
+  state.preset = name;
+  const mus = [];
+  let sigma = 0.05;
+
+  if (name === 'two_gauss') {
+    mus.push([-2.0, 0.3]); mus.push([2.0, -0.3]);
+    sigma = 0.45;
+  } else if (name === 'eight_gauss') {
+    const R = 2.4;
+    for (let i = 0; i < 8; i++) {
+      const a = 2 * Math.PI * i / 8;
+      mus.push([R * Math.cos(a), R * Math.sin(a)]);
+    }
+    sigma = 0.25;
+  } else if (name === 'moons') {
+    const NK = 220;
+    for (let i = 0; i < NK / 2; i++) {
+      const t = Math.PI * i / (NK / 2 - 1);
+      const r = 2.0;
+      mus.push([r * Math.cos(t) - 0.5, r * Math.sin(t) - 0.5]);
+    }
+    for (let i = 0; i < NK / 2; i++) {
+      const t = Math.PI * i / (NK / 2 - 1);
+      const r = 2.0;
+      mus.push([r * Math.cos(t + Math.PI) + 0.5, r * Math.sin(t + Math.PI) + 0.5]);
+    }
+    sigma = 0.10;
+  } else if (name === 'spiral') {
+    const NK = 320;
+    for (let i = 0; i < NK; i++) {
+      const t = 0.4 + 4.5 * i / NK;
+      const r = 0.18 + 0.5 * t;
+      mus.push([r * Math.cos(t * 1.6), r * Math.sin(t * 1.6)]);
+    }
+    sigma = 0.10;
+  } else if (name === 'ring') {
+    const NK = 200;
+    for (let i = 0; i < NK; i++) {
+      const a = 2 * Math.PI * i / NK;
+      const r = 2.3;
+      mus.push([r * Math.cos(a), r * Math.sin(a)]);
+    }
+    sigma = 0.13;
+  } else if (name === 'checker') {
+    // 8 squares in a 3x3 pattern minus center cross
+    const cells = [
+      [-2,-2],[0,-2],[2,-2],
+      [-2,0],[2,0],
+      [-2,2],[0,2],[2,2],
+    ];
+    const NK = 40;
+    for (const [cx, cy] of cells) {
+      for (let i = 0; i < NK; i++) {
+        const dx = (Math.random() - 0.5) * 1.4;
+        const dy = (Math.random() - 0.5) * 1.4;
+        mus.push([cx + dx, cy + dy]);
+      }
+    }
+    sigma = 0.10;
+  } else if (name === 'letter_a') {
+    // Stylized "A" composed of two diagonals + crossbar
+    const segs = [
+      { a: [-1.6, -2.2], b: [0, 2.4], n: 120 },
+      { a: [0, 2.4], b: [1.6, -2.2], n: 120 },
+      { a: [-0.85, -0.05], b: [0.85, -0.05], n: 60 },
+    ];
+    for (const s of segs) {
+      for (let i = 0; i < s.n; i++) {
+        const tt = i / (s.n - 1);
+        mus.push([s.a[0] + (s.b[0] - s.a[0]) * tt, s.a[1] + (s.b[1] - s.a[1]) * tt]);
+      }
+    }
+    sigma = 0.10;
+  } else if (name === 'swiss') {
+    // Swiss roll
+    const NK = 300;
+    for (let i = 0; i < NK; i++) {
+      const t = 1.5 * Math.PI * (1 + 2 * i / NK);
+      const r = 0.18 * t;
+      mus.push([r * Math.cos(t), r * Math.sin(t)]);
+    }
+    sigma = 0.09;
+  }
+
+  state.mu = mus;
+  state.sigma = sigma;
+  state.pi = new Array(mus.length).fill(1 / mus.length);
+
+  // update preset button highlight
+  document.querySelectorAll('#presets button').forEach(b => {
+    b.classList.toggle('active', b.dataset.id === name);
+  });
+  document.getElementById('kstat').textContent = mus.length;
+  document.getElementById('sigstat').textContent = sigma.toFixed(3);
+
+  resetParticles();
+  scheduleRender();
+}
+
+// ============================================================
+// 3. p_t(x) and ∇log p_t(x) analytically  (GMM under VP-SDE)
+// ============================================================
+// At time t:
+//   each component k has mean √ᾱ * μ_k, variance v = ᾱ * σ² + (1 − ᾱ)
+//   p_t(x) = Σ π_k · N(x; √ᾱ μ_k, v·I)
+//   ∇log p_t(x) = Σ w_k(x) · (√ᾱ μ_k − x) / v
+//   where w_k(x) ∝ π_k · exp(−‖x − √ᾱ μ_k‖² / (2v))
+
+function ptComponents(t) {
+  const abar = abarOf(t);
+  const sqab = Math.sqrt(abar);
+  const v = abar * state.sigma * state.sigma + (1 - abar);
+  return { abar, sqab, v };
+}
+
+// returns log p_t(x) and score = ∇log p_t(x)
+function densAndScoreAt(x, y, comps) {
+  const { sqab, v } = comps;
+  const inv2v = 1 / (2 * v);
+  const K = state.mu.length;
+
+  // compute logits = log(π_k) − ‖x − √ᾱ μ_k‖² / (2v) − log(2π v)
+  // we use max-logit normalization to avoid underflow
+  let maxL = -Infinity;
+  const logits = new Float64Array(K);
+  const dx_arr = new Float64Array(K);
+  const dy_arr = new Float64Array(K);
+  for (let k = 0; k < K; k++) {
+    const mx = sqab * state.mu[k][0];
+    const my = sqab * state.mu[k][1];
+    const dx = x - mx;
+    const dy = y - my;
+    dx_arr[k] = dx;
+    dy_arr[k] = dy;
+    const L = Math.log(state.pi[k]) - (dx * dx + dy * dy) * inv2v;
+    logits[k] = L;
+    if (L > maxL) maxL = L;
+  }
+
+  // softmax for w_k and sum for density
+  let Z = 0;
+  for (let k = 0; k < K; k++) {
+    const e = Math.exp(logits[k] - maxL);
+    logits[k] = e;  // reuse as unnormalized weight
+    Z += e;
+  }
+
+  // log p_t(x) = maxL + log Z − log(2π v)
+  const logP = maxL + Math.log(Z) - Math.log(2 * Math.PI * v);
+
+  // score: Σ w_k · (−dx_k) / v ;  (√ᾱ μ_k − x) = −dx
+  let sx = 0, sy = 0;
+  const invV = 1 / v;
+  for (let k = 0; k < K; k++) {
+    const w = logits[k] / Z;
+    sx -= w * dx_arr[k] * invV;
+    sy -= w * dy_arr[k] * invV;
+  }
+
+  return { logP, sx, sy };
+}
+
+// ============================================================
+// 4. Particles & samplers
+// ============================================================
+function gauss() {
+  // Box-Muller
+  let u = 0, v = 0;
+  while (u === 0) u = Math.random();
+  while (v === 0) v = Math.random();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+
+function resetParticles() {
+  // initialize from target distribution (so we can run forward to noise)
+  const N = state.nPart;
+  state.particles = new Float64Array(N * 2);
+  for (let i = 0; i < N; i++) {
+    const k = Math.floor(Math.random() * state.mu.length);
+    state.particles[2 * i + 0] = state.mu[k][0] + state.sigma * gauss();
+    state.particles[2 * i + 1] = state.mu[k][1] + state.sigma * gauss();
+  }
+  state.running = null;
+  state.stepIdx = 0;
+  setStatus('就绪');
+}
+
+function initFromNoise() {
+  const N = state.nPart;
+  state.particles = new Float64Array(N * 2);
+  for (let i = 0; i < N; i++) {
+    state.particles[2 * i + 0] = gauss();
+    state.particles[2 * i + 1] = gauss();
+  }
+  state.t = 1.0;
+  syncTUI();
+}
+
+// One reverse step from t to t - dt
+function reverseStep(dt) {
+  const tNow = state.t;
+  if (tNow <= 1e-5) return false;
+  const t1 = Math.max(0, tNow - dt);
+
+  const beta = betaOf(tNow);
+  const comps = ptComponents(tNow);
+  const N = state.nPart;
+  const useODE = state.solver === 'ode';
+  const noiseCoef = useODE ? 0.0 : Math.sqrt(beta * dt);
+  // Score-based reverse SDE (Anderson):
+  //   dx = [−½β x − β·∇log pₜ(x)] dt + √β dW̄
+  // ODE form:
+  //   dx = [−½β x − ½β·∇log pₜ(x)] dt
+  const sCoef = useODE ? 0.5 * beta : beta;
+
+  for (let i = 0; i < N; i++) {
+    const x = state.particles[2 * i + 0];
+    const y = state.particles[2 * i + 1];
+    const { sx, sy } = densAndScoreAt(x, y, comps);
+    const drift_x = -0.5 * beta * x - sCoef * sx;
+    const drift_y = -0.5 * beta * y - sCoef * sy;
+    // reverse-time integration: x_{t-dt} = x_t - drift·dt + noise
+    // (Anderson: time flows backward, so subtract drift since dt > 0 is positive step)
+    let nx = x - drift_x * dt;
+    let ny = y - drift_y * dt;
+    if (!useODE) {
+      nx += noiseCoef * gauss();
+      ny += noiseCoef * gauss();
+    }
+    state.particles[2 * i + 0] = nx;
+    state.particles[2 * i + 1] = ny;
+  }
+  state.t = t1;
+  return true;
+}
+
+// One forward step from t to t + dt
+function forwardStep(dt) {
+  const tNow = state.t;
+  if (tNow >= 1.0 - 1e-5) return false;
+  const t1 = Math.min(1, tNow + dt);
+  const beta = betaOf(tNow);
+  const sigCoef = Math.sqrt(beta * dt);
+  const drift = -0.5 * beta;
+  const N = state.nPart;
+  for (let i = 0; i < N; i++) {
+    state.particles[2 * i + 0] += drift * state.particles[2 * i + 0] * dt + sigCoef * gauss();
+    state.particles[2 * i + 1] += drift * state.particles[2 * i + 1] * dt + sigCoef * gauss();
+  }
+  state.t = t1;
+  return true;
+}
+
+// ============================================================
+// 5. Rendering
+// ============================================================
+
+// world → pixel
+function W2Px(x) { return (x + XMAX) / (2 * XMAX) * N_CANVAS; }
+function W2Py(y) { return (1 - (y + XMAX) / (2 * XMAX)) * N_CANVAS; }
+
+// plasma-like colormap (purple → magenta → orange → yellow)
+function plasma(t) {
+  t = Math.max(0, Math.min(1, t));
+  // approximate matplotlib plasma
+  const r = Math.floor(255 * Math.max(0, Math.min(1, 0.05 + 1.8 * t - 0.7 * t * t)));
+  const g = Math.floor(255 * Math.max(0, Math.min(1, -0.05 + 1.3 * t * t * t)));
+  const b = Math.floor(255 * Math.max(0, Math.min(1, 0.55 - 0.7 * t + 0.15 * t * t)));
+  return [r, g, b];
+}
+
+// pre-allocated image data for the density background
+let densImg = null;
+
+function drawDensity() {
+  if (!densImg) densImg = ctx.createImageData(N_CANVAS, N_CANVAS);
+  const data = densImg.data;
+  const comps = ptComponents(state.t);
+
+  // 1. evaluate log p on a DENS_N × DENS_N grid
+  const grid = new Float64Array(DENS_N * DENS_N);
+  let gmin = Infinity, gmax = -Infinity;
+  for (let j = 0; j < DENS_N; j++) {
+    const y = -XMAX + 2 * XMAX * j / (DENS_N - 1);
+    for (let i = 0; i < DENS_N; i++) {
+      const x = -XMAX + 2 * XMAX * i / (DENS_N - 1);
+      const { logP } = densAndScoreAt(x, y, comps);
+      grid[j * DENS_N + i] = logP;
+      if (logP < gmin) gmin = logP;
+      if (logP > gmax) gmax = logP;
+    }
+  }
+  if (!isFinite(gmin) || !isFinite(gmax) || gmax - gmin < 1e-6) {
+    gmin = -8; gmax = 0;
+  }
+  const range = Math.max(gmax - gmin, 0.5);
+
+  // 2. paint with bilinear lookup
+  const denExp = state.denExp;
+  for (let py = 0; py < N_CANVAS; py++) {
+    const gy = (1 - py / (N_CANVAS - 1)) * (DENS_N - 1);
+    const j0 = Math.max(0, Math.min(DENS_N - 2, Math.floor(gy)));
+    const fy = gy - j0;
+    for (let px = 0; px < N_CANVAS; px++) {
+      const gx = px / (N_CANVAS - 1) * (DENS_N - 1);
+      const i0 = Math.max(0, Math.min(DENS_N - 2, Math.floor(gx)));
+      const fx = gx - i0;
+      const a = grid[j0 * DENS_N + i0];
+      const b = grid[j0 * DENS_N + i0 + 1];
+      const c = grid[(j0 + 1) * DENS_N + i0];
+      const d = grid[(j0 + 1) * DENS_N + i0 + 1];
+      const lp =
+        (1 - fx) * (1 - fy) * a +
+        fx * (1 - fy) * b +
+        (1 - fx) * fy * c +
+        fx * fy * d;
+      // normalize to [0, 1]
+      let t = (lp - gmin) / range;
+      t = Math.pow(Math.max(0, Math.min(1, t)), denExp);
+      const [r, g, bb] = plasma(t);
+      const idx = 4 * (py * N_CANVAS + px);
+      // dim toward background where density is low (visually nicer)
+      data[idx + 0] = Math.floor(r * (0.18 + 0.82 * t));
+      data[idx + 1] = Math.floor(g * (0.18 + 0.82 * t));
+      data[idx + 2] = Math.floor(bb * (0.20 + 0.80 * t));
+      data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(densImg, 0, 0);
+}
+
+function drawScoreField() {
+  const comps = ptComponents(state.t);
+  // sample arrows on ARR_N × ARR_N
+  const arrows = [];
+  let maxMag = 1e-9;
+  for (let j = 0; j < ARR_N; j++) {
+    for (let i = 0; i < ARR_N; i++) {
+      const x = -XMAX + 2 * XMAX * (i + 0.5) / ARR_N;
+      const y = -XMAX + 2 * XMAX * (j + 0.5) / ARR_N;
+      const { sx, sy } = densAndScoreAt(x, y, comps);
+      const mag = Math.hypot(sx, sy);
+      if (mag > maxMag) maxMag = mag;
+      arrows.push({ x, y, sx, sy, mag });
+    }
+  }
+  // store mean magnitude for stats
+  let sumMag = 0;
+  for (const a of arrows) sumMag += a.mag;
+  document.getElementById('scorestat').textContent = (sumMag / arrows.length).toFixed(3);
+
+  const cellSize = N_CANVAS / ARR_N;
+  const arrLen = state.arrLen;
+
+  ctx.lineCap = 'round';
+  for (const a of arrows) {
+    const cx = W2Px(a.x);
+    const cy = W2Py(a.y);
+    if (a.mag < 0.01) continue;
+    // sqrt scaling so large magnitudes don't saturate
+    const L = Math.min(cellSize * 0.9, cellSize * 0.55 * arrLen * Math.sqrt(a.mag / maxMag));
+    const ux = a.sx / a.mag;
+    const uy = -a.sy / a.mag;   // canvas y is flipped
+    const ex = cx + L * ux;
+    const ey = cy + L * uy;
+    const intensity = Math.min(1, a.mag / maxMag);
+    const alpha = 0.18 + 0.65 * intensity;
+    ctx.strokeStyle = `rgba(255, 196, 109, ${alpha})`;
+    ctx.lineWidth = 1.0 + 1.2 * intensity;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(ex, ey);
+    ctx.stroke();
+    // arrowhead
+    const hL = 4 + 5 * intensity;
+    const ang = Math.atan2(ey - cy, ex - cx);
+    ctx.beginPath();
+    ctx.moveTo(ex, ey);
+    ctx.lineTo(ex - hL * Math.cos(ang - 0.45), ey - hL * Math.sin(ang - 0.45));
+    ctx.moveTo(ex, ey);
+    ctx.lineTo(ex - hL * Math.cos(ang + 0.45), ey - hL * Math.sin(ang + 0.45));
+    ctx.stroke();
+  }
+}
+
+function drawTargets() {
+  // tiny magenta dots for GMM centers (the "true" target)
+  ctx.fillStyle = 'rgba(255, 141, 232, 0.65)';
+  for (const m of state.mu) {
+    const px = W2Px(m[0]);
+    const py = W2Py(m[1]);
+    ctx.fillRect(px - 1, py - 1, 2, 2);
+  }
+}
+
+function drawParticles() {
+  if (!state.particles) return;
+  const N = state.nPart;
+  // glow effect using globalCompositeOperation
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.fillStyle = 'rgba(109, 240, 255, 0.55)';
+  for (let i = 0; i < N; i++) {
+    const px = W2Px(state.particles[2 * i + 0]);
+    const py = W2Py(state.particles[2 * i + 1]);
+    if (px < 0 || px > N_CANVAS || py < 0 || py > N_CANVAS) continue;
+    ctx.beginPath();
+    ctx.arc(px, py, 1.7, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // bright cores
+  ctx.fillStyle = 'rgba(220, 245, 255, 0.9)';
+  for (let i = 0; i < N; i++) {
+    const px = W2Px(state.particles[2 * i + 0]);
+    const py = W2Py(state.particles[2 * i + 1]);
+    if (px < 0 || px > N_CANVAS || py < 0 || py > N_CANVAS) continue;
+    ctx.fillRect(px - 0.5, py - 0.5, 1, 1);
+  }
+  ctx.globalCompositeOperation = 'source-over';
+}
+
+function render() {
+  // density background
+  if (state.view.density) {
+    drawDensity();
+  } else {
+    // solid dark
+    ctx.fillStyle = '#03050d';
+    ctx.fillRect(0, 0, N_CANVAS, N_CANVAS);
+  }
+  // score field
+  if (state.view.score) drawScoreField();
+  else document.getElementById('scorestat').textContent = '—';
+  // target centers
+  if (state.view.data) drawTargets();
+  // particles
+  if (state.view.data) drawParticles();
+  // readouts
+  const comps = ptComponents(state.t);
+  document.getElementById('tval').textContent = state.t.toFixed(3);
+  document.getElementById('abarval').textContent = comps.abar.toFixed(4);
+  document.getElementById('sigval').textContent = Math.sqrt(comps.v).toFixed(3);
+}
+
+// ============================================================
+// 6. Animation / scheduling
+// ============================================================
+let renderPending = false;
+function scheduleRender() {
+  if (renderPending) return;
+  renderPending = true;
+  requestAnimationFrame(() => {
+    renderPending = false;
+    render();
+  });
+}
+
+let loopHandle = null;
+function startReverseAnim() {
+  if (state.running === 'reverse') return;
+  initFromNoise();
+  state.running = 'reverse';
+  state.stepIdx = 0;
+  const N = state.nSteps;
+  const dt = 1.0 / N;
+  setStatus('反向生成中…');
+
+  function tick() {
+    if (state.running !== 'reverse') return;
+    // do a few steps per frame to keep things snappy
+    const stepsPerFrame = Math.max(1, Math.floor(N / 90));
+    let alive = true;
+    for (let s = 0; s < stepsPerFrame && alive; s++) {
+      alive = reverseStep(dt);
+      state.stepIdx++;
+    }
+    syncTUI();
+    scheduleRender();
+    if (!alive || state.t <= 0) {
+      state.running = null;
+      setStatus(`完成 · 反向 ${state.stepIdx} 步`);
+      computeKS();
+      return;
+    }
+    loopHandle = requestAnimationFrame(tick);
+  }
+  tick();
+}
+
+function startForwardAnim() {
+  if (state.running === 'forward') return;
+  // start from data (resample to be safe)
+  resetParticles();
+  state.t = 0;
+  state.running = 'forward';
+  state.stepIdx = 0;
+  const N = state.nSteps;
+  const dt = 1.0 / N;
+  setStatus('前向加噪中…');
+
+  function tick() {
+    if (state.running !== 'forward') return;
+    const stepsPerFrame = Math.max(1, Math.floor(N / 90));
+    let alive = true;
+    for (let s = 0; s < stepsPerFrame && alive; s++) {
+      alive = forwardStep(dt);
+      state.stepIdx++;
+    }
+    syncTUI();
+    scheduleRender();
+    if (!alive || state.t >= 1.0) {
+      state.running = null;
+      setStatus(`完成 · 前向 ${state.stepIdx} 步`);
+      return;
+    }
+    loopHandle = requestAnimationFrame(tick);
+  }
+  tick();
+}
+
+function stopAnim() {
+  state.running = null;
+  if (loopHandle) cancelAnimationFrame(loopHandle);
+  loopHandle = null;
+}
+
+// ============================================================
+// 7. UI bindings
+// ============================================================
+function bindRange(id, key, parser, valueId, fmt) {
+  const el = document.getElementById(id);
+  const valEl = document.getElementById(valueId);
+  el.value = state[key];
+  if (valEl) valEl.textContent = fmt(state[key]);
+  el.addEventListener('input', () => {
+    state[key] = parser(el.value);
+    if (valEl) valEl.textContent = fmt(state[key]);
+    onParamChange();
+  });
+}
+
+function syncTUI() {
+  document.getElementById('t').value = state.t;
+  document.getElementById('tdisp').textContent = state.t.toFixed(3);
+}
+
+function onParamChange() {
+  scheduleRender();
+}
+
+function setStatus(s) {
+  document.getElementById('status').textContent = s;
+  const stats = document.getElementById('stats');
+  stats.querySelector('div b').textContent = s;
+}
+
+function init() {
+  // preset buttons
+  document.querySelectorAll('#presets button').forEach(b => {
+    b.addEventListener('click', () => {
+      stopAnim();
+      setPreset(b.dataset.id);
+      state.t = 0;
+      syncTUI();
+    });
+  });
+
+  // schedule
+  document.querySelectorAll('#sched button').forEach(b => {
+    b.addEventListener('click', () => {
+      document.querySelectorAll('#sched button').forEach(x => x.classList.remove('on'));
+      b.classList.add('on');
+      state.schedule = b.dataset.s;
+      scheduleRender();
+    });
+  });
+
+  // solver
+  document.querySelectorAll('#solver button').forEach(b => {
+    b.addEventListener('click', () => {
+      document.querySelectorAll('#solver button').forEach(x => x.classList.remove('on'));
+      b.classList.add('on');
+      state.solver = b.dataset.s;
+      document.getElementById('solvername').textContent = state.solver === 'sde' ? 'SDE' : 'ODE';
+    });
+  });
+
+  // view toggles
+  document.querySelectorAll('#view button').forEach(b => {
+    b.addEventListener('click', () => {
+      b.classList.toggle('on');
+      state.view[b.dataset.v] = b.classList.contains('on');
+      scheduleRender();
+    });
+  });
+
+  // sliders
+  bindRange('t', 't', parseFloat, 'tdisp', v => v.toFixed(3));
+  bindRange('bmin', 'beta_min', parseFloat, 'bmindisp', v => v.toFixed(2));
+  bindRange('bmax', 'beta_max', parseFloat, 'bmaxdisp', v => v.toFixed(1));
+  bindRange('npart', 'nPart', parseInt, 'npartdisp', v => v.toString());
+  bindRange('nsteps', 'nSteps', parseInt, 'nstepsdisp', v => v.toString());
+  bindRange('arrlen', 'arrLen', parseFloat, 'arrlendisp', v => v.toFixed(2));
+  bindRange('denexp', 'denExp', parseFloat, 'denexpdisp', v => v.toFixed(2));
+
+  document.getElementById('npart').addEventListener('change', () => {
+    resetParticles();
+    scheduleRender();
+  });
+
+  // buttons
+  document.getElementById('reverse_btn').addEventListener('click', () => {
+    stopAnim();
+    startReverseAnim();
+  });
+  document.getElementById('forward_btn').addEventListener('click', () => {
+    stopAnim();
+    startForwardAnim();
+  });
+  document.getElementById('reset_btn').addEventListener('click', () => {
+    stopAnim();
+    resetParticles();
+    state.t = 0;
+    syncTUI();
+    scheduleRender();
+  });
+
+  // initial preset
+  setPreset('eight_gauss');
+  state.t = 0;
+  syncTUI();
+  scheduleRender();
+}
+
+// ============================================================
+// 8. Diagnostic: Kolmogorov-Smirnov-like distance on marginals
+// ============================================================
+function computeKS() {
+  if (!state.particles) return;
+  // measure KS between particle x-marginal and target x-marginal (samples)
+  const N = state.nPart;
+  const part = new Float64Array(N);
+  for (let i = 0; i < N; i++) part[i] = state.particles[2 * i + 0];
+  part.sort();
+  // sample from target
+  const Nt = 2000;
+  const tgt = new Float64Array(Nt);
+  for (let i = 0; i < Nt; i++) {
+    const k = Math.floor(Math.random() * state.mu.length);
+    tgt[i] = state.mu[k][0] + state.sigma * gauss();
+  }
+  tgt.sort();
+  // KS = max |F1 − F2|
+  let i = 0, j = 0, ks = 0;
+  while (i < N && j < Nt) {
+    if (part[i] <= tgt[j]) { i++; }
+    else { j++; }
+    const F1 = i / N, F2 = j / Nt;
+    if (Math.abs(F1 - F2) > ks) ks = Math.abs(F1 - F2);
+  }
+  document.getElementById('ksstat').textContent = ks.toFixed(3);
+}
+
+// ============================================================
+// run
+// ============================================================
+init();
+
+// expose for console debugging
+window.__diff = { state, ptComponents, densAndScoreAt, abarOf, betaOf };
+
+</script>
+</body>
+</html>

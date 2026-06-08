@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>渗流相变 · Percolation Phase Transition</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #0d1117;
+  color: #e2e8f0;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+}
+h1 {
+  font-size: 1.4rem;
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  color: #94a3b8;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+.subtitle {
+  font-size: 0.78rem;
+  color: #475569;
+  margin-bottom: 20px;
+  letter-spacing: 0.05em;
+}
+.main-layout {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  max-width: 1100px;
+  width: 100%;
+}
+canvas#grid {
+  border: 1px solid #1e293b;
+  background: #080c14;
+  flex-shrink: 0;
+  image-rendering: pixelated;
+}
+.side-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 300px;
+  flex: 1;
+}
+.card {
+  background: #111827;
+  border: 1px solid #1e293b;
+  border-radius: 8px;
+  padding: 16px;
+}
+.card-title {
+  font-size: 0.72rem;
+  color: #64748b;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.slider-label {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  width: 16px;
+  text-align: right;
+}
+input[type=range] {
+  -webkit-appearance: none;
+  flex: 1;
+  height: 4px;
+  background: #1e293b;
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fbbf24;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.slider-val {
+  font-size: 0.9rem;
+  color: #fbbf24;
+  width: 52px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.pc-marker {
+  font-size: 0.72rem;
+  color: #f87171;
+  text-align: center;
+  margin-top: 4px;
+  letter-spacing: 0.05em;
+}
+canvas#hist {
+  width: 100%;
+  border-radius: 4px;
+  background: #0d1117;
+}
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.stat-item {
+  background: #0d1117;
+  border-radius: 6px;
+  padding: 10px;
+  text-align: center;
+}
+.stat-val {
+  font-size: 1.3rem;
+  color: #fbbf24;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+.stat-label {
+  font-size: 0.65rem;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-top: 2px;
+}
+.stat-val.spanning { color: #fb923c; }
+.stat-val.no-span  { color: #94a3b8; }
+.legend {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.7rem;
+  color: #64748b;
+}
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+canvas#pinfty {
+  width: 100%;
+  background: #0d1117;
+  border-radius: 4px;
+  margin-top: 6px;
+}
+.insight {
+  font-size: 0.75rem;
+  color: #475569;
+  line-height: 1.7;
+  margin-top: 8px;
+  border-left: 2px solid #1e293b;
+  padding-left: 10px;
+}
+.insight em { color: #94a3b8; font-style: normal; }
+.btn-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+button {
+  flex: 1;
+  background: #1e293b;
+  border: 1px solid #334155;
+  color: #94a3b8;
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 0.75rem;
+  font-family: inherit;
+  cursor: pointer;
+  letter-spacing: 0.05em;
+  transition: all 0.15s;
+}
+button:hover { background: #263548; color: #e2e8f0; }
+button.active { background: #1d3a2a; border-color: #16a34a; color: #4ade80; }
+</style>
+</head>
+<body>
+<h1>渗流相变</h1>
+<div class="subtitle">Percolation Phase Transition · 200×200 Site Percolation · Square Lattice</div>
+
+<div class="main-layout">
+  <canvas id="grid" width="600" height="600"></canvas>
+
+  <div class="side-panel">
+
+    <div class="card">
+      <div class="card-title">控制</div>
+      <div class="slider-row">
+        <span class="slider-label">p</span>
+        <input type="range" id="pSlider" min="0" max="1" step="0.001" value="0.59">
+        <span class="slider-val" id="pVal">0.590</span>
+      </div>
+      <div class="pc-marker">临界点 p<sub>c</sub> ≈ 0.5927 (精确值由 SLE₆ 确定)</div>
+      <div class="btn-row" style="margin-top:10px">
+        <button id="btnResample">重新采样 ↻</button>
+        <button id="btnAnimate" class="active">动画扫描</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">当前状态</div>
+      <div class="stats-grid">
+        <div class="stat-item">
+          <div class="stat-val" id="spanSize">—</div>
+          <div class="stat-label">跨越团簇大小</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-val" id="pInfty">—</div>
+          <div class="stat-label">P∞ 占比</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-val" id="numClusters">—</div>
+          <div class="stat-label">团簇数量</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-val" id="spanStatus">—</div>
+          <div class="stat-label">跨越状态</div>
+        </div>
+      </div>
+      <div class="legend" style="margin-top:12px">
+        <div class="legend-item"><div class="legend-dot" style="background:#fb923c"></div>跨越团簇</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div>大团簇</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#1e4a6e"></div>小团簇</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#0f172a"></div>空位点</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">团簇大小分布（对数-对数）</div>
+      <canvas id="hist" width="280" height="140"></canvas>
+      <div class="insight">
+        在临界点 <em>p = p<sub>c</sub></em>，分布服从幂律 <em>P(s) ~ s<sup>−τ</sup></em>，指数 <em>τ = 187/91 ≈ 2.055</em>。这是一个精确有理数——由共形场论的 Coulomb 气体形式给出。
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">序参数 P∞(p)（实测 + 理论）</div>
+      <canvas id="pinfty" width="280" height="120"></canvas>
+      <div class="insight">
+        蓝点：模拟实测。黄线：理论 <em>P∞ ~ (p−p<sub>c</sub>)<sup>β</sup></em>，<em>β = 5/36 ≈ 0.139</em>——另一个精确有理数。相变在 <em>p<sub>c</sub></em> 处连续但不可解析。
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ─── Union-Find ──────────────────────────────────────────────────────────────
+class UF {
+  constructor(n) {
+    this.p = Int32Array.from({length:n}, (_,i)=>i);
+    this.r = new Int32Array(n);
+    this.sz = new Int32Array(n).fill(1);
+  }
+  find(x) {
+    while (this.p[x] !== x) { this.p[x] = this.p[this.p[x]]; x = this.p[x]; }
+    return x;
+  }
+  union(a, b) {
+    let ra = this.find(a), rb = this.find(b);
+    if (ra === rb) return;
+    if (this.r[ra] < this.r[rb]) { let t=ra; ra=rb; rb=t; }
+    this.p[rb] = ra;
+    this.sz[ra] += this.sz[rb];
+    if (this.r[ra] === this.r[rb]) this.r[ra]++;
+  }
+}
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+const N = 200;         // grid size
+const PC = 0.5927;     // critical probability
+const BETA = 5/36;     // critical exponent (exact)
+const TAU  = 187/91;   // Fisher exponent   (exact)
+
+// ─── State ────────────────────────────────────────────────────────────────────
+let p = 0.59;
+let grid = null;       // Uint8Array, 1=occupied 0=empty
+let labels = null;     // Int32Array, root of cluster
+let spanRoot = -1;     // root of spanning cluster (-1 = none)
+let clusterSizes = {}; // root → size (only occupied)
+let animating = false;
+let animDir = 1;
+let animTimer = null;
+let pHistory = [];     // [{p, pInf}] for the P∞ chart
+
+// ─── Generate & Label ─────────────────────────────────────────────────────────
+function build(prob) {
+  const n2 = N*N;
+  const g  = new Uint8Array(n2);
+  for (let i=0; i<n2; i++) g[i] = Math.random() < prob ? 1 : 0;
+
+  const uf = new UF(n2);
+  for (let r=0; r<N; r++) {
+    for (let c=0; c<N; c++) {
+      const i = r*N+c;
+      if (!g[i]) continue;
+      if (r>0 && g[i-N]) uf.union(i, i-N);
+      if (c>0 && g[i-1]) uf.union(i, i-1);
+    }
+  }
+
+  // Find spanning roots: appear in both top and bottom row
+  const topRoots = new Set();
+  const botRoots = new Set();
+  for (let c=0; c<N; c++) {
+    if (g[c])     topRoots.add(uf.find(c));
+    if (g[(N-1)*N+c]) botRoots.add(uf.find((N-1)*N+c));
+  }
+  // also check left/right for robustness
+  const leftRoots = new Set();
+  const rightRoots = new Set();
+  for (let r=0; r<N; r++) {
+    if (g[r*N])     leftRoots.add(uf.find(r*N));
+    if (g[r*N+N-1]) rightRoots.add(uf.find(r*N+N-1));
+  }
+
+  let sr = -1;
+  let srSize = 0;
+  for (const root of topRoots) {
+    if (botRoots.has(root) || (leftRoots.has(root) && rightRoots.has(root))) {
+      if (uf.sz[root] > srSize) { srSize = uf.sz[root]; sr = root; }
+    }
+  }
+
+  // Build sizes map for occupied sites
+  const sizes = {};
+  for (let i=0; i<n2; i++) {
+    if (g[i]) {
+      const r2 = uf.find(i);
+      sizes[r2] = uf.sz[r2];
+    }
+  }
+
+  // Build label array (roots)
+  const lbl = new Int32Array(n2);
+  for (let i=0; i<n2; i++) lbl[i] = g[i] ? uf.find(i) : -1;
+
+  return { g, lbl, sr, sizes };
+}
+
+// ─── Color mapping ───────────────────────────────────────────────────────────
+// Map log(size) → hue, avoiding orange (reserved for spanning)
+function sizeToColor(sz, isSpan) {
+  if (isSpan) return [251, 146, 60];  // amber/orange
+  const logMax = Math.log(N*N);
+  const t = Math.min(1, Math.log(Math.max(1, sz)) / logMax);
+  // Blue gradient: small=dark, large=bright blue/cyan
+  const r = Math.round(15 + t * 20);
+  const g2 = Math.round(30 + t * 100);
+  const b2 = Math.round(80 + t * 170);
+  return [r, g2, b2];
+}
+
+// ─── Render grid ──────────────────────────────────────────────────────────────
+const gridCanvas = document.getElementById('grid');
+const ctx = gridCanvas.getContext('2d');
+
+function render() {
+  const cellPx = gridCanvas.width / N;  // = 3
+  const imgData = ctx.createImageData(gridCanvas.width, gridCanvas.height);
+  const data = imgData.data;
+
+  for (let r=0; r<N; r++) {
+    for (let c=0; c<N; c++) {
+      const i = r*N+c;
+      const lbl = labels[i];
+      let color;
+      if (lbl === -1) {
+        color = [8, 12, 20];  // empty
+      } else {
+        const sz = clusterSizes[lbl] || 1;
+        color = sizeToColor(sz, lbl === spanRoot);
+      }
+      // fill cellPx×cellPx block
+      for (let dr=0; dr<cellPx; dr++) {
+        for (let dc=0; dc<cellPx; dc++) {
+          const px = ((r*cellPx+dr)*gridCanvas.width + (c*cellPx+dc))*4;
+          data[px]   = color[0];
+          data[px+1] = color[1];
+          data[px+2] = color[2];
+          data[px+3] = 255;
+        }
+      }
+    }
+  }
+  ctx.putImageData(imgData, 0, 0);
+
+  // Draw p_c line
+  const xPc = Math.round(PC * (gridCanvas.width-1));
+  ctx.strokeStyle = 'rgba(248,113,113,0.0)'; // invisible on grid, shown in slider
+}
+
+// ─── Stats ────────────────────────────────────────────────────────────────────
+function updateStats() {
+  const totalOccupied = grid.reduce((a,b)=>a+b, 0);
+  const spanSz = spanRoot !== -1 ? (clusterSizes[spanRoot]||0) : 0;
+  const pInf = totalOccupied > 0 ? spanSz / (N*N) : 0;
+  const numClus = Object.keys(clusterSizes).length;
+
+  document.getElementById('spanSize').textContent =
+    spanSz > 0 ? spanSz.toLocaleString() : '—';
+  document.getElementById('pInfty').textContent =
+    spanSz > 0 ? pInf.toFixed(3) : '0.000';
+  document.getElementById('numClusters').textContent = numClus.toLocaleString();
+  const ss = document.getElementById('spanStatus');
+  if (spanRoot !== -1) {
+    ss.textContent = '已跨越';
+    ss.className = 'stat-val spanning';
+  } else {
+    ss.textContent = '未跨越';
+    ss.className = 'stat-val no-span';
+  }
+
+  // Record for P∞ chart
+  pHistory.push({ p, pInf });
+  if (pHistory.length > 200) pHistory.shift();
+
+  drawHistogram();
+  drawPinfty(pInf);
+}
+
+// ─── Histogram ───────────────────────────────────────────────────────────────
+const histCanvas = document.getElementById('hist');
+const hctx = histCanvas.getContext('2d');
+
+function drawHistogram() {
+  const W = histCanvas.width, H = histCanvas.height;
+  hctx.clearRect(0,0,W,H);
+  hctx.fillStyle = '#0d1117';
+  hctx.fillRect(0,0,W,H);
+
+  // Build histogram of log10(size)
+  const bins = 20;
+  const counts = new Float32Array(bins);
+  let maxSz = 1;
+  const sizes = Object.values(clusterSizes).filter(s => s < (spanRoot !== -1 ? clusterSizes[spanRoot] : Infinity));
+  for (const s of sizes) if (s > maxSz) maxSz = s;
+
+  const logMax = Math.log10(Math.max(maxSz, 2));
+  for (const s of sizes) {
+    const b = Math.min(bins-1, Math.floor(Math.log10(Math.max(1,s)) / logMax * bins));
+    counts[b]++;
+  }
+
+  const maxCount = Math.max(...counts, 1);
+  const pad = {l:30, r:10, t:10, b:25};
+  const plotW = W - pad.l - pad.r;
+  const plotH = H - pad.t - pad.b;
+
+  // Grid lines
+  hctx.strokeStyle = '#1e293b';
+  hctx.lineWidth = 1;
+  for (let i=0; i<=4; i++) {
+    const y = pad.t + plotH * (1 - i/4);
+    hctx.beginPath(); hctx.moveTo(pad.l, y); hctx.lineTo(pad.l+plotW, y); hctx.stroke();
+  }
+
+  // Bars
+  const bw = plotW / bins;
+  for (let b=0; b<bins; b++) {
+    if (counts[b] === 0) continue;
+    const logCount = Math.log10(Math.max(1, counts[b]));
+    const logMaxCount = Math.log10(Math.max(1, maxCount));
+    const h = plotH * (logCount / Math.max(logMaxCount, 1));
+    const x = pad.l + b * bw;
+    const y = pad.t + plotH - h;
+
+    // Color by position (small=dark, large=bright)
+    const t = b / bins;
+    hctx.fillStyle = `rgb(${Math.round(15+t*20)},${Math.round(30+t*100)},${Math.round(80+t*170)})`;
+    hctx.fillRect(x+1, y, bw-2, h);
+  }
+
+  // Power-law reference line P(s) ~ s^{-τ} → log P = -τ log s + C
+  if (sizes.length > 10) {
+    hctx.beginPath();
+    hctx.strokeStyle = 'rgba(251,191,36,0.7)';
+    hctx.lineWidth = 1.5;
+    hctx.setLineDash([4,3]);
+    let first = true;
+    for (let b=0; b<bins; b++) {
+      const logS = (b+0.5)/bins * logMax;
+      const logP = -TAU * logS;
+      // normalize so that at b=1 it matches counts[1] if nonzero
+      const refLog = logP + (counts[1] > 0 ? Math.log10(counts[1]) + TAU * (1.5/bins*logMax) : 0);
+      const refNorm = refLog / Math.log10(Math.max(1, maxCount));
+      const y = pad.t + plotH * (1 - refNorm);
+      const x = pad.l + (b+0.5)*bw;
+      if (y > pad.t && y < pad.t+plotH) {
+        if (first) { hctx.moveTo(x,y); first=false; }
+        else hctx.lineTo(x,y);
+      }
+    }
+    hctx.stroke();
+    hctx.setLineDash([]);
+  }
+
+  // Axes
+  hctx.strokeStyle = '#334155';
+  hctx.lineWidth = 1;
+  hctx.beginPath();
+  hctx.moveTo(pad.l, pad.t); hctx.lineTo(pad.l, pad.t+plotH);
+  hctx.lineTo(pad.l+plotW, pad.t+plotH);
+  hctx.stroke();
+
+  // Labels
+  hctx.fillStyle = '#475569';
+  hctx.font = '9px monospace';
+  hctx.textAlign = 'center';
+  hctx.fillText('1', pad.l, pad.t+plotH+12);
+  hctx.fillText('10', pad.l+plotW*0.33, pad.t+plotH+12);
+  hctx.fillText('100', pad.l+plotW*0.66, pad.t+plotH+12);
+  hctx.fillText('N²', pad.l+plotW, pad.t+plotH+12);
+  hctx.fillStyle = '#475569';
+  hctx.textAlign = 'right';
+  hctx.fillText('log s', pad.l+plotW, pad.t+plotH+22);
+
+  // Legend
+  hctx.fillStyle = 'rgba(251,191,36,0.7)';
+  hctx.textAlign = 'right';
+  hctx.font = '9px monospace';
+  hctx.fillText('s⁻²·⁰⁵⁵', W-2, pad.t+12);
+}
+
+// ─── P∞ chart ──────────────────────────────────────────────────────────────
+const piCanvas = document.getElementById('pinfty');
+const pctx = piCanvas.getContext('2d');
+
+function theoreticalPInf(prob) {
+  if (prob <= PC) return 0;
+  return Math.pow(Math.max(0, (prob - PC) / (1 - PC)), BETA);
+}
+
+function drawPinfty(currentPInf) {
+  const W = piCanvas.width, H = piCanvas.height;
+  pctx.clearRect(0,0,W,H);
+  pctx.fillStyle = '#0d1117';
+  pctx.fillRect(0,0,W,H);
+
+  const pad = {l:30, r:10, t:8, b:22};
+  const plotW = W - pad.l - pad.r;
+  const plotH = H - pad.t - pad.b;
+
+  // Grid
+  pctx.strokeStyle = '#1e293b';
+  pctx.lineWidth = 1;
+  for (let i=0; i<=4; i++) {
+    const y = pad.t + plotH * i/4;
+    pctx.beginPath(); pctx.moveTo(pad.l,y); pctx.lineTo(pad.l+plotW,y); pctx.stroke();
+  }
+
+  // p_c vertical line
+  const xpc = pad.l + (PC) * plotW;
+  pctx.strokeStyle = 'rgba(248,113,113,0.5)';
+  pctx.lineWidth = 1;
+  pctx.setLineDash([3,3]);
+  pctx.beginPath(); pctx.moveTo(xpc, pad.t); pctx.lineTo(xpc, pad.t+plotH); pctx.stroke();
+  pctx.setLineDash([]);
+
+  // Theoretical curve
+  pctx.beginPath();
+  pctx.strokeStyle = 'rgba(251,191,36,0.8)';
+  pctx.lineWidth = 1.5;
+  let first = true;
+  for (let i=0; i<=200; i++) {
+    const prob = i/200;
+    const th = theoreticalPInf(prob);
+    const x = pad.l + prob * plotW;
+    const y = pad.t + plotH * (1 - th);
+    if (first) { pctx.moveTo(x,y); first=false; }
+    else pctx.lineTo(x,y);
+  }
+  pctx.stroke();
+
+  // Historical dots
+  for (const d of pHistory) {
+    const x = pad.l + d.p * plotW;
+    const y = pad.t + plotH * (1 - Math.min(1, d.pInf));
+    pctx.fillStyle = 'rgba(96,165,250,0.7)';
+    pctx.beginPath();
+    pctx.arc(x, y, 2.5, 0, Math.PI*2);
+    pctx.fill();
+  }
+
+  // Current point
+  const xc = pad.l + p * plotW;
+  const yc = pad.t + plotH * (1 - Math.min(1, currentPInf));
+  pctx.fillStyle = '#3b82f6';
+  pctx.beginPath();
+  pctx.arc(xc, yc, 4, 0, Math.PI*2);
+  pctx.fill();
+
+  // Axes
+  pctx.strokeStyle = '#334155';
+  pctx.lineWidth = 1;
+  pctx.beginPath();
+  pctx.moveTo(pad.l, pad.t); pctx.lineTo(pad.l, pad.t+plotH);
+  pctx.lineTo(pad.l+plotW, pad.t+plotH);
+  pctx.stroke();
+
+  // Labels
+  pctx.fillStyle = '#475569';
+  pctx.font = '9px monospace';
+  pctx.textAlign = 'center';
+  pctx.fillText('0', pad.l, pad.t+plotH+12);
+  pctx.fillText('p_c', xpc, pad.t+plotH+12);
+  pctx.fillText('1', pad.l+plotW, pad.t+plotH+12);
+  pctx.textAlign = 'right';
+  pctx.fillStyle = '#475569';
+  pctx.fillText('1', pad.l-2, pad.t+5);
+  pctx.fillText('0', pad.l-2, pad.t+plotH);
+
+  // Legend
+  pctx.fillStyle = 'rgba(251,191,36,0.8)';
+  pctx.textAlign = 'right';
+  pctx.font = '9px monospace';
+  pctx.fillText('(p−p_c)^β', W-2, pad.t+11);
+  pctx.fillStyle = 'rgba(96,165,250,0.8)';
+  pctx.fillText('实测', W-2, pad.t+23);
+}
+
+// ─── Main update ─────────────────────────────────────────────────────────────
+function update(prob) {
+  p = prob;
+  const result = build(p);
+  grid = result.g;
+  labels = result.lbl;
+  spanRoot = result.sr;
+  clusterSizes = result.sizes;
+  render();
+  updateStats();
+}
+
+// ─── Controls ─────────────────────────────────────────────────────────────────
+const pSlider = document.getElementById('pSlider');
+const pVal = document.getElementById('pVal');
+
+pSlider.addEventListener('input', () => {
+  p = parseFloat(pSlider.value);
+  pVal.textContent = p.toFixed(3);
+  update(p);
+});
+
+document.getElementById('btnResample').addEventListener('click', () => {
+  update(p);
+});
+
+let animRunning = false;
+const btnAnimate = document.getElementById('btnAnimate');
+btnAnimate.addEventListener('click', () => {
+  animRunning = !animRunning;
+  btnAnimate.textContent = animRunning ? '停止扫描 ■' : '动画扫描';
+  btnAnimate.className = animRunning ? '' : 'active';
+  if (animRunning) animLoop();
+});
+
+let animP = 0.3;
+let animDirVal = 1;
+function animLoop() {
+  if (!animRunning) return;
+  animP += animDirVal * 0.003;
+  if (animP >= 0.85) { animP = 0.85; animDirVal = -1; }
+  if (animP <= 0.25) { animP = 0.25; animDirVal = 1; }
+  pSlider.value = animP.toFixed(3);
+  pVal.textContent = animP.toFixed(3);
+  update(animP);
+  setTimeout(animLoop, 60);
+}
+
+// ─── Initial render ──────────────────────────────────────────────────────────
+update(p);
+</script>
+</body>
+</html>

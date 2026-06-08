@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Physarum · Slime Mold Transport Networks</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#08090e;color:#c8d0e0;font-family:'SF Mono',Menlo,monospace;font-size:12px;display:flex;height:100vh;overflow:hidden}
+  #left{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;gap:10px;min-width:0}
+  canvas{border:1px solid #1e2230;border-radius:4px;display:block}
+  #stats{font-size:11px;color:#4a5568;letter-spacing:0.05em}
+  #right{width:240px;flex-shrink:0;padding:16px 12px;overflow-y:auto;border-left:1px solid #1a1d26;display:flex;flex-direction:column;gap:14px}
+  h1{font-size:13px;color:#7eb8f7;letter-spacing:0.08em;font-weight:600}
+  .section{display:flex;flex-direction:column;gap:8px}
+  .label{color:#6a7590;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:2px}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:6px}
+  .row span{color:#8090a8;min-width:32px;text-align:right;font-size:11px}
+  input[type=range]{flex:1;accent-color:#5a9cf8;height:3px;cursor:pointer}
+  select,button{background:#111420;border:1px solid #232840;color:#c0ccdf;border-radius:3px;padding:4px 8px;font-size:11px;cursor:pointer;font-family:inherit;width:100%}
+  select:hover,button:hover{border-color:#3a4a70;background:#161a2e}
+  button.active{background:#162040;border-color:#5a9cf8;color:#7eb8f7}
+  button{padding:6px 8px}
+  .btns{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  #insight{font-size:10.5px;line-height:1.6;color:#5a6580;border-top:1px solid #1a1d26;padding-top:14px;margin-top:4px}
+  #insight strong{color:#7090b8}
+  hr{border:none;border-top:1px solid #1a1d26}
+</style>
+</head>
+<body>
+<div id="left">
+  <canvas id="canvas"></canvas>
+  <div id="stats">agents: — · fps: —</div>
+</div>
+<div id="right">
+  <h1>PHYSARUM</h1>
+  <div class="section">
+    <div class="label">Food Preset</div>
+    <select id="preset">
+      <option value="scatter">Scattered (8 nodes)</option>
+      <option value="ring">Ring (6 nodes)</option>
+      <option value="tokyo" selected>Tokyo (12 nodes)</option>
+      <option value="line">Linear Chain (5 nodes)</option>
+      <option value="grid">Grid (9 nodes)</option>
+    </select>
+    <div class="btns">
+      <button id="btnReset">↺ Reset</button>
+      <button id="btnPause">⏸ Pause</button>
+    </div>
+  </div>
+  <div class="section">
+    <div class="label">Color Scheme</div>
+    <select id="colorScheme">
+      <option value="mycelium" selected>Mycelium</option>
+      <option value="fire">Fire</option>
+      <option value="toxic">Toxic</option>
+      <option value="void">Void</option>
+      <option value="ice">Ice</option>
+    </select>
+  </div>
+  <hr>
+  <div class="section">
+    <div class="label">Sensor Angle</div>
+    <div class="row"><input type="range" id="sa" min="10" max="90" value="45" step="1"><span id="saV">45°</span></div>
+    <div class="label">Sensor Distance</div>
+    <div class="row"><input type="range" id="so" min="3" max="20" value="9" step="1"><span id="soV">9px</span></div>
+    <div class="label">Rotation Angle</div>
+    <div class="row"><input type="range" id="ra" min="5" max="90" value="45" step="1"><span id="raV">45°</span></div>
+  </div>
+  <hr>
+  <div class="section">
+    <div class="label">Trail Decay</div>
+    <div class="row"><input type="range" id="decay" min="0.88" max="0.995" value="0.96" step="0.001"><span id="decayV">.960</span></div>
+    <div class="label">Diffusion</div>
+    <div class="row"><input type="range" id="diffuse" min="0" max="1" value="0.5" step="0.05"><span id="diffuseV">0.5</span></div>
+    <div class="label">Deposit Amount</div>
+    <div class="row"><input type="range" id="deposit" min="1" max="20" value="5" step="0.5"><span id="depositV">5</span></div>
+    <div class="label">Agent Count</div>
+    <div class="row"><input type="range" id="agentCount" min="20000" max="200000" value="120000" step="10000"><span id="agentCountV">120k</span></div>
+  </div>
+  <div id="insight">
+    <strong>Physarum polycephalum</strong> is a slime mold with no neurons that solves network optimization problems. Each agent senses the chemoattractant trail ahead-left and ahead-right, rotates toward the stronger signal, moves forward, and deposits more trail. Repeated 120,000 times per frame.<br><br>
+    The emergent networks approximate <strong>Steiner minimum trees</strong> — connecting all food nodes with near-minimal total path length. This is NP-hard to solve exactly. The organism finds near-optimal solutions in minutes through pure chemistry.
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ─── Canvas setup ────────────────────────────────────────────────────────────
+const canvas = document.getElementById('canvas');
+const ctx    = canvas.getContext('2d', {willReadFrequently: true});
+const W = 700, H = 700;
+canvas.width = W; canvas.height = H;
+
+// ─── Simulation buffers ───────────────────────────────────────────────────────
+let trailA = new Float32Array(W * H);  // current trail
+let trailB = new Float32Array(W * H);  // scratch for diffusion
+let foodMap = new Float32Array(W * H); // constant food source mask
+let imgData = new ImageData(W, H);
+
+// Agent storage: [x, y, angle] × N, packed as Float32Array
+let agents;
+let N = 120000;
+
+// ─── Parameters ───────────────────────────────────────────────────────────────
+let P = {
+  SA: 45 * Math.PI / 180,   // sensor angle
+  SO: 9,                    // sensor offset distance
+  RA: 45 * Math.PI / 180,   // rotation angle
+  decay: 0.96,
+  diffuse: 0.5,
+  deposit: 5,
+  colorScheme: 'mycelium',
+};
+
+// ─── Food presets ─────────────────────────────────────────────────────────────
+// Tokyo nodes: approximate relative positions (scaled to canvas)
+const PRESETS = {
+  scatter: () => {
+    const rng = mulberry32(42);
+    const pts = [];
+    for (let i = 0; i < 8; i++) pts.push([0.1 + rng() * 0.8, 0.1 + rng() * 0.8]);
+    return pts;
+  },
+  ring: () => {
+    const pts = [];
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      pts.push([0.5 + 0.35 * Math.cos(a), 0.5 + 0.35 * Math.sin(a)]);
+    }
+    return pts;
+  },
+  tokyo: () => [
+    // Core: Shinjuku, Shibuya, Tokyo, Ueno, Ikebukuro
+    [0.50, 0.50], // Shinjuku (center)
+    [0.47, 0.58], // Shibuya
+    [0.62, 0.48], // Tokyo station
+    [0.60, 0.38], // Ueno
+    [0.45, 0.35], // Ikebukuro
+    // Inner ring: Shinagawa, Akihabara, Harajuku
+    [0.55, 0.65], // Shinagawa
+    [0.64, 0.42], // Akihabara
+    [0.44, 0.54], // Harajuku
+    // Outer: Yokohama, Kawasaki, Saitama, Chiba
+    [0.42, 0.82], // Yokohama
+    [0.52, 0.73], // Kawasaki
+    [0.40, 0.18], // Saitama
+    [0.82, 0.45], // Chiba
+  ],
+  line: () => [
+    [0.15, 0.50], [0.32, 0.50], [0.50, 0.50], [0.68, 0.50], [0.85, 0.50]
+  ],
+  grid: () => {
+    const pts = [];
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++)
+      pts.push([0.2 + c * 0.3, 0.2 + r * 0.3]);
+    return pts;
+  },
+};
+
+// ─── LCG for reproducibility ──────────────────────────────────────────────────
+function mulberry32(seed) {
+  return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
+
+// ─── Init food map ────────────────────────────────────────────────────────────
+function initFood(preset) {
+  foodMap.fill(0);
+  const pts = PRESETS[preset]();
+  const r = 14;
+  for (const [fx, fy] of pts) {
+    const px = Math.round(fx * W), py = Math.round(fy * H);
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+      if (dx*dx + dy*dy > r*r) continue;
+      const ix = px+dx, iy = py+dy;
+      if (ix < 0 || iy < 0 || ix >= W || iy >= H) continue;
+      foodMap[iy * W + ix] = 80;
+    }
+  }
+}
+
+// ─── Init agents ─────────────────────────────────────────────────────────────
+function initAgents(preset) {
+  agents = new Float32Array(N * 3);
+  const rng = mulberry32(137);
+  const pts = PRESETS[preset]();
+
+  if (preset === 'tokyo' || preset === 'scatter' || preset === 'grid') {
+    // Start agents randomly distributed across canvas
+    for (let i = 0; i < N; i++) {
+      agents[i*3  ] = rng() * W;
+      agents[i*3+1] = rng() * H;
+      agents[i*3+2] = rng() * Math.PI * 2;
+    }
+  } else if (preset === 'ring') {
+    // Start from center, radiate outward
+    for (let i = 0; i < N; i++) {
+      const a = rng() * Math.PI * 2;
+      const r = rng() * 20;
+      agents[i*3  ] = W/2 + r * Math.cos(a);
+      agents[i*3+1] = H/2 + r * Math.sin(a);
+      agents[i*3+2] = a;
+    }
+  } else {
+    // Line: agents spread along center horizontal
+    for (let i = 0; i < N; i++) {
+      agents[i*3  ] = rng() * W;
+      agents[i*3+1] = H/2 + (rng()-0.5) * 40;
+      agents[i*3+2] = (rng() > 0.5 ? 0 : Math.PI);
+    }
+  }
+}
+
+// ─── Color palettes ───────────────────────────────────────────────────────────
+const PALETTES = {
+  mycelium: t => {  // dark navy → cyan → white
+    const r = Math.min(255, t < 0.4 ? 0 : (t-0.4)/0.6 * 220 + 35);
+    const g = Math.min(255, t * 200 + 40);
+    const b = Math.min(255, t < 0.3 ? t/0.3*180 : 180 + (t-0.3)/0.7*75);
+    return [r, g, b];
+  },
+  fire: t => {
+    const r = Math.min(255, t * 3 * 255);
+    const g = Math.min(255, Math.max(0, t*3 - 1) * 255);
+    const b = Math.min(255, Math.max(0, t*3 - 2) * 255);
+    return [r, g, b];
+  },
+  toxic: t => [
+    Math.round(t * 30),
+    Math.min(255, Math.round(t < 0.5 ? t*2*180 : 180 + (t-0.5)*2*75)),
+    Math.round(t * 40)
+  ],
+  void: t => {
+    const r = Math.min(255, t < 0.5 ? t*2*120 : 120 + (t-0.5)*2*135);
+    const g = Math.round(t * 30);
+    const b = Math.min(255, t*255);
+    return [r, g, b];
+  },
+  ice: t => {
+    const v = Math.min(255, Math.round(t * 255));
+    return [
+      Math.round(v * 0.4 + 20 * t),
+      Math.round(v * 0.7 + 40 * t),
+      Math.min(255, v + 40)
+    ];
+  },
+};
+
+// ─── Simulation step ──────────────────────────────────────────────────────────
+const TWO_PI = Math.PI * 2;
+
+function sense(x, y, angle, offset) {
+  const sx = x + P.SO * Math.cos(angle + offset) | 0;
+  const sy = y + P.SO * Math.sin(angle + offset) | 0;
+  if (sx < 0 || sy < 0 || sx >= W || sy >= H) return 0;
+  return trailA[sy * W + sx];
+}
+
+function step() {
+  // 1) Agent sense-rotate-move-deposit
+  for (let i = 0; i < N; i++) {
+    const base = i * 3;
+    let x = agents[base], y = agents[base+1], a = agents[base+2];
+
+    // Sense three directions
+    const fwd   = sense(x, y, a,     0);
+    const left  = sense(x, y, a,  P.SA);
+    const right = sense(x, y, a, -P.SA);
+
+    // Stochastic rotation (Jones 2010 Rule 1-3)
+    if (fwd > left && fwd > right) {
+      // keep heading
+    } else if (fwd < left && fwd < right) {
+      // random rotate
+      a += (Math.random() < 0.5 ? P.RA : -P.RA);
+    } else if (left > right) {
+      a += P.RA;
+    } else if (right > left) {
+      a -= P.RA;
+    }
+
+    // Move
+    let nx = x + Math.cos(a);
+    let ny = y + Math.sin(a);
+
+    // Boundary: bounce
+    if (nx < 0 || nx >= W || ny < 0 || ny >= H) {
+      a += Math.PI + (Math.random() - 0.5);
+      nx = Math.min(W-1, Math.max(0, x + Math.cos(a)));
+      ny = Math.min(H-1, Math.max(0, y + Math.sin(a)));
+    }
+
+    // Deposit
+    const idx = (ny | 0) * W + (nx | 0);
+    trailA[idx] = Math.min(trailA[idx] + P.deposit, 255);
+
+    agents[base] = nx; agents[base+1] = ny; agents[base+2] = a;
+  }
+
+  // 2) Diffuse: weighted average of 3×3 neighbourhood
+  const d = P.diffuse;
+  const inv = 1 - d;
+  for (let y = 1; y < H-1; y++) {
+    for (let x = 1; x < W-1; x++) {
+      const c = y*W + x;
+      const avg = (
+        trailA[c-W-1] + trailA[c-W] + trailA[c-W+1] +
+        trailA[c-1]   + trailA[c]   + trailA[c+1]   +
+        trailA[c+W-1] + trailA[c+W] + trailA[c+W+1]
+      ) / 9;
+      trailB[c] = trailA[c] * inv + avg * d;
+    }
+  }
+
+  // 3) Decay + food refresh
+  for (let i = 0; i < W*H; i++) {
+    let v = trailB[i] * P.decay;
+    if (foodMap[i] > 0) v = Math.max(v, foodMap[i]);
+    trailA[i] = v;
+  }
+}
+
+// ─── Render ───────────────────────────────────────────────────────────────────
+function render() {
+  const palette = PALETTES[P.colorScheme];
+  const data = imgData.data;
+  for (let i = 0; i < W * H; i++) {
+    const t = Math.min(1, trailA[i] / 100);  // normalize
+    const [r, g, b] = palette(t);
+    const j = i * 4;
+    data[j]   = r;
+    data[j+1] = g;
+    data[j+2] = b;
+    data[j+3] = 255;
+  }
+
+  // Draw food source halos
+  for (let i = 0; i < W*H; i++) {
+    if (foodMap[i] > 0) {
+      const j = i*4;
+      data[j]   = Math.min(255, data[j]   + 60);
+      data[j+1] = Math.min(255, data[j+1] + 60);
+      data[j+2] = Math.min(255, data[j+2] + 80);
+    }
+  }
+
+  ctx.putImageData(imgData, 0, 0);
+}
+
+// ─── Main loop ────────────────────────────────────────────────────────────────
+let paused = false;
+let lastTime = 0, fpsSmooth = 60;
+
+function loop(ts) {
+  if (!paused) {
+    step();
+    render();
+    const dt = ts - lastTime;
+    if (dt > 0) fpsSmooth = fpsSmooth * 0.92 + (1000/dt) * 0.08;
+    lastTime = ts;
+    document.getElementById('stats').textContent =
+      `agents: ${(N/1000).toFixed(0)}k · fps: ${fpsSmooth.toFixed(1)}`;
+  }
+  requestAnimationFrame(loop);
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+let currentPreset = 'tokyo';
+
+function reset() {
+  trailA.fill(0);
+  trailB.fill(0);
+  initFood(currentPreset);
+  initAgents(currentPreset);
+  // Warm-start food areas with some trail
+  for (let i = 0; i < W*H; i++) if (foodMap[i] > 0) trailA[i] = 60;
+}
+
+reset();
+requestAnimationFrame(loop);
+
+// ─── UI bindings ──────────────────────────────────────────────────────────────
+function bind(id, valId, suffix, setter, fmt) {
+  const el = document.getElementById(id);
+  const vEl = document.getElementById(valId);
+  el.addEventListener('input', () => {
+    const v = parseFloat(el.value);
+    setter(v);
+    vEl.textContent = fmt ? fmt(v) : v + suffix;
+  });
+}
+
+bind('sa',    'saV',    '',  v => P.SA = v*Math.PI/180, v => v+'°');
+bind('so',    'soV',    'px', v => P.SO = v, null);
+bind('ra',    'raV',    '',  v => P.RA = v*Math.PI/180, v => v+'°');
+bind('decay', 'decayV', '',  v => P.decay = v, v => v.toFixed(3));
+bind('diffuse','diffuseV','', v => P.diffuse = v, v => v.toFixed(2));
+bind('deposit','depositV','', v => P.deposit = v, null);
+bind('agentCount','agentCountV','', v => {
+  N = Math.round(v);
+  agents = new Float32Array(N * 3);
+  const rng = mulberry32(42);
+  for (let i = 0; i < N; i++) {
+    agents[i*3]   = rng() * W;
+    agents[i*3+1] = rng() * H;
+    agents[i*3+2] = rng() * Math.PI * 2;
+  }
+}, v => (v/1000).toFixed(0)+'k');
+
+document.getElementById('preset').addEventListener('change', e => {
+  currentPreset = e.target.value;
+  reset();
+});
+
+document.getElementById('colorScheme').addEventListener('change', e => {
+  P.colorScheme = e.target.value;
+});
+
+document.getElementById('btnReset').addEventListener('click', reset);
+document.getElementById('btnPause').addEventListener('click', function() {
+  paused = !paused;
+  this.textContent = paused ? '▶ Resume' : '⏸ Pause';
+  this.classList.toggle('active', paused);
+});
+
+// Click canvas to add food at mouse position
+canvas.addEventListener('click', e => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = Math.round((e.clientX - rect.left) * W / rect.width);
+  const my = Math.round((e.clientY - rect.top) * H / rect.height);
+  const r = 12;
+  for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+    if (dx*dx + dy*dy > r*r) continue;
+    const ix = mx+dx, iy = my+dy;
+    if (ix < 0 || iy < 0 || ix >= W || iy >= H) continue;
+    foodMap[iy*W+ix] = 80;
+    trailA[iy*W+ix] = Math.max(trailA[iy*W+ix], 60);
+  }
+});
+</script>
+</body>
+</html>

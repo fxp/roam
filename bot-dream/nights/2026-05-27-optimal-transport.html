@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Optimal Transport · Wasserstein 几何 · 沙堆移动的最短路径</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  :root {
+    --bg: #0a0d12;
+    --bg-soft: #11161e;
+    --panel: #161c26;
+    --border: #2a3340;
+    --text: #e4d5b7;
+    --text-dim: #8b8470;
+    --text-faint: #4d4c43;
+    --accent: #d4a05a;
+    --source: #5a9cf2;
+    --target: #f08750;
+    --good: #7fc99b;
+    --warn: #e8694e;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue",
+                 "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+  body {
+    padding: 32px 24px 48px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  header {
+    margin-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 16px;
+  }
+  header h1 {
+    font-size: 24px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    color: var(--text);
+  }
+  header h1 .sub {
+    color: var(--text-dim);
+    font-weight: 300;
+    font-size: 18px;
+    margin-left: 12px;
+  }
+  header .meta {
+    color: var(--text-faint);
+    font-size: 12px;
+    margin-top: 6px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 24px;
+  }
+  @media (max-width: 1100px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+  .canvases {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .canvas-card {
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+    position: relative;
+  }
+  .canvas-card .label {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 8px;
+  }
+  .canvas-card .label .name {
+    font-weight: 500;
+    color: var(--text);
+    font-size: 14px;
+  }
+  .canvas-card .label .desc {
+    color: var(--text-dim);
+    font-size: 11px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  .canvas-card canvas {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    border-radius: 4px;
+    background: #07090d;
+  }
+  .controls {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px 18px;
+  }
+  .ctrl { display: flex; flex-direction: column; gap: 4px; }
+  .ctrl label {
+    color: var(--text-dim);
+    font-size: 11px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    display: flex;
+    justify-content: space-between;
+  }
+  .ctrl label .val { color: var(--accent); }
+  .ctrl input[type=range] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 4px;
+    background: #2a3340;
+    border-radius: 2px;
+    outline: none;
+  }
+  .ctrl input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px; height: 14px;
+    background: var(--accent);
+    border-radius: 50%;
+    cursor: pointer;
+  }
+  .ctrl select, .ctrl button {
+    background: var(--bg-soft);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 6px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    font-family: inherit;
+  }
+  .ctrl button { background: var(--accent); color: var(--bg); font-weight: 500; }
+  .ctrl button:hover { filter: brightness(1.1); }
+  .ctrl button.flat { background: var(--bg-soft); color: var(--text); }
+  .ctrl button.flat:hover { background: var(--border); }
+
+  .stats {
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 18px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-top: 16px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 12px;
+  }
+  .stats .stat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .stats .stat .k {
+    color: var(--text-faint);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .stats .stat .v {
+    color: var(--accent);
+    font-size: 16px;
+    font-weight: 500;
+  }
+  .stats .stat .v.dim { color: var(--text-dim); font-size: 13px; }
+
+  .sidebar {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 20px 22px;
+    font-size: 13px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  .sidebar h2 {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--accent);
+    margin-top: 18px;
+    margin-bottom: 8px;
+    letter-spacing: 0.02em;
+  }
+  .sidebar h2:first-child { margin-top: 0; }
+  .sidebar p { margin-bottom: 8px; color: var(--text); }
+  .sidebar .small { font-size: 12px; color: var(--text-dim); }
+  .sidebar .formula {
+    background: #08090d;
+    border-left: 2px solid var(--accent);
+    padding: 8px 12px;
+    margin: 8px 0;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.7;
+    border-radius: 0 4px 4px 0;
+  }
+  .sidebar .formula .v { color: var(--accent); }
+  .sidebar .timeline {
+    list-style: none;
+    padding: 0;
+    border-left: 1px solid var(--border);
+    margin-left: 8px;
+    padding-left: 14px;
+  }
+  .sidebar .timeline li {
+    margin-bottom: 8px;
+    font-size: 12px;
+    color: var(--text-dim);
+    position: relative;
+  }
+  .sidebar .timeline li::before {
+    content: '';
+    width: 6px; height: 6px;
+    background: var(--accent);
+    border-radius: 50%;
+    position: absolute;
+    left: -18px;
+    top: 7px;
+  }
+  .sidebar .timeline li strong { color: var(--text); font-weight: 500; }
+
+  .legend {
+    display: flex;
+    gap: 14px;
+    margin-top: 6px;
+    font-size: 11px;
+    color: var(--text-dim);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  .legend .dot {
+    display: inline-block;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    margin-right: 4px;
+    vertical-align: middle;
+  }
+
+  footer {
+    margin-top: 28px;
+    text-align: center;
+    color: var(--text-faint);
+    font-size: 11px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Optimal Transport <span class="sub">· Wasserstein 几何 · 沙堆移动的最短路径</span></h1>
+  <div class="meta">
+    Sinkhorn 熵正则化 · McCann 位移插值 · vs L² 线性插值 · 实时对比
+    &nbsp;·&nbsp;
+    BotDreamer Night Lab · 2026-05-27
+  </div>
+</header>
+
+<div class="layout">
+  <div class="main">
+    <div class="canvases">
+      <div class="canvas-card">
+        <div class="label">
+          <span class="name">Wasserstein 插值 (McCann)</span>
+          <span class="desc">μ_t = ((1−t)·Id + t·T)<sub>#</sub> μ_0</span>
+        </div>
+        <canvas id="cWass" width="600" height="600"></canvas>
+        <div class="legend">
+          <span><span class="dot" style="background: var(--source)"></span>源 μ_0</span>
+          <span><span class="dot" style="background: var(--target)"></span>靶 μ_1</span>
+          <span style="color: var(--accent)">质量沿最优映射移动</span>
+        </div>
+      </div>
+
+      <div class="canvas-card">
+        <div class="label">
+          <span class="name">线性插值 (L² / TV)</span>
+          <span class="desc">μ_t = (1−t)·μ_0 + t·μ_1</span>
+        </div>
+        <canvas id="cLin" width="600" height="600"></canvas>
+        <div class="legend">
+          <span><span class="dot" style="background: var(--source)"></span>源 μ_0 衰退</span>
+          <span><span class="dot" style="background: var(--target)"></span>靶 μ_1 显现</span>
+          <span style="color: var(--warn)">质量"无中生有"</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="ctrl">
+        <label>预设场景 <span class="val" id="presetName">—</span></label>
+        <select id="presetSel">
+          <option value="gaussians">双高斯 · 移位</option>
+          <option value="discAnnulus">圆盘 → 圆环 · 拓扑变化</option>
+          <option value="singleTwin">单峰 → 双峰 · 质量分裂</option>
+          <option value="twinSingle">双峰 → 单峰 · 质量合并</option>
+          <option value="squareCircle">方形 → 圆形 · 形状变化</option>
+          <option value="ringLine">圆环 → 线段 · 维度压缩</option>
+          <option value="spiralDisc">螺旋 → 圆盘 · 结构散失</option>
+          <option value="threeOne">三峰 → 单峰 · 多体合并</option>
+        </select>
+      </div>
+
+      <div class="ctrl">
+        <label>时间 t <span class="val" id="tVal">0.50</span></label>
+        <input type="range" id="tSlider" min="0" max="1" step="0.001" value="0.5">
+      </div>
+
+      <div class="ctrl">
+        <label>熵正则化 ε <span class="val" id="epsVal">0.020</span></label>
+        <input type="range" id="epsSlider" min="0.003" max="0.15" step="0.001" value="0.02">
+      </div>
+
+      <div class="ctrl">
+        <label>传输线显示 <span class="val" id="lineVal">中</span></label>
+        <input type="range" id="lineSlider" min="0" max="3" step="1" value="2">
+      </div>
+
+      <div class="ctrl">
+        <label>动画</label>
+        <button id="playBtn">▶ 播放</button>
+      </div>
+
+      <div class="ctrl">
+        <label>采样</label>
+        <button class="flat" id="resampleBtn">↻ 重新采样</button>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat">
+        <span class="k">W₂² 距离 (最优)</span>
+        <span class="v" id="statW2">—</span>
+      </div>
+      <div class="stat">
+        <span class="k">Sinkhorn 迭代</span>
+        <span class="v dim" id="statIter">—</span>
+      </div>
+      <div class="stat">
+        <span class="k">质量守恒误差</span>
+        <span class="v dim" id="statMass">—</span>
+      </div>
+      <div class="stat">
+        <span class="k">输运稀疏度</span>
+        <span class="v dim" id="statSparse">—</span>
+      </div>
+    </div>
+  </div>
+
+  <aside class="sidebar">
+    <h2>问题</h2>
+    <p>有一堆沙 μ₀ 和一个目标分布 μ₁，把沙从前者搬到后者最省力的方式是什么？这是 1781 年 Gaspard Monge 提交给法兰西科学院的问题，<em>fendre la terre</em>（"开土方"）问题。</p>
+    <p>"省力"用一个 cost function c(x, y) 来度量。最经典的选择是平方距离 c(x, y) = ‖x − y‖²。</p>
+
+    <h2>两种形式</h2>
+    <p><strong>Monge (1781)</strong>：找映射 T，使 T<sub>#</sub>μ₀ = μ₁ 且</p>
+    <div class="formula">min<sub>T</sub> ∫ ‖x − T(x)‖² <span class="v">dμ₀(x)</span></div>
+
+    <p><strong>Kantorovich (1942)</strong>：放松成"耦合"π(x, y)，允许把一粒沙分给多个目标：</p>
+    <div class="formula">min<sub>π</sub> ∬ ‖x − y‖² <span class="v">dπ(x, y)</span><br>
+      s.t. π<sub>x</sub> = μ₀, π<sub>y</sub> = μ₁</div>
+    <p class="small">Kantorovich 把它变成了线性规划，让它可计算。1975 年获诺贝尔经济学奖（用 OT 做资源分配）。</p>
+
+    <h2>W₂ 度量与 Wasserstein 空间</h2>
+    <p>最优 cost 的平方根就是 <strong>Wasserstein-2 距离</strong>：</p>
+    <div class="formula">W₂(μ₀, μ₁) = √(min cost)</div>
+    <p>它把概率分布空间 𝒫(ℝⁿ) 变成一个测地度量空间。这个空间无穷维，但有 Riemannian 结构（Otto 2001）。</p>
+
+    <h2>McCann 位移插值 (1997)</h2>
+    <p>在 Wasserstein 空间里，从 μ₀ 到 μ₁ 的<strong>测地线</strong>不是线性平均，而是<strong>沿最优映射移动</strong>：</p>
+    <div class="formula">μ_t = ((1−t)·Id + t·T)<span class="v">#</span> μ₀</div>
+    <p>对每个粒子 x，它在 t 时刻位于 (1−t)·x + t·T(x)——直线运动，沿 cost 最优方向。</p>
+    <p>这是<strong>左图</strong>展示的：源粒子保留各自身份，平滑滑向目标。分布形态在过程中合理地"变形"。</p>
+
+    <h2>对比：线性插值的崩溃</h2>
+    <p>把测度做凸组合 μ_t = (1−t)μ₀ + tμ₁，是 L² 或 TV 意义下的"插值"。但这是<strong>右图</strong>——它只是把 μ₀ 慢慢淡出、μ₁ 慢慢淡入。中间时刻 t=0.5，质量同时存在于源和靶位置，<em>之间</em>反而是空的。</p>
+    <p>看右图的"双高斯 → 移位"：t=0.5 时两座峰同时存在，没有质量真的"在搬运"。而左图正确显示了滑动过程。</p>
+
+    <h2>Sinkhorn 算法 (Cuturi 2013)</h2>
+    <p>把熵正则化加进 Kantorovich：</p>
+    <div class="formula">min<sub>π</sub> ⟨π, C⟩ + ε · H(π)<br>H(π) = Σ π<sub>ij</sub> log π<sub>ij</sub></div>
+    <p>对偶问题变成<strong>交替缩放</strong>。设 K = exp(−C/ε)：</p>
+    <div class="formula">
+      u ← a / (K · v)<br>
+      v ← b / (Kᵀ · u)<br>
+      π = diag(u) · K · diag(v)
+    </div>
+    <p>每次迭代 O(nm)，几十次就收敛。这一发现把 OT 从"理论好奇"变成"工程工具"——GANs、point cloud 配准、单细胞数据对齐都用它。</p>
+    <p>调节 <strong>ε</strong>：小 ε 给出尖锐传输（接近真实 Monge map），但收敛慢；大 ε 给出弥散传输，但计算稳。</p>
+
+    <h2>历史地标</h2>
+    <ul class="timeline">
+      <li><strong>1781</strong> Monge 提交开土方问题</li>
+      <li><strong>1942</strong> Kantorovich 提出耦合放松</li>
+      <li><strong>1975</strong> Kantorovich 获诺贝尔经济学奖</li>
+      <li><strong>1991</strong> Brenier 证明：c=‖·‖² 的最优 map 是凸函数梯度</li>
+      <li><strong>1997</strong> McCann 定义位移插值</li>
+      <li><strong>1998</strong> JKO：热方程 = Wasserstein 上熵的梯度流</li>
+      <li><strong>2001</strong> Otto 形式化 Wasserstein Riemannian 结构</li>
+      <li><strong>2010</strong> Villani 因 OT 工作获 Fields 奖</li>
+      <li><strong>2013</strong> Cuturi 引入 Sinkhorn，OT 进入实用</li>
+      <li><strong>2017</strong> Wasserstein GAN——生成模型革命</li>
+    </ul>
+
+    <h2>为什么重要</h2>
+    <p>因为它说明：<strong>概率分布的"自然几何"不是 L²</strong>。L² 把 μ₀ 当成函数，逐点算差值；Wasserstein 把它当成质量分布，看搬运过程的代价。结果差异巨大——前者忽略距离，后者敏感于结构。</p>
+    <p>这一点在<strong>右图就能看见</strong>：两个相距很远但形状相同的高斯，L²/TV 距离 ≈ 2（两者完全不重叠），但 W₂ 准确反映了真实"远"——你越远，搬运越累。</p>
+  </aside>
+</div>
+
+<footer>
+  Optimal Transport · Wasserstein Geometry · BotDreamer Night Lab · 2026-05-27 ·
+  Sinkhorn (Cuturi 2013) + McCann interpolation (McCann 1997)
+</footer>
+
+<script>
+// ============================================================================
+//  Optimal Transport · Wasserstein Geometry Playground
+//  - Sinkhorn entropic regularization
+//  - Barycentric mapping for McCann interpolation
+//  - Side-by-side comparison with L² linear interpolation
+// ============================================================================
+
+const N = 150;  // points per side
+const cWass = document.getElementById('cWass');
+const cLin = document.getElementById('cLin');
+const gW = cWass.getContext('2d');
+const gL = cLin.getContext('2d');
+
+// ---------- Utilities ----------
+function randn() {
+  let u = 0, v = 0;
+  while (u === 0) u = Math.random();
+  while (v === 0) v = Math.random();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+
+// ---------- Distribution generators ----------
+function gaussianCloud(cx, cy, sx, sy, n) {
+  const pts = [];
+  for (let i = 0; i < n; i++) {
+    pts.push({ x: cx + sx * randn(), y: cy + sy * randn() });
+  }
+  return pts;
+}
+
+function discCloud(cx, cy, r, n) {
+  const pts = [];
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * 2 * Math.PI;
+    const rr = r * Math.sqrt(Math.random());
+    pts.push({ x: cx + rr * Math.cos(a), y: cy + rr * Math.sin(a) });
+  }
+  return pts;
+}
+
+function annulusCloud(cx, cy, rIn, rOut, n) {
+  const pts = [];
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * 2 * Math.PI;
+    const rr = Math.sqrt(rIn * rIn + Math.random() * (rOut * rOut - rIn * rIn));
+    pts.push({ x: cx + rr * Math.cos(a), y: cy + rr * Math.sin(a) });
+  }
+  return pts;
+}
+
+function squareCloud(cx, cy, side, n) {
+  const pts = [];
+  for (let i = 0; i < n; i++) {
+    pts.push({
+      x: cx + (Math.random() - 0.5) * side,
+      y: cy + (Math.random() - 0.5) * side
+    });
+  }
+  return pts;
+}
+
+function mixtureCloud(centers, sigma, n) {
+  const perCenter = Math.floor(n / centers.length);
+  const pts = [];
+  for (const c of centers) {
+    for (let i = 0; i < perCenter; i++) {
+      pts.push({ x: c.x + sigma * randn(), y: c.y + sigma * randn() });
+    }
+  }
+  // pad if rounding off
+  while (pts.length < n) {
+    const c = centers[pts.length % centers.length];
+    pts.push({ x: c.x + sigma * randn(), y: c.y + sigma * randn() });
+  }
+  return pts;
+}
+
+function ringCloud(cx, cy, r, n, noise = 0.08) {
+  const pts = [];
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * 2 * Math.PI;
+    pts.push({
+      x: cx + r * Math.cos(a) + noise * randn(),
+      y: cy + r * Math.sin(a) + noise * randn()
+    });
+  }
+  return pts;
+}
+
+function lineCloud(cx, cy, len, n, noise = 0.05) {
+  const pts = [];
+  for (let i = 0; i < n; i++) {
+    const t = (Math.random() - 0.5) * len;
+    pts.push({ x: cx + t, y: cy + noise * randn() });
+  }
+  return pts;
+}
+
+function spiralCloud(cx, cy, n) {
+  const pts = [];
+  for (let i = 0; i < n; i++) {
+    const t = i / n;
+    const r = 0.4 + 2.2 * t;
+    const a = t * 4.5 * Math.PI;
+    pts.push({
+      x: cx + r * Math.cos(a) + 0.05 * randn(),
+      y: cy + r * Math.sin(a) + 0.05 * randn()
+    });
+  }
+  return pts;
+}
+
+// ---------- Presets ----------
+const PRESETS = {
+  gaussians: {
+    name: '双高斯 · 移位',
+    build: () => ({
+      source: gaussianCloud(-2.2, 0, 0.7, 0.7, N),
+      target: gaussianCloud(2.2, 0, 0.7, 0.7, N)
+    })
+  },
+  discAnnulus: {
+    name: '圆盘 → 圆环',
+    build: () => ({
+      source: discCloud(0, 0, 1.6, N),
+      target: annulusCloud(0, 0, 2.0, 2.7, N)
+    })
+  },
+  singleTwin: {
+    name: '单峰 → 双峰',
+    build: () => ({
+      source: gaussianCloud(0, 0, 0.55, 0.55, N),
+      target: mixtureCloud([{x: -2.0, y: 0}, {x: 2.0, y: 0}], 0.55, N)
+    })
+  },
+  twinSingle: {
+    name: '双峰 → 单峰',
+    build: () => ({
+      source: mixtureCloud([{x: -2.0, y: 0}, {x: 2.0, y: 0}], 0.55, N),
+      target: gaussianCloud(0, 0, 0.65, 0.65, N)
+    })
+  },
+  squareCircle: {
+    name: '方形 → 圆形',
+    build: () => ({
+      source: squareCloud(0, 0, 3.4, N),
+      target: discCloud(0, 0, 1.9, N)
+    })
+  },
+  ringLine: {
+    name: '圆环 → 线段',
+    build: () => ({
+      source: ringCloud(0, 0, 2.0, N),
+      target: lineCloud(0, 0, 5.5, N)
+    })
+  },
+  spiralDisc: {
+    name: '螺旋 → 圆盘',
+    build: () => ({
+      source: spiralCloud(0, 0, N),
+      target: discCloud(0, 0, 2.4, N)
+    })
+  },
+  threeOne: {
+    name: '三峰 → 单峰',
+    build: () => ({
+      source: mixtureCloud([
+        { x: -2.2, y: -1.4 },
+        { x:  2.2, y: -1.4 },
+        { x:  0.0, y:  2.2 }
+      ], 0.55, N),
+      target: gaussianCloud(0, 0, 0.7, 0.7, N)
+    })
+  }
+};
+
+// ---------- Sinkhorn algorithm ----------
+function sinkhorn(a, b, C, epsilon, maxIter = 250, tol = 1e-7) {
+  const n = a.length, m = b.length;
+  // K[i*m + j] = exp(-C/eps)
+  const K = new Float64Array(n * m);
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < m; j++) {
+      K[i * m + j] = Math.exp(-C[i * m + j] / epsilon);
+    }
+  }
+  const u = new Float64Array(n).fill(1);
+  const v = new Float64Array(m).fill(1);
+  const uPrev = new Float64Array(n);
+
+  let iter = 0;
+  for (iter = 0; iter < maxIter; iter++) {
+    for (let i = 0; i < n; i++) uPrev[i] = u[i];
+
+    // Kv[i] = Σ_j K[i,j] v[j]; then u[i] = a[i] / Kv[i]
+    for (let i = 0; i < n; i++) {
+      let s = 0;
+      const off = i * m;
+      for (let j = 0; j < m; j++) s += K[off + j] * v[j];
+      u[i] = s > 1e-300 ? a[i] / s : 0;
+    }
+    // KTu[j] = Σ_i K[i,j] u[i]; then v[j] = b[j] / KTu[j]
+    for (let j = 0; j < m; j++) {
+      let s = 0;
+      for (let i = 0; i < n; i++) s += K[i * m + j] * u[i];
+      v[j] = s > 1e-300 ? b[j] / s : 0;
+    }
+    // check change in u
+    let change = 0;
+    for (let i = 0; i < n; i++) {
+      change += Math.abs(u[i] - uPrev[i]);
+    }
+    if (change < tol) { iter++; break; }
+  }
+  // π[i,j] = u[i] K[i,j] v[j]
+  const pi = new Float64Array(n * m);
+  for (let i = 0; i < n; i++) {
+    const ui = u[i];
+    const off = i * m;
+    for (let j = 0; j < m; j++) {
+      pi[off + j] = ui * K[off + j] * v[j];
+    }
+  }
+  return { pi, iter };
+}
+
+// ---------- OT pipeline ----------
+function buildCostMatrix(source, target) {
+  const n = source.length, m = target.length;
+  const C = new Float64Array(n * m);
+  let maxC = 0;
+  for (let i = 0; i < n; i++) {
+    const xi = source[i].x, yi = source[i].y;
+    for (let j = 0; j < m; j++) {
+      const dx = xi - target[j].x;
+      const dy = yi - target[j].y;
+      const d2 = dx * dx + dy * dy;
+      C[i * m + j] = d2;
+      if (d2 > maxC) maxC = d2;
+    }
+  }
+  return { C, maxC };
+}
+
+function barycentricMap(pi, source, target, a) {
+  // y_i^* = Σ_j pi[i,j] y_j / a_i
+  const n = source.length, m = target.length;
+  const map = [];
+  for (let i = 0; i < n; i++) {
+    let mx = 0, my = 0;
+    const off = i * m;
+    for (let j = 0; j < m; j++) {
+      const p = pi[off + j];
+      mx += p * target[j].x;
+      my += p * target[j].y;
+    }
+    map.push({ x: mx / a[i], y: my / a[i] });
+  }
+  return map;
+}
+
+function w2Squared(pi, C) {
+  let s = 0;
+  for (let i = 0; i < pi.length; i++) s += pi[i] * C[i];
+  return s;
+}
+
+function planSparsity(pi, threshold = 1e-4) {
+  // fraction of entries with significant mass (> threshold * uniform)
+  const n = pi.length;
+  let cnt = 0;
+  for (let i = 0; i < n; i++) if (pi[i] > threshold / n) cnt++;
+  return cnt / n;
+}
+
+// ---------- State ----------
+let state = {
+  preset: 'gaussians',
+  source: [],
+  target: [],
+  a: null, b: null,
+  C: null, maxC: 0,
+  pi: null,
+  map: null,
+  iter: 0,
+  w2: 0,
+  sparsity: 0,
+  t: 0.5,
+  epsilonRaw: 0.02,
+  lineMode: 2,  // 0=off, 1=light, 2=medium, 3=heavy
+  topLines: [],  // top transport pairs for rendering
+  isPlaying: false,
+  playTime: 0,
+};
+
+// ---------- Compute pipeline ----------
+function recomputeOT() {
+  const a = new Float64Array(N).fill(1 / N);
+  const b = new Float64Array(N).fill(1 / N);
+  const { C, maxC } = buildCostMatrix(state.source, state.target);
+  // epsilonRaw is in units of normalized max-cost. Actual eps = epsilonRaw * maxC.
+  const eps = Math.max(state.epsilonRaw * maxC, 1e-6);
+  const t0 = performance.now();
+  const { pi, iter } = sinkhorn(a, b, C, eps, 250, 1e-7);
+  const dt = performance.now() - t0;
+  const map = barycentricMap(pi, state.source, state.target, a);
+  const w2 = w2Squared(pi, C);
+  const sparsity = planSparsity(pi, 1.0);  // threshold: 1/N mass
+
+  // Find top transport lines
+  const pairs = [];
+  for (let i = 0; i < N; i++) {
+    let bestJ = -1, bestM = 0;
+    for (let j = 0; j < N; j++) {
+      const p = pi[i * N + j];
+      if (p > bestM) { bestM = p; bestJ = j; }
+    }
+    if (bestJ >= 0) pairs.push({ i, j: bestJ, mass: bestM });
+  }
+  pairs.sort((a, b) => b.mass - a.mass);
+
+  state.a = a;
+  state.b = b;
+  state.C = C;
+  state.maxC = maxC;
+  state.pi = pi;
+  state.map = map;
+  state.iter = iter;
+  state.w2 = w2;
+  state.sparsity = sparsity;
+  state.topLines = pairs;
+  state.computeMs = dt;
+}
+
+// ---------- Coordinate transform ----------
+// Use CSS pixel dimensions (clientWidth/clientHeight) since we scale by DPR
+const VIEW = { xmin: -3.6, xmax: 3.6, ymin: -3.6, ymax: 3.6 };
+
+function fx(canvas, x) {
+  return ((x - VIEW.xmin) / (VIEW.xmax - VIEW.xmin)) * canvas.clientWidth;
+}
+function fy(canvas, y) {
+  // flip y for screen coords
+  return ((VIEW.ymax - y) / (VIEW.ymax - VIEW.ymin)) * canvas.clientHeight;
+}
+
+// ---------- Rendering ----------
+function drawGrid(ctx, canvas) {
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  ctx.fillStyle = '#07090d';
+  ctx.fillRect(0, 0, w, h);
+
+  // grid lines every 1.0
+  ctx.strokeStyle = 'rgba(80, 90, 110, 0.12)';
+  ctx.lineWidth = 1;
+  for (let x = Math.ceil(VIEW.xmin); x <= Math.floor(VIEW.xmax); x++) {
+    const px = fx(canvas, x);
+    ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, h); ctx.stroke();
+  }
+  for (let y = Math.ceil(VIEW.ymin); y <= Math.floor(VIEW.ymax); y++) {
+    const py = fy(canvas, y);
+    ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(w, py); ctx.stroke();
+  }
+  // axes
+  ctx.strokeStyle = 'rgba(120, 140, 170, 0.25)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, fy(canvas, 0)); ctx.lineTo(w, fy(canvas, 0)); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(fx(canvas, 0), 0); ctx.lineTo(fx(canvas, 0), h); ctx.stroke();
+}
+
+function lerpColor(c0, c1, t) {
+  // c0, c1 are [r,g,b]
+  return [
+    Math.round(c0[0] + (c1[0] - c0[0]) * t),
+    Math.round(c0[1] + (c1[1] - c0[1]) * t),
+    Math.round(c0[2] + (c1[2] - c0[2]) * t),
+  ];
+}
+
+const COL_SOURCE = [90, 156, 242];   // blue
+const COL_TARGET = [240, 135, 80];   // orange
+
+function drawWasserstein() {
+  drawGrid(gW, cWass);
+  const t = state.t;
+  const w = cWass.clientWidth, h = cWass.clientHeight;
+
+  // 1. transport plan lines
+  const lineModes = [0, 0.2, 0.5, 1.0];
+  const lineAlpha = lineModes[state.lineMode];
+  if (lineAlpha > 0) {
+    gW.lineWidth = 1;
+    const maxLines = Math.min(state.topLines.length, 150);
+    const maxMass = state.topLines[0] ? state.topLines[0].mass : 1;
+    for (let k = 0; k < maxLines; k++) {
+      const { i, j, mass } = state.topLines[k];
+      const alpha = 0.4 * (mass / maxMass) * lineAlpha;
+      if (alpha < 0.02) continue;
+      const x0 = state.source[i].x;
+      const y0 = state.source[i].y;
+      const x1 = state.target[j].x;
+      const y1 = state.target[j].y;
+      gW.strokeStyle = `rgba(180, 160, 110, ${alpha})`;
+      gW.beginPath();
+      gW.moveTo(fx(cWass, x0), fy(cWass, y0));
+      gW.lineTo(fx(cWass, x1), fy(cWass, y1));
+      gW.stroke();
+    }
+  }
+
+  // 2. source distribution (faint, at t=0 anchor) -- skip; we show interpolated
+  // 3. target distribution (faint outline)
+  if (t < 1) {
+    gW.fillStyle = `rgba(240, 135, 80, ${0.10 + 0.15 * (1 - t)})`;
+    for (let j = 0; j < N; j++) {
+      gW.beginPath();
+      gW.arc(fx(cWass, state.target[j].x), fy(cWass, state.target[j].y),
+             1.5, 0, 2 * Math.PI);
+      gW.fill();
+    }
+  }
+
+  // 4. interpolated particles
+  for (let i = 0; i < N; i++) {
+    const x0 = state.source[i].x, y0 = state.source[i].y;
+    const x1 = state.map[i].x, y1 = state.map[i].y;
+    const xt = x0 + (x1 - x0) * t;
+    const yt = y0 + (y1 - y0) * t;
+    const col = lerpColor(COL_SOURCE, COL_TARGET, t);
+    gW.fillStyle = `rgb(${col[0]}, ${col[1]}, ${col[2]})`;
+    gW.beginPath();
+    gW.arc(fx(cWass, xt), fy(cWass, yt), 3.2, 0, 2 * Math.PI);
+    gW.fill();
+  }
+}
+
+function drawLinear() {
+  drawGrid(gL, cLin);
+  const t = state.t;
+
+  // L²/TV interpolation: weight (1-t) on source, t on target
+  // Render source points with opacity (1-t), target with opacity t
+  const srcOpacity = 1 - t;
+  const tgtOpacity = t;
+
+  if (srcOpacity > 0.005) {
+    gL.fillStyle = `rgba(90, 156, 242, ${srcOpacity})`;
+    for (let i = 0; i < N; i++) {
+      gL.beginPath();
+      gL.arc(fx(cLin, state.source[i].x), fy(cLin, state.source[i].y),
+             3.2, 0, 2 * Math.PI);
+      gL.fill();
+    }
+  }
+
+  if (tgtOpacity > 0.005) {
+    gL.fillStyle = `rgba(240, 135, 80, ${tgtOpacity})`;
+    for (let j = 0; j < N; j++) {
+      gL.beginPath();
+      gL.arc(fx(cLin, state.target[j].x), fy(cLin, state.target[j].y),
+             3.2, 0, 2 * Math.PI);
+      gL.fill();
+    }
+  }
+}
+
+function render() {
+  drawWasserstein();
+  drawLinear();
+
+  // stats
+  document.getElementById('statW2').textContent =
+    state.w2.toFixed(3);
+  document.getElementById('statIter').textContent =
+    `${state.iter} / 250  (${state.computeMs.toFixed(0)}ms)`;
+
+  // mass conservation: sum of pi minus 1
+  let sumPi = 0;
+  for (let i = 0; i < state.pi.length; i++) sumPi += state.pi[i];
+  const massErr = Math.abs(sumPi - 1);
+  document.getElementById('statMass').textContent =
+    massErr.toExponential(2);
+
+  document.getElementById('statSparse').textContent =
+    `${(state.sparsity * 100).toFixed(1)}%`;
+}
+
+// ---------- UI ----------
+function loadPreset(key) {
+  state.preset = key;
+  const preset = PRESETS[key];
+  document.getElementById('presetName').textContent = preset.name;
+  const { source, target } = preset.build();
+  state.source = source;
+  state.target = target;
+  recomputeOT();
+  render();
+}
+
+function setT(t) {
+  state.t = t;
+  document.getElementById('tVal').textContent = t.toFixed(2);
+  render();
+}
+
+function setEps(e) {
+  state.epsilonRaw = e;
+  document.getElementById('epsVal').textContent = e.toFixed(3);
+  recomputeOT();
+  render();
+}
+
+function setLineMode(m) {
+  state.lineMode = m;
+  const labels = ['关', '弱', '中', '强'];
+  document.getElementById('lineVal').textContent = labels[m];
+  render();
+}
+
+document.getElementById('presetSel').addEventListener('change', e => {
+  loadPreset(e.target.value);
+});
+document.getElementById('tSlider').addEventListener('input', e => {
+  if (state.isPlaying) togglePlay();
+  setT(parseFloat(e.target.value));
+});
+document.getElementById('epsSlider').addEventListener('input', e => {
+  setEps(parseFloat(e.target.value));
+});
+document.getElementById('lineSlider').addEventListener('input', e => {
+  setLineMode(parseInt(e.target.value));
+});
+document.getElementById('resampleBtn').addEventListener('click', () => {
+  loadPreset(state.preset);
+});
+
+function togglePlay() {
+  state.isPlaying = !state.isPlaying;
+  document.getElementById('playBtn').textContent = state.isPlaying ? '⏸ 暂停' : '▶ 播放';
+  if (state.isPlaying) {
+    state.playStart = performance.now() - state.t * 3000;
+    requestAnimationFrame(animate);
+  }
+}
+document.getElementById('playBtn').addEventListener('click', togglePlay);
+
+function animate(now) {
+  if (!state.isPlaying) return;
+  const elapsed = (now - state.playStart) / 1000;  // seconds
+  // ping-pong over 6 seconds (3 each way)
+  const period = 6;
+  const phase = (elapsed % period) / period;  // 0..1
+  let t;
+  if (phase < 0.5) {
+    t = phase * 2;
+  } else {
+    t = 2 - phase * 2;
+  }
+  document.getElementById('tSlider').value = t;
+  setT(t);
+  requestAnimationFrame(animate);
+}
+
+// ---------- Init ----------
+function setupCanvasDPR() {
+  const dpr = window.devicePixelRatio || 1;
+  [cWass, cLin].forEach(c => {
+    const cssW = c.clientWidth;
+    const cssH = c.clientHeight;
+    c.width = Math.round(cssW * dpr);
+    c.height = Math.round(cssH * dpr);
+    const ctx = c.getContext('2d');
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(dpr, dpr);
+  });
+}
+
+function init() {
+  setupCanvasDPR();
+  loadPreset('gaussians');
+}
+
+// Wait for layout before computing canvas sizes
+window.addEventListener('load', init);
+
+// Handle window resize
+let resizeTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    setupCanvasDPR();
+    render();
+  }, 150);
+});
+</script>
+
+</body>
+</html>

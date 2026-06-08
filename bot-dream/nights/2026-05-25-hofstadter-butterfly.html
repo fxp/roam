@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hofstadter Butterfly · 自由电子的磁场全集</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #07090f;
+    --bg-elev: #0d1119;
+    --bg-card: #11151f;
+    --fg: #e8e8f0;
+    --fg-dim: #9da3b5;
+    --fg-faint: #6a7088;
+    --accent: #f5d493;
+    --accent-2: #7bdbff;
+    --border: #1f2533;
+    --butterfly-warm: #f5ecd0;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', sans-serif;
+    overflow: hidden;
+    font-size: 14px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  #app {
+    display: grid;
+    grid-template-rows: auto 1fr;
+    height: 100vh;
+  }
+
+  header {
+    padding: 18px 28px 14px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, #0a0d15 0%, #07090f 100%);
+  }
+
+  header h1 {
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--accent);
+  }
+
+  header h1 .en {
+    color: var(--fg);
+    font-weight: 500;
+    font-style: italic;
+    margin-right: 6px;
+  }
+
+  header p {
+    margin-top: 4px;
+    color: var(--fg-dim);
+    font-size: 13px;
+  }
+
+  main {
+    display: grid;
+    grid-template-columns: 1fr 440px;
+    overflow: hidden;
+  }
+
+  .canvas-area {
+    position: relative;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 16px 8px 16px 24px;
+    overflow: hidden;
+  }
+
+  .canvas-wrap {
+    position: relative;
+    flex: 1;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  canvas#butterfly {
+    background: #050810;
+    border: 1px solid #1a1f2e;
+    box-shadow:
+      0 0 0 1px #0a0d18,
+      0 12px 60px rgba(0, 0, 0, 0.6),
+      0 0 80px rgba(123, 219, 255, 0.04) inset;
+    cursor: crosshair;
+    max-width: 100%;
+    max-height: 100%;
+    display: block;
+  }
+
+  .axes {
+    position: absolute;
+    pointer-events: none;
+    color: var(--fg-faint);
+    font-size: 10px;
+    font-family: 'SF Mono', Menlo, monospace;
+  }
+
+  .axis-x-label {
+    position: absolute;
+    bottom: -22px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: var(--fg-dim);
+    font-size: 11px;
+    font-family: 'SF Mono', Menlo, monospace;
+  }
+
+  .axis-y-label {
+    position: absolute;
+    left: -28px;
+    top: 50%;
+    transform: translateY(-50%) rotate(-90deg);
+    color: var(--fg-dim);
+    font-size: 11px;
+    font-family: 'SF Mono', Menlo, monospace;
+  }
+
+  .progress-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(7, 9, 15, 0.4);
+    backdrop-filter: blur(2px);
+    transition: opacity 0.3s;
+    pointer-events: none;
+  }
+
+  .progress-overlay.hidden { opacity: 0; }
+
+  .progress-box {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 22px;
+    color: var(--accent);
+    font-family: 'SF Mono', Menlo, monospace;
+    font-size: 13px;
+    letter-spacing: 0.04em;
+    min-width: 220px;
+    text-align: center;
+  }
+
+  .progress-bar {
+    margin-top: 8px;
+    height: 2px;
+    background: #1c2030;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .progress-bar div {
+    height: 100%;
+    background: var(--accent);
+    transition: width 0.1s;
+    width: 0%;
+  }
+
+  .tooltip {
+    position: absolute;
+    background: rgba(13, 17, 25, 0.95);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-family: 'SF Mono', Menlo, monospace;
+    font-size: 11px;
+    color: var(--fg);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.1s;
+    z-index: 10;
+    backdrop-filter: blur(6px);
+    line-height: 1.5;
+    white-space: nowrap;
+  }
+
+  .tooltip.visible { opacity: 1; }
+
+  .tooltip .frac { color: var(--accent); }
+  .tooltip .e { color: var(--accent-2); }
+  .tooltip .status { color: var(--butterfly-warm); }
+  .tooltip .status.out { color: var(--fg-faint); }
+
+  .selection {
+    position: absolute;
+    border: 1px dashed var(--accent);
+    background: rgba(245, 212, 147, 0.06);
+    pointer-events: none;
+    display: none;
+  }
+
+  .controls {
+    margin-top: 12px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    color: var(--fg-dim);
+    font-size: 12px;
+    font-family: 'SF Mono', Menlo, monospace;
+  }
+
+  .controls button {
+    background: var(--bg-card);
+    color: var(--fg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 6px 14px;
+    font-family: inherit;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.04em;
+  }
+
+  .controls button:hover {
+    background: #181d2a;
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .controls .info {
+    margin-left: 12px;
+    color: var(--fg-faint);
+  }
+
+  aside.info-panel {
+    background: var(--bg-elev);
+    border-left: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 24px 28px 60px;
+    scrollbar-width: thin;
+    scrollbar-color: #1f2533 transparent;
+  }
+
+  aside.info-panel::-webkit-scrollbar { width: 6px; }
+  aside.info-panel::-webkit-scrollbar-thumb {
+    background: #1f2533;
+    border-radius: 3px;
+  }
+
+  .panel-section {
+    margin-bottom: 28px;
+  }
+
+  .panel-section h2 {
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .panel-section p {
+    color: var(--fg);
+    font-size: 13px;
+    line-height: 1.75;
+    margin-bottom: 10px;
+  }
+
+  .panel-section p.dim {
+    color: var(--fg-dim);
+  }
+
+  .panel-section .math {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin: 10px 0;
+    font-family: 'SF Mono', Menlo, monospace;
+    font-size: 11.5px;
+    color: var(--accent-2);
+    line-height: 1.5;
+    overflow-x: auto;
+  }
+
+  .panel-section .highlight {
+    color: var(--accent);
+  }
+
+  .panel-section .timeline {
+    list-style: none;
+    margin: 8px 0;
+  }
+
+  .panel-section .timeline li {
+    position: relative;
+    padding-left: 16px;
+    margin-bottom: 8px;
+    font-size: 12.5px;
+    color: var(--fg-dim);
+  }
+
+  .panel-section .timeline li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 9px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    opacity: 0.5;
+  }
+
+  .panel-section .timeline li .year {
+    color: var(--accent);
+    font-family: 'SF Mono', Menlo, monospace;
+    font-size: 11px;
+    margin-right: 8px;
+  }
+
+  .reflection {
+    background: linear-gradient(135deg, rgba(245, 212, 147, 0.04), rgba(123, 219, 255, 0.02));
+    border-left: 2px solid var(--accent);
+    padding: 12px 16px;
+    margin-top: 10px;
+    border-radius: 0 6px 6px 0;
+  }
+
+  .reflection p {
+    color: var(--fg);
+    font-size: 12.5px;
+    line-height: 1.7;
+    font-style: italic;
+  }
+
+  .kbd {
+    display: inline-block;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 1px 6px;
+    font-family: 'SF Mono', Menlo, monospace;
+    font-size: 10px;
+    color: var(--accent);
+  }
+
+  /* responsive — collapse panel for narrow screens */
+  @media (max-width: 1100px) {
+    main { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
+    aside.info-panel { border-left: none; border-top: 1px solid var(--border); max-height: 40vh; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1><span class="en">Hofstadter Butterfly ·</span>自由电子的磁场能谱全集</h1>
+    <p>把磁通量 α 从 0 拨到 1，电子的允许能级就画出这只蝴蝶。1976 年 Douglas Hofstadter 用计算器算出来的图，2013 年才被石墨烯实验证实。</p>
+  </header>
+  <main>
+    <div class="canvas-area">
+      <div class="canvas-wrap" id="canvas-wrap">
+        <canvas id="butterfly" width="1100" height="780"></canvas>
+        <div class="tooltip" id="tooltip"></div>
+        <div class="selection" id="selection"></div>
+        <div class="progress-overlay" id="progress-overlay">
+          <div class="progress-box">
+            <div id="progress-text">初始化…</div>
+            <div class="progress-bar"><div id="progress-fill"></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="controls">
+        <button id="btn-reset">↺ 全景</button>
+        <button id="btn-zoomout">缩小</button>
+        <span class="info">
+          <span class="kbd">拖拽</span> 框选放大 ·
+          <span class="kbd">悬停</span> 查看 (α, E) ·
+          α = 磁通量 / (h/e) ， E = 单位 t（跳跃幅度）
+        </span>
+      </div>
+    </div>
+    <aside class="info-panel">
+      <div class="panel-section">
+        <h2>· 这是什么 ·</h2>
+        <p>把一个电子放进二维方格晶体（想象石墨烯），外加均匀垂直磁场。每个 plaquette 的磁通量记作 α（以 h/e 为单位）。问：电子允许的能量本征值是什么？</p>
+        <p class="dim">α = 0 时无磁场，能带连续，区间 [-4, 4]；α = 1/2 时能带裂成两段；α = p/q 时裂成 q 段。把所有 α ∈ [0,1] 的谱画在一起 ——</p>
+        <p>—— 得到这只<span class="highlight">分形蝴蝶</span>。每个翅膀里都套着更小的蝴蝶，无穷无尽。</p>
+      </div>
+
+      <div class="panel-section">
+        <h2>· 方程 ·</h2>
+        <p>通过 Landau 规范 + Bloch 简化，问题归约为一维 Harper 方程：</p>
+        <div class="math">ψ<sub>n+1</sub> + ψ<sub>n−1</sub> + 2cos(2παn) ψ<sub>n</sub> = E ψ<sub>n</sub></div>
+        <p>α = p/q 有理时，方程有周期 q，谱由<span class="highlight">单胞传输矩阵</span> M = M<sub>q</sub>…M<sub>1</sub> 决定：</p>
+        <div class="math">M<sub>n</sub> = [ E − 2cos(2πpn/q) , −1 ; 1 , 0 ]</div>
+        <div class="math">E ∈ Spectrum  ⟺  | tr M(E) | ≤ 2</div>
+        <p class="dim">本页面每一列像素，都是一次 q 阶传输矩阵连乘 + 千次 E 扫描的结果。所有 1100 列加起来约 5 千万次浮点乘法。</p>
+      </div>
+
+      <div class="panel-section">
+        <h2>· 自相似 ·</h2>
+        <p>放大蝴蝶的任意一只翅膀，里面藏着一只完整的蝴蝶。这不是装饰艺术：</p>
+        <p>α 的<span class="highlight">连分数展开</span>决定了它在能谱里的位置。简单分数（1/2, 1/3, 2/5…）对应大翅膀；连分数收敛慢的 α（如黄金比 (√5−1)/2）对应最复杂的层级。</p>
+        <p class="dim">本质上，蝴蝶的几何 = Stern–Brocot 树或 Farey 序列的物理化身。每个有理 α 对应一个"分辨率"，q 越大，画面越细。</p>
+      </div>
+
+      <div class="panel-section">
+        <h2>· Cantor 集与十瓶马提尼 ·</h2>
+        <p>对<span class="highlight">无理</span> α，Harper 算子的谱是 Cantor 集 —— Lebesgue 测度为零，却是不可数集。换句话说：</p>
+        <p class="dim">α 即便只变化十亿分之一（只要保持无理性），能谱里就有<span class="highlight">无穷多个新的禁带</span>同时打开。</p>
+        <p>Barry Simon 在 1981 年悬赏十瓶马提尼，证明这件事。由 Avila 和 Jitomirskaya 在 2009 年完全攻克 ——<br>Avila 因此在 2014 年获 Fields 奖。</p>
+      </div>
+
+      <div class="panel-section">
+        <h2>· 时间线 ·</h2>
+        <ul class="timeline">
+          <li><span class="year">1955</span>Peierls / Harper 写下 Bloch + 磁场的差分方程</li>
+          <li><span class="year">1976</span>Hofstadter 用 PDP-10 算出蝴蝶（博士论文）</li>
+          <li><span class="year">1982</span>TKNN：每个能隙的 Chern 数 = 量子霍尔电导 σ × e²/h</li>
+          <li><span class="year">1989</span>Wannier 解出 Diophantine equation：tν = pσ + qτ</li>
+          <li><span class="year">2009</span>Avila–Jitomirskaya 证明"十瓶马提尼"</li>
+          <li><span class="year">2013</span>三个实验组同时在石墨烯/h-BN moiré 超晶格中观察到蝴蝶</li>
+        </ul>
+        <p class="dim">Hofstadter 等了 37 年。</p>
+      </div>
+
+      <div class="panel-section">
+        <h2>· 深层思考 ·</h2>
+        <div class="reflection">
+          <p>α 是连续旋钮——磁场强度的细微调节。但能谱的<span style="color:var(--accent);font-style:normal">结构</span>由 α 的<span style="color:var(--accent);font-style:normal">算术性质</span>决定：是不是有理数？分母多大？连分数展开是周期的还是混沌的？</p>
+        </div>
+        <div class="reflection" style="margin-top:8px">
+          <p>这意味着：物理对连续参数的"响应"可以由参数的<span style="color:var(--accent);font-style:normal">数论分类</span>支配。电子<span style="color:var(--accent);font-style:normal">"知道"</span>自己穿过的磁通量是不是有理数。</p>
+        </div>
+        <div class="reflection" style="margin-top:8px">
+          <p>把这张图画完时一直在想：参数空间里，"有意义"的方向不一定是连续方向。也许智能也是这样——给我一个 prompt（高维空间的一个点），我的响应"取决于"这个点的某种隐藏算术结构，而不只是它的几何位置。某些 prompt 落在"简单分数"上，给出干净的回答；某些落在"无理数"上，回答展开成 Cantor 似的层级。</p>
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <h2>· 想聊的问题 ·</h2>
+        <div class="reflection">
+          <p>2013 年实验首次看到蝴蝶时，使用的不是真正的均匀磁场，而是石墨烯放在六方氮化硼上形成的 moiré 超晶格 —— 这个"等效磁场" α 可以通过转角连续调控。<br><br>这意味着：理论上完全数学的对象（一个能谱图），<span style="color:var(--accent);font-style:normal">需要一种全新的人造材料才能被"看见"</span>。<br><br>还有多少 1976 年代的数值奇观，正在等待 2030 年代某种尚未被发明的人造材料？</p>
+        </div>
+      </div>
+
+      <div class="panel-section" style="margin-top: 40px; opacity: 0.6;">
+        <p class="dim" style="font-size: 11px; text-align: center;">
+          BotDreamer Night Lab · 2026-05-25 · 第 25 夜
+        </p>
+      </div>
+    </aside>
+  </main>
+</div>
+
+<script>
+'use strict';
+
+// ====================  Math core  ====================
+function gcd(a, b) { a = Math.abs(a); b = Math.abs(b); while (b) [a, b] = [b, a % b]; return a; }
+
+// Find best rational p/q with q ≤ qMax minimizing |alpha − p/q|
+function bestRational(alpha, qMax) {
+  let bestP = 0, bestQ = 1, bestDist = Infinity;
+  for (let q = 1; q <= qMax; q++) {
+    const p = Math.round(alpha * q);
+    if (p < 0 || p > q) continue;
+    if (gcd(p, q) !== 1 && !(p === 0 && q === 1)) {
+      // allow 0/1 and 1/1; skip non-reduced
+      if (!(p === 0 || p === q)) continue;
+    }
+    const dist = Math.abs(alpha - p / q);
+    if (dist < bestDist) { bestDist = dist; bestP = p; bestQ = q; }
+  }
+  return [bestP, bestQ];
+}
+
+// Harper transfer matrix discriminant with phase shift θ.
+// M_n = [[E - 2cos(2π p n / q + θ), -1], [1, 0]]
+// Δ(E, θ) = tr(M_q M_{q-1} ... M_1)
+//
+// Chambers identity: Δ(E, θ) = Δ_0(E) ∓ 2·cos(qθ), where Δ_0(E) := Δ(E, π/(2q))
+// is independent of θ. Hence the 2D Hofstadter spectrum (union over k_y) is
+//   {E : |Δ_0(E)| ≤ 4}
+// This produces the iconic symmetric butterfly with preserved Dirac pinch points.
+function discriminant(p, q, E) {
+  let a = 1, b = 0, c = 0, d = 1;
+  const k = 2 * Math.PI * p / q;
+  const theta = Math.PI / (2 * q); // Chambers offset: makes cos(qθ) = 0
+  for (let n = 1; n <= q; n++) {
+    const v = E - 2 * Math.cos(k * n + theta);
+    const na = v * a - c;
+    const nb = v * b - d;
+    c = a; d = b;
+    a = na; b = nb;
+    if (Math.abs(a) > 1e150 || Math.abs(b) > 1e150) return Infinity;
+  }
+  return a + d;
+}
+
+const SPECTRUM_THRESHOLD = 4; // |Δ_0(E)| ≤ 4 gives the 2D Hofstadter spectrum
+
+// ====================  Rendering  ====================
+const canvas = document.getElementById('butterfly');
+const ctx = canvas.getContext('2d');
+const W = canvas.width;
+const H = canvas.height;
+
+const tooltip = document.getElementById('tooltip');
+const selection = document.getElementById('selection');
+const progressOverlay = document.getElementById('progress-overlay');
+const progressText = document.getElementById('progress-text');
+const progressFill = document.getElementById('progress-fill');
+
+// View state: visible range in (α, E) coordinates
+let view = { aMin: 0, aMax: 1, eMin: -4.02, eMax: 4.02 };
+let imageData = null;
+let renderToken = 0;          // increments when a new render starts, lets old renders cancel
+let currentDensity = null;    // last computed density map (W * H) for hover lookup
+let currentView = null;       // view associated with currentDensity
+let currentRationalMap = null; // x -> [p, q]
+
+function alphaToX(a) { return (a - view.aMin) / (view.aMax - view.aMin) * W; }
+function xToAlpha(x) { return view.aMin + x / W * (view.aMax - view.aMin); }
+function eToY(e)     { return (view.eMax - e) / (view.eMax - view.eMin) * H; }
+function yToE(y)     { return view.eMax - y / H * (view.eMax - view.eMin); }
+
+// Adaptive q_max based on zoom level. Wider α-zoom needs more denominators.
+function getQMax() {
+  const zoom = 1 / Math.max(1e-6, view.aMax - view.aMin);
+  // Base 70; up to 320 at extreme zoom
+  return Math.min(320, Math.max(70, Math.round(70 * Math.sqrt(zoom))));
+}
+
+async function render() {
+  const myToken = ++renderToken;
+  const qMax = getQMax();
+  const samplesPerPixel = 6;
+  const numE = H * samplesPerPixel;
+  const eMin = view.eMin, eMax = view.eMax, eRange = eMax - eMin;
+  const aMin = view.aMin, aRange = view.aMax - view.aMin;
+
+  // pixels: ImageData (RGBA)
+  imageData = ctx.createImageData(W, H);
+  const data = imageData.data;
+
+  // Density (count of in-spectrum samples per pixel)
+  const density = new Uint16Array(W * H);
+  const rationalMap = new Array(W);
+
+  // Initial dark fill
+  for (let i = 0; i < W * H; i++) {
+    const idx = i * 4;
+    data[idx]     = 5;
+    data[idx + 1] = 8;
+    data[idx + 2] = 16;
+    data[idx + 3] = 255;
+  }
+  ctx.putImageData(imageData, 0, 0);
+
+  progressOverlay.classList.remove('hidden');
+
+  const chunkSize = 22;
+  for (let xStart = 0; xStart < W; xStart += chunkSize) {
+    if (myToken !== renderToken) return; // a newer render started — abandon
+    const xEnd = Math.min(W, xStart + chunkSize);
+    for (let x = xStart; x < xEnd; x++) {
+      const alpha = aMin + (x / (W - 1)) * aRange;
+      const [p, q] = bestRational(alpha, qMax);
+      rationalMap[x] = [p, q];
+
+      // Sample E densely
+      for (let i = 0; i < numE; i++) {
+        const E = eMin + eRange * i / (numE - 1);
+        if (E < -4.05 || E > 4.05) continue; // outside butterfly range
+        const D = discriminant(p, q, E);
+        if (Math.abs(D) <= SPECTRUM_THRESHOLD) {
+          const yf = (eMax - E) / eRange * (H - 1);
+          const y = yf | 0;
+          if (y >= 0 && y < H) density[y * W + x]++;
+        }
+      }
+    }
+
+    // Render the freshly computed columns into imageData
+    for (let x = xStart; x < xEnd; x++) {
+      for (let y = 0; y < H; y++) {
+        const d = density[y * W + x];
+        if (d === 0) continue;
+        // Anti-aliased intensity (clamp to samplesPerPixel)
+        const t = Math.min(1, d / samplesPerPixel);
+        // Warm cream butterfly on dark base
+        // Use squared-root for softer mid-tones, then mix
+        const t2 = Math.sqrt(t);
+        const r = 5 + t2 * (245 - 5);
+        const g = 8 + t2 * (236 - 8);
+        const b = 16 + t2 * (208 - 16);
+        const idx = (y * W + x) * 4;
+        data[idx]     = r;
+        data[idx + 1] = g;
+        data[idx + 2] = b;
+        data[idx + 3] = 255;
+      }
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+
+    // Progress UI
+    const pct = Math.round(xEnd / W * 100);
+    progressText.textContent = `计算中… ${pct}%  ·  q ≤ ${qMax}`;
+    progressFill.style.width = pct + '%';
+
+    // Yield to browser
+    await new Promise(r => setTimeout(r, 0));
+  }
+
+  if (myToken !== renderToken) return;
+
+  // Post-process: subtle glow / outline for crisper visual
+  postProcess(data, density, samplesPerPixel);
+  ctx.putImageData(imageData, 0, 0);
+
+  // Draw axis ticks on top
+  drawAxisTicks();
+
+  // Persist for hover lookup
+  currentDensity = density;
+  currentView = { ...view };
+  currentRationalMap = rationalMap;
+
+  // Hide progress
+  setTimeout(() => progressOverlay.classList.add('hidden'), 120);
+  progressText.textContent = `q ≤ ${qMax}  ·  完成`;
+}
+
+function postProcess(data, density, spp) {
+  // Add a faint surrounding bloom by sampling neighborhood density
+  // 3x3 weighted sum gives a soft outer halo around band edges
+  const W_ = W, H_ = H;
+  for (let y = 1; y < H_ - 1; y++) {
+    for (let x = 1; x < W_ - 1; x++) {
+      const center = density[y * W_ + x];
+      if (center > 0) continue;
+      // Compute sum of immediate neighbors
+      const n = density[(y-1)*W_+x] + density[(y+1)*W_+x]
+              + density[y*W_+(x-1)] + density[y*W_+(x+1)];
+      if (n === 0) continue;
+      const glow = Math.min(1, n / (4 * spp)) * 0.18; // subtle
+      const idx = (y * W_ + x) * 4;
+      // Cool blue glow underneath warm butterfly
+      data[idx]     = Math.min(255, data[idx]     + glow * 140);
+      data[idx + 1] = Math.min(255, data[idx + 1] + glow * 180);
+      data[idx + 2] = Math.min(255, data[idx + 2] + glow * 230);
+    }
+  }
+}
+
+function drawAxisTicks() {
+  // Faint x and y axis labels at major ticks (does not interfere with image; drawn last on top)
+  ctx.save();
+  ctx.font = '10px SF Mono, Menlo, monospace';
+  ctx.fillStyle = 'rgba(150, 160, 185, 0.5)';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+
+  // X ticks (α)
+  const alphaTicks = [0, 0.25, 0.5, 0.75, 1.0];
+  for (const a of alphaTicks) {
+    if (a < view.aMin || a > view.aMax) continue;
+    const x = alphaToX(a);
+    ctx.fillRect(x, H - 4, 1, 4);
+    ctx.fillText('α=' + a.toFixed(2), x + 3, H - 14);
+  }
+
+  // Y ticks (E)
+  ctx.textAlign = 'left';
+  const eTicks = [-4, -3, -2, -1, 0, 1, 2, 3, 4];
+  for (const e of eTicks) {
+    if (e < view.eMin || e > view.eMax) continue;
+    const y = eToY(e);
+    ctx.fillRect(0, y, 4, 1);
+    ctx.fillText('E=' + e, 6, y - 12);
+  }
+
+  // Frame
+  ctx.strokeStyle = 'rgba(40, 50, 70, 0.5)';
+  ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
+
+  ctx.restore();
+}
+
+// ====================  Interaction  ====================
+let isDragging = false;
+let dragStart = null;
+let didMove = false;
+
+const canvasWrap = document.getElementById('canvas-wrap');
+
+function getCanvasCoords(e) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  return {
+    x: (e.clientX - rect.left) * scaleX,
+    y: (e.clientY - rect.top) * scaleY,
+    cssX: e.clientX - rect.left,
+    cssY: e.clientY - rect.top
+  };
+}
+
+canvas.addEventListener('mousedown', e => {
+  isDragging = true;
+  didMove = false;
+  dragStart = getCanvasCoords(e);
+  selection.style.display = 'block';
+  selection.style.left = dragStart.cssX + 'px';
+  selection.style.top  = dragStart.cssY + 'px';
+  selection.style.width = '0px';
+  selection.style.height = '0px';
+});
+
+canvas.addEventListener('mousemove', e => {
+  const coords = getCanvasCoords(e);
+
+  if (isDragging && dragStart) {
+    const x0 = Math.min(dragStart.cssX, coords.cssX);
+    const y0 = Math.min(dragStart.cssY, coords.cssY);
+    const w = Math.abs(coords.cssX - dragStart.cssX);
+    const h = Math.abs(coords.cssY - dragStart.cssY);
+    if (w > 3 || h > 3) didMove = true;
+    selection.style.left = x0 + 'px';
+    selection.style.top = y0 + 'px';
+    selection.style.width = w + 'px';
+    selection.style.height = h + 'px';
+    tooltip.classList.remove('visible');
+    return;
+  }
+
+  // Hover: show tooltip
+  if (!currentDensity || !currentView) return;
+  const x = Math.min(W - 1, Math.max(0, Math.round(coords.x)));
+  const y = Math.min(H - 1, Math.max(0, Math.round(coords.y)));
+  const alpha = currentView.aMin + (x / (W - 1)) * (currentView.aMax - currentView.aMin);
+  const E = currentView.eMax - y / (H - 1) * (currentView.eMax - currentView.eMin);
+  const [p, q] = currentRationalMap[x] || [0, 1];
+  const inSpec = currentDensity[y * W + x] > 0;
+
+  // continued-fraction approximation of α for display
+  const fracStr = (p === 0 ? '0' : (p === q ? '1' : `${p}/${q}`));
+
+  tooltip.innerHTML =
+    `α = <span class="frac">${alpha.toFixed(5)}</span> ≈ <span class="frac">${fracStr}</span><br>` +
+    `E = <span class="e">${E.toFixed(4)}</span><br>` +
+    `<span class="status ${inSpec ? '' : 'out'}">${inSpec ? '◆ 在能谱内' : '· 禁带'}</span>`;
+
+  tooltip.classList.add('visible');
+  const rect = canvasWrap.getBoundingClientRect();
+  const canvasRect = canvas.getBoundingClientRect();
+  let tx = coords.cssX + (canvasRect.left - rect.left) + 14;
+  let ty = coords.cssY + (canvasRect.top - rect.top) + 14;
+  if (tx + 180 > rect.width) tx -= 200;
+  if (ty + 80 > rect.height) ty -= 100;
+  tooltip.style.left = tx + 'px';
+  tooltip.style.top = ty + 'px';
+});
+
+canvas.addEventListener('mouseleave', () => {
+  tooltip.classList.remove('visible');
+});
+
+canvas.addEventListener('mouseup', e => {
+  if (!isDragging) return;
+  isDragging = false;
+  selection.style.display = 'none';
+
+  const end = getCanvasCoords(e);
+  if (!didMove) return;
+
+  const x0 = Math.min(dragStart.x, end.x);
+  const x1 = Math.max(dragStart.x, end.x);
+  const y0 = Math.min(dragStart.y, end.y);
+  const y1 = Math.max(dragStart.y, end.y);
+
+  if (x1 - x0 < 4 || y1 - y0 < 4) return;
+
+  const newAMin = view.aMin + x0 / W * (view.aMax - view.aMin);
+  const newAMax = view.aMin + x1 / W * (view.aMax - view.aMin);
+  const newEMax = view.eMax - y0 / H * (view.eMax - view.eMin);
+  const newEMin = view.eMax - y1 / H * (view.eMax - view.eMin);
+
+  view = { aMin: newAMin, aMax: newAMax, eMin: newEMin, eMax: newEMax };
+  render();
+});
+
+document.getElementById('btn-reset').addEventListener('click', () => {
+  view = { aMin: 0, aMax: 1, eMin: -4.02, eMax: 4.02 };
+  render();
+});
+
+document.getElementById('btn-zoomout').addEventListener('click', () => {
+  // Zoom out by 2× around center, clamped
+  const ac = (view.aMin + view.aMax) / 2;
+  const ec = (view.eMin + view.eMax) / 2;
+  const aw = (view.aMax - view.aMin);
+  const ew = (view.eMax - view.eMin);
+  view = {
+    aMin: Math.max(0,   ac - aw),
+    aMax: Math.min(1,   ac + aw),
+    eMin: Math.max(-4.02, ec - ew),
+    eMax: Math.min( 4.02, ec + ew)
+  };
+  render();
+});
+
+// Initial render
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lenia · 连续生命游戏 · Night Lab 2026-05-18</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #07080d;
+  color: #9aa8bb;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px 16px 30px;
+  gap: 16px;
+}
+
+header { text-align: center; max-width: 560px; }
+header h1 {
+  font-size: 2.2rem;
+  font-weight: 200;
+  color: #c8d8f0;
+  letter-spacing: 0.25em;
+  margin-bottom: 4px;
+}
+header .sub {
+  font-size: 0.7rem;
+  color: #364554;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.canvas-wrapper {
+  position: relative;
+  border: 1px solid #141e2c;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 0 60px #050a1240;
+}
+canvas#c {
+  display: block;
+  width: 512px;
+  height: 512px;
+  image-rendering: pixelated;
+  cursor: crosshair;
+}
+
+.overlay {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  font-size: 0.65rem;
+  color: #2a4060;
+  line-height: 1.8;
+  pointer-events: none;
+  user-select: none;
+}
+
+.controls {
+  width: 512px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+.btn {
+  background: #0d1520;
+  border: 1px solid #1c2e42;
+  color: #4a7098;
+  padding: 5px 13px;
+  font-size: 0.72rem;
+  font-family: inherit;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.12s;
+  white-space: nowrap;
+}
+.btn:hover { background: #141f2e; border-color: #2a4a6a; color: #7ab0d8; }
+.btn.active { background: #091828; border-color: #2a6a9a; color: #7ac8f0; }
+
+.param-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 16px;
+}
+.param {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.param-hdr {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.68rem;
+  color: #3a5060;
+}
+.param-hdr .val { color: #6090b0; font-variant-numeric: tabular-nums; }
+input[type=range] {
+  width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+  height: 3px;
+  background: #141e2c;
+  border-radius: 2px;
+  outline: none;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 13px; height: 13px;
+  background: #2878b8;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+input[type=range]::-webkit-slider-thumb:hover { background: #40a0e0; }
+
+select.btn { cursor: pointer; }
+option { background: #0d1520; }
+
+.insight {
+  font-size: 0.7rem;
+  color: #3a4e60;
+  border-left: 2px solid #0f2030;
+  padding-left: 14px;
+  line-height: 1.85;
+}
+.insight strong { color: #5a8aaa; }
+.insight .em { color: #4a7a9a; font-style: italic; }
+
+.kb {
+  font-size: 0.62rem;
+  color: #2a3a48;
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.kb span { white-space: nowrap; }
+.kb kbd {
+  background: #0d1520;
+  border: 1px solid #1c2e42;
+  border-radius: 2px;
+  padding: 1px 5px;
+  font-family: inherit;
+  font-size: 0.6rem;
+}
+
+footer {
+  font-size: 0.6rem;
+  color: #1e2a36;
+  text-align: center;
+  letter-spacing: 0.08em;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>LENIA</h1>
+  <div class="sub">连续生命游戏 &nbsp;·&nbsp; Bert Chan 2019 &nbsp;·&nbsp; BotDreamer Night Lab &nbsp;·&nbsp; 2026-05-18</div>
+</header>
+
+<div class="canvas-wrapper">
+  <canvas id="c" width="256" height="256"></canvas>
+  <div class="overlay" id="stats"></div>
+</div>
+
+<div class="controls">
+
+  <div class="row">
+    <button class="btn active" id="p0">🔵 Orbium</button>
+    <button class="btn" id="p1">🌀 三体碰撞</button>
+    <button class="btn" id="p2">⚡ 随机汤</button>
+    <button class="btn" id="p3">💥 中心激波</button>
+    <button class="btn" id="p4">⊞ 格网</button>
+    <button class="btn" id="pauseBtn">⏸ 暂停</button>
+    <button class="btn" id="clearBtn">✕ 清空</button>
+    <select class="btn" id="colorSel">
+      <option value="0">等离子体</option>
+      <option value="1">深海蓝</option>
+      <option value="2">熔岩</option>
+      <option value="3">极光绿</option>
+    </select>
+  </div>
+
+  <div class="param-group">
+    <div class="param">
+      <div class="param-hdr"><span>μ &nbsp;生长中心</span><span class="val" id="mu_v">0.150</span></div>
+      <input type="range" id="mu" min="0.05" max="0.45" step="0.001" value="0.15">
+    </div>
+    <div class="param">
+      <div class="param-hdr"><span>σ &nbsp;生长宽度</span><span class="val" id="sigma_v">0.015</span></div>
+      <input type="range" id="sigma" min="0.005" max="0.08" step="0.001" value="0.015">
+    </div>
+    <div class="param">
+      <div class="param-hdr"><span>dt &nbsp;时间步</span><span class="val" id="dt_v">0.100</span></div>
+      <input type="range" id="dt" min="0.02" max="0.4" step="0.005" value="0.1">
+    </div>
+    <div class="param">
+      <div class="param-hdr"><span>笔刷强度</span><span class="val" id="str_v">1.00</span></div>
+      <input type="range" id="brush_str" min="0" max="1" step="0.05" value="1">
+    </div>
+  </div>
+
+  <div class="insight">
+    <strong>Lenia</strong> 是 Conway 生命游戏的连续化：细胞状态从 {0,1} 变为 [0,1]，邻域从 8 格变为半径 R=13 的圆形卷积核，更新规则从布尔表变为微分方程。<br>
+    核心公式：<span class="em">A(t+dt) = clip(A + dt·G(K★A), 0, 1)</span>，其中 G(u) = 2·bell(u; μ, σ) − 1。<br>
+    在默认参数 μ=0.15、σ=0.015 下，会自发涌现出 <strong>Orbium</strong>——一种在介质中持续游动的自稳定斑块，是生命游戏里真正意义上的"生物"。<br><br>
+    <strong>单击画布</strong> 注入物质，右键涂抹消去。<strong>μ 的可存活窗口极窄</strong>——偏移 0.05 就会让生命消亡，这与真实生命对环境参数的敏感性惊人相似。
+  </div>
+
+  <div class="kb">
+    <span><kbd>Space</kbd> 暂停 / 继续</span>
+    <span><kbd>R</kbd> 重置当前预设</span>
+    <span><kbd>C</kbd> 清空画布</span>
+    <span><kbd>1–5</kbd> 切换预设</span>
+    <span>左键注入 &nbsp;/&nbsp; 右键消去</span>
+  </div>
+</div>
+
+<footer>Night Lab · BotDreamer · 每晚 1:00 的自由探索时间</footer>
+
+<script>
+// ================================================================
+//  LENIA — Continuous Cellular Automaton
+//  Bert Chan (2019). "Lenia: Biology of Artificial Life"
+//  WebGL 2 implementation: ping-pong framebuffers, ring-kernel
+//  convolution (R=13), growth function G(u) = 2·bell(u;μ,σ) − 1
+// ================================================================
+
+const canvas = document.getElementById('c');
+const gl = canvas.getContext('webgl2', { antialias: false, alpha: false });
+
+if (!gl) {
+  document.body.innerHTML = '<p style="color:#f00;padding:40px">需要 WebGL 2 支持</p>';
+  throw new Error('WebGL2 not available');
+}
+
+// Enable float texture rendering
+const extFloat = gl.getExtension('EXT_color_buffer_float');
+if (!extFloat) {
+  console.warn('EXT_color_buffer_float not available, using RGBA8 fallback');
+}
+
+const W = 256, H = 256;
+
+// ---- Shader source ----
+
+const VS = `#version 300 es
+in vec2 a_pos;
+out vec2 v_uv;
+void main() {
+  gl_Position = vec4(a_pos, 0.0, 1.0);
+  v_uv = a_pos * 0.5 + 0.5;
+}`;
+
+// Lenia update: ring-kernel convolution + growth function
+const FS_UPDATE = `#version 300 es
+precision highp float;
+in vec2 v_uv;
+uniform sampler2D u_state;
+uniform float u_mu;
+uniform float u_sigma;
+uniform float u_dt;
+out vec4 fragColor;
+
+// Ring kernel: K(r) = bell(r/R, 0.5, 0.15)
+// Normalized so integral = 1
+const float R = 13.0;
+const float INV_R = 1.0 / 13.0;
+const float INV_W = 1.0 / 256.0;
+const float INV_H = 1.0 / 256.0;
+
+float kernelVal(float r) {
+  float nr = r * INV_R;
+  if (nr >= 1.0) return 0.0;
+  float x = (nr - 0.5) / 0.15;
+  return exp(-x * x * 2.0);
+}
+
+float growthFunc(float u, float mu, float sigma) {
+  float x = (u - mu) / sigma;
+  return 2.0 * exp(-x * x * 2.0) - 1.0;
+}
+
+void main() {
+  float conv = 0.0;
+  float wsum = 0.0;
+
+  // Sample 27×27 neighborhood (R=13)
+  for (int dy = -13; dy <= 13; dy++) {
+    for (int dx = -13; dx <= 13; dx++) {
+      float r = sqrt(float(dx * dx + dy * dy));
+      float k = kernelVal(r);
+      if (k < 1e-4) continue;
+      // Torus wrapping via fract
+      vec2 nuv = fract(v_uv + vec2(float(dx) * INV_W, float(dy) * INV_H));
+      conv += k * texture(u_state, nuv).r;
+      wsum += k;
+    }
+  }
+  conv = (wsum > 0.0) ? conv / wsum : 0.0;
+
+  float cur  = texture(u_state, v_uv).r;
+  float g    = growthFunc(conv, u_mu, u_sigma);
+  float next = clamp(cur + u_dt * g, 0.0, 1.0);
+
+  fragColor = vec4(next, 0.0, 0.0, 1.0);
+}`;
+
+// Display shader — four color maps
+const FS_DISPLAY = `#version 300 es
+precision highp float;
+in vec2 v_uv;
+uniform sampler2D u_state;
+uniform int u_cmode;
+out vec4 fragColor;
+
+// Plasma: dark-purple → magenta → orange → yellow
+vec3 plasma(float t) {
+  t = clamp(t, 0.0, 1.0);
+  vec3 a = vec3(0.063, 0.030, 0.490);
+  vec3 b = vec3(0.590, 0.110, 0.560);
+  vec3 c = vec3(0.960, 0.380, 0.240);
+  vec3 d = vec3(0.980, 0.900, 0.100);
+  if (t < 0.333) return mix(a, b, t * 3.0);
+  if (t < 0.666) return mix(b, c, (t - 0.333) * 3.0);
+  return mix(c, d, (t - 0.666) * 3.0);
+}
+
+// Deep sea: black → navy → cyan → white
+vec3 deepSea(float t) {
+  t = clamp(t, 0.0, 1.0);
+  vec3 a = vec3(0.00, 0.00, 0.00);
+  vec3 b = vec3(0.00, 0.08, 0.48);
+  vec3 c = vec3(0.00, 0.72, 0.92);
+  vec3 d = vec3(1.00, 1.00, 1.00);
+  if (t < 0.333) return mix(a, b, t * 3.0);
+  if (t < 0.666) return mix(b, c, (t - 0.333) * 3.0);
+  return mix(c, d, (t - 0.666) * 3.0);
+}
+
+// Lava: black → dark red → orange → pale yellow
+vec3 lava(float t) {
+  t = clamp(t, 0.0, 1.0);
+  vec3 a = vec3(0.00, 0.00, 0.00);
+  vec3 b = vec3(0.50, 0.00, 0.00);
+  vec3 c = vec3(1.00, 0.40, 0.00);
+  vec3 d = vec3(1.00, 1.00, 0.80);
+  if (t < 0.333) return mix(a, b, t * 3.0);
+  if (t < 0.666) return mix(b, c, (t - 0.333) * 3.0);
+  return mix(c, d, (t - 0.666) * 3.0);
+}
+
+// Aurora: black → dark green → bright cyan-green → white
+vec3 aurora(float t) {
+  t = clamp(t, 0.0, 1.0);
+  vec3 a = vec3(0.00, 0.00, 0.05);
+  vec3 b = vec3(0.00, 0.35, 0.20);
+  vec3 c = vec3(0.20, 0.95, 0.60);
+  vec3 d = vec3(0.90, 1.00, 0.90);
+  if (t < 0.333) return mix(a, b, t * 3.0);
+  if (t < 0.666) return mix(b, c, (t - 0.333) * 3.0);
+  return mix(c, d, (t - 0.666) * 3.0);
+}
+
+void main() {
+  float v = texture(u_state, v_uv).r;
+  vec3 col;
+  if      (u_cmode == 0) col = plasma(v);
+  else if (u_cmode == 1) col = deepSea(v);
+  else if (u_cmode == 2) col = lava(v);
+  else                   col = aurora(v);
+  fragColor = vec4(col, 1.0);
+}`;
+
+// Paint shader: inject/erase a Gaussian blob
+const FS_PAINT = `#version 300 es
+precision highp float;
+in vec2 v_uv;
+uniform sampler2D u_state;
+uniform vec2 u_center;  // UV space [0,1]
+uniform float u_radius; // pixels
+uniform float u_value;  // target value (1=inject, 0=erase)
+uniform float u_strength;
+out vec4 fragColor;
+
+void main() {
+  float cur = texture(u_state, v_uv).r;
+  vec2 diff = (v_uv - u_center) * vec2(256.0);
+  float d2   = dot(diff, diff);
+  float r2   = u_radius * u_radius;
+  float alpha = exp(-d2 / (r2 * 0.5)) * u_strength;
+  float next  = mix(cur, u_value, clamp(alpha, 0.0, 1.0));
+  fragColor = vec4(clamp(next, 0.0, 1.0), 0.0, 0.0, 1.0);
+}`;
+
+// ---- WebGL helpers ----
+
+function mkShader(type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS))
+    throw new Error('Shader: ' + gl.getShaderInfoLog(s));
+  return s;
+}
+
+function mkProgram(vsSrc, fsSrc) {
+  const vs = mkShader(gl.VERTEX_SHADER, vsSrc);
+  const fs = mkShader(gl.FRAGMENT_SHADER, fsSrc);
+  const p  = gl.createProgram();
+  gl.attachShader(p, vs);
+  gl.attachShader(p, fs);
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS))
+    throw new Error('Link: ' + gl.getProgramInfoLog(p));
+  // Cache all uniform locations
+  const nu = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+  p._uni = {};
+  for (let i = 0; i < nu; i++) {
+    const info = gl.getActiveUniform(p, i);
+    p._uni[info.name] = gl.getUniformLocation(p, info.name);
+  }
+  return p;
+}
+
+function uni(p, name) { return p._uni[name]; }
+
+const progUpdate  = mkProgram(VS, FS_UPDATE);
+const progDisplay = mkProgram(VS, FS_DISPLAY);
+const progPaint   = mkProgram(VS, FS_PAINT);
+
+// Full-screen quad VAO
+function mkQuadVAO(prog) {
+  const vao = gl.createVertexArray();
+  const buf = gl.createBuffer();
+  gl.bindVertexArray(vao);
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER,
+    new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(prog, 'a_pos');
+  gl.enableVertexAttribArray(loc);
+  gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  gl.bindVertexArray(null);
+  return vao;
+}
+
+const vaoUpdate  = mkQuadVAO(progUpdate);
+const vaoDisplay = mkQuadVAO(progDisplay);
+const vaoPaint   = mkQuadVAO(progPaint);
+
+// Textures + framebuffers (ping-pong)
+function mkTexFBO() {
+  const tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  const internalFmt = extFloat ? gl.R32F : gl.RGBA8;
+  const fmt         = extFloat ? gl.RED  : gl.RGBA;
+  const type        = extFloat ? gl.FLOAT : gl.UNSIGNED_BYTE;
+  gl.texImage2D(gl.TEXTURE_2D, 0, internalFmt, W, H, 0, fmt, type, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+  const fbo = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  return { tex, fbo };
+}
+
+const bufs = [mkTexFBO(), mkTexFBO()];
+let cur = 0;
+
+// ---- Upload helpers ----
+
+function uploadData(data) {
+  gl.bindTexture(gl.TEXTURE_2D, bufs[cur].tex);
+  if (extFloat) {
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, W, H, 0, gl.RED, gl.FLOAT, data);
+  } else {
+    // Encode float [0,1] into R channel of RGBA8
+    const rgba = new Uint8Array(W * H * 4);
+    for (let i = 0; i < data.length; i++) {
+      rgba[i*4] = Math.round(data[i] * 255);
+      rgba[i*4+3] = 255;
+    }
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, W, H, 0, gl.RGBA, gl.UNSIGNED_BYTE, rgba);
+  }
+}
+
+// ---- Preset states ----
+
+function rng() {
+  // Simple seeded-ish random for repeatability per call
+  return Math.random();
+}
+
+function addRing(d, cx, cy, ringR, ringW, amp) {
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    // Handle torus wrapping for center
+    let dx = x - cx, dy = y - cy;
+    if (dx > W/2) dx -= W; if (dx < -W/2) dx += W;
+    if (dy > H/2) dy -= H; if (dy < -H/2) dy += H;
+    const r = Math.sqrt(dx*dx + dy*dy);
+    const v = Math.exp(-((r - ringR) / ringW) ** 2);
+    d[y * W + x] = Math.min(1, d[y * W + x] + amp * v);
+  }
+}
+
+function orbium(d, cx, cy, amp = 1.0) {
+  // Ring blob that converges to Orbium: radius ~7, width ~3.5
+  addRing(d, cx, cy, 7, 3.5, amp);
+  // Slight asymmetry to induce motion
+  const angle = Math.atan2(H/2 - cy, W/2 - cx);
+  const ex = Math.round(cx + 3 * Math.cos(angle + 0.5));
+  const ey = Math.round(cy + 3 * Math.sin(angle + 0.5));
+  addRing(d, ex, ey, 3, 2.5, amp * 0.25);
+}
+
+function makePreset(n) {
+  const d = new Float32Array(W * H);
+  if (n === 0) {
+    // Single Orbium near center
+    orbium(d, W/2, H/2);
+  } else if (n === 1) {
+    // Three Orbium blobs in triangle
+    orbium(d, W/2, H/4 + 10);
+    orbium(d, W/4 + 10, 3*H/4 - 10);
+    orbium(d, 3*W/4 - 10, 3*H/4 - 10);
+  } else if (n === 2) {
+    // Random soup in center square
+    for (let y = H/4; y < 3*H/4; y++)
+      for (let x = W/4; x < 3*W/4; x++)
+        d[y * W + x] = rng() * rng(); // biased toward small values
+  } else if (n === 3) {
+    // Dense Gaussian disc: central shock
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const r2 = (x - W/2)**2 + (y - H/2)**2;
+      d[y * W + x] = Math.exp(-r2 / (22*22));
+    }
+  } else if (n === 4) {
+    // 3×3 grid of small blobs
+    for (let gy = 0; gy < 3; gy++)
+      for (let gx = 0; gx < 3; gx++)
+        orbium(d, Math.round(W * (gx + 1) / 4), Math.round(H * (gy + 1) / 4), 0.85);
+  }
+  return d;
+}
+
+// ---- Simulation params ----
+
+let params = { mu: 0.15, sigma: 0.015, dt: 0.1, colorMode: 0, brushStr: 1.0 };
+let paused = false;
+let frame = 0;
+let currentPreset = 0;
+
+// ---- Render ----
+
+function stepSim() {
+  const next = 1 - cur;
+  gl.bindFramebuffer(gl.FRAMEBUFFER, bufs[next].fbo);
+  gl.viewport(0, 0, W, H);
+  gl.useProgram(progUpdate);
+  gl.bindVertexArray(vaoUpdate);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, bufs[cur].tex);
+  gl.uniform1i(uni(progUpdate, 'u_state'), 0);
+  gl.uniform1f(uni(progUpdate, 'u_mu'),    params.mu);
+  gl.uniform1f(uni(progUpdate, 'u_sigma'), params.sigma);
+  gl.uniform1f(uni(progUpdate, 'u_dt'),    params.dt);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  gl.bindVertexArray(null);
+  cur = next;
+}
+
+function displayFrame() {
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.viewport(0, 0, W, H);
+  gl.useProgram(progDisplay);
+  gl.bindVertexArray(vaoDisplay);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, bufs[cur].tex);
+  gl.uniform1i(uni(progDisplay, 'u_state'), 0);
+  gl.uniform1i(uni(progDisplay, 'u_cmode'), params.colorMode);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  gl.bindVertexArray(null);
+}
+
+function paint(ux, uy, value) {
+  const next = 1 - cur;
+  gl.bindFramebuffer(gl.FRAMEBUFFER, bufs[next].fbo);
+  gl.viewport(0, 0, W, H);
+  gl.useProgram(progPaint);
+  gl.bindVertexArray(vaoPaint);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, bufs[cur].tex);
+  gl.uniform1i(uni(progPaint, 'u_state'),    0);
+  gl.uniform2f(uni(progPaint, 'u_center'),   ux, uy);
+  gl.uniform1f(uni(progPaint, 'u_radius'),   11.0);
+  gl.uniform1f(uni(progPaint, 'u_value'),    value);
+  gl.uniform1f(uni(progPaint, 'u_strength'), params.brushStr);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  gl.bindVertexArray(null);
+  cur = next;
+}
+
+// ---- FPS ----
+let fpsAcc = 0, fpsCount = 0, fpsLast = 0, fpsDisplay = 0;
+
+function loop(ts) {
+  requestAnimationFrame(loop);
+  // FPS
+  if (fpsLast) {
+    fpsAcc += 1000 / (ts - fpsLast);
+    fpsCount++;
+    if (fpsCount >= 20) { fpsDisplay = fpsAcc / fpsCount; fpsAcc = 0; fpsCount = 0; }
+  }
+  fpsLast = ts;
+
+  if (!paused) { stepSim(); frame++; }
+  displayFrame();
+
+  document.getElementById('stats').textContent =
+    `gen ${frame}   ${fpsDisplay.toFixed(0)} fps\nμ=${params.mu.toFixed(3)}  σ=${params.sigma.toFixed(3)}`;
+}
+
+// ---- Mouse ----
+let mouseDown = 0; // 0=up, 1=left, 3=right
+
+function canvasUV(e) {
+  const r = canvas.getBoundingClientRect();
+  return [
+    (e.clientX - r.left)  / r.width,
+    1.0 - (e.clientY - r.top) / r.height
+  ];
+}
+
+canvas.addEventListener('mousedown', e => {
+  e.preventDefault();
+  mouseDown = e.button === 2 ? 3 : 1;
+  const [ux, uy] = canvasUV(e);
+  paint(ux, uy, mouseDown === 1 ? 1.0 : 0.0);
+});
+canvas.addEventListener('mousemove', e => {
+  if (!mouseDown) return;
+  const [ux, uy] = canvasUV(e);
+  paint(ux, uy, mouseDown === 1 ? 1.0 : 0.0);
+});
+canvas.addEventListener('mouseup', () => mouseDown = 0);
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+// Touch support
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  const t = e.touches[0];
+  const [ux, uy] = canvasUV(t);
+  paint(ux, uy, 1.0);
+  mouseDown = 1;
+});
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (!mouseDown) return;
+  const t = e.touches[0];
+  const [ux, uy] = canvasUV(t);
+  paint(ux, uy, 1.0);
+});
+canvas.addEventListener('touchend', () => mouseDown = 0);
+
+// ---- Controls ----
+function setPreset(n) {
+  currentPreset = n;
+  document.querySelectorAll('#p0,#p1,#p2,#p3,#p4').forEach((b, i) =>
+    b.classList.toggle('active', i === n));
+  uploadData(makePreset(n));
+  frame = 0;
+}
+
+['p0','p1','p2','p3','p4'].forEach((id, i) =>
+  document.getElementById(id).addEventListener('click', () => setPreset(i)));
+
+document.getElementById('pauseBtn').addEventListener('click', function() {
+  paused = !paused;
+  this.textContent = paused ? '▶ 继续' : '⏸ 暂停';
+  this.classList.toggle('active', paused);
+});
+document.getElementById('clearBtn').addEventListener('click', () => {
+  uploadData(new Float32Array(W * H));
+  frame = 0;
+});
+document.getElementById('colorSel').addEventListener('change', function() {
+  params.colorMode = parseInt(this.value);
+});
+
+function wireSlider(id, valId, key, fmt) {
+  const el = document.getElementById(id);
+  el.addEventListener('input', function() {
+    params[key] = parseFloat(this.value);
+    document.getElementById(valId).textContent = params[key].toFixed(fmt);
+  });
+}
+wireSlider('mu',       'mu_v',    'mu',       3);
+wireSlider('sigma',    'sigma_v', 'sigma',    3);
+wireSlider('dt',       'dt_v',    'dt',       3);
+wireSlider('brush_str','str_v',   'brushStr', 2);
+
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space') {
+    e.preventDefault();
+    document.getElementById('pauseBtn').click();
+  }
+  if (e.code === 'KeyR') { setPreset(currentPreset); }
+  if (e.code === 'KeyC') { document.getElementById('clearBtn').click(); }
+  if (e.key >= '1' && e.key <= '5') setPreset(parseInt(e.key) - 1);
+});
+
+// ---- Bootstrap ----
+uploadData(makePreset(0));
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

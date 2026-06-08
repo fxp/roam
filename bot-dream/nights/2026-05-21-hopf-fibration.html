@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Hopf Fibration · Night Lab</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #04040f; color: #d8d8f8; font-family: 'Georgia', serif; overflow: hidden; }
+#cv { position: absolute; top: 0; left: 0; }
+#ui {
+  position: absolute; top: 0; right: 0; width: 310px; height: 100vh;
+  background: linear-gradient(180deg, rgba(4,4,20,0.95) 0%, rgba(6,4,22,0.92) 100%);
+  border-left: 1px solid rgba(80,80,180,0.2); overflow-y: auto;
+  padding: 22px 18px; scrollbar-width: thin; scrollbar-color: #334 transparent;
+}
+h1 { font-size: 1.05rem; letter-spacing: 0.2em; color: #8899ff; margin-bottom: 2px; }
+.sub { font-size: 0.68rem; color: #5566aa; letter-spacing: 0.12em; margin-bottom: 22px; }
+.sec { margin-bottom: 20px; }
+.sec-title {
+  font-size: 0.62rem; letter-spacing: 0.22em; text-transform: uppercase; color: #5577bb;
+  border-bottom: 1px solid rgba(80,80,160,0.18); padding-bottom: 5px; margin-bottom: 10px;
+}
+.prose { font-size: 0.75rem; line-height: 1.65; color: #9a98bc; }
+.prose em { color: #aabbdd; font-style: italic; }
+.prose strong { color: #bbc8ee; font-style: normal; font-weight: normal; }
+.math {
+  font-family: 'Courier New', monospace; font-size: 0.68rem; color: #88aaee;
+  background: rgba(30,30,80,0.4); border: 1px solid rgba(60,60,120,0.3);
+  padding: 9px 11px; border-radius: 4px; margin: 8px 0; line-height: 1.6;
+}
+.row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.lbl { font-size: 0.68rem; color: #7788aa; }
+.val { font-size: 0.68rem; color: #99bbee; font-family: monospace; }
+input[type=range] {
+  width: 100%; height: 2px; accent-color: #5577ff; margin-bottom: 10px; cursor: pointer;
+}
+.btns { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 6px; }
+button {
+  background: rgba(30,30,80,0.5); border: 1px solid rgba(80,90,160,0.35);
+  color: #99aacc; font-size: 0.65rem; padding: 5px 10px; border-radius: 3px;
+  cursor: pointer; letter-spacing: 0.04em; transition: all 0.18s;
+}
+button:hover { background: rgba(50,50,130,0.65); color: #ccddf0; border-color: #6688ee; }
+button.on { background: rgba(60,70,180,0.45); border-color: #7799ff; color: #ddeeff; }
+.tag {
+  display: inline-block; margin: 2px; padding: 2px 7px; font-size: 0.62rem;
+  background: rgba(50,30,90,0.4); border: 1px solid rgba(100,60,150,0.35); color: #aa88cc;
+  border-radius: 2px;
+}
+#hint {
+  position: absolute; bottom: 16px; left: calc(50% - 155px);
+  font-size: 0.65rem; color: rgba(120,120,180,0.45); letter-spacing: 0.1em; pointer-events: none;
+}
+.linkinfo {
+  font-size: 0.7rem; color: #7a9acc; background: rgba(20,30,70,0.5);
+  border-left: 2px solid #4466cc; padding: 7px 10px; margin-top: 8px; line-height: 1.6;
+}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<div id="ui">
+  <h1>HOPF FIBRATION</h1>
+  <div class="sub">S³ → S²&nbsp;&nbsp;·&nbsp;&nbsp;Heinz Hopf · 1931</div>
+
+  <div class="sec">
+    <div class="sec-title">Controls</div>
+    <div class="row"><span class="lbl">Mode</span></div>
+    <div class="btns">
+      <button id="b-tori" class="on" onclick="setMode('tori')">Nested Tori</button>
+      <button id="b-fibers" onclick="setMode('fibers')">All Fibers</button>
+      <button id="b-linked" onclick="setMode('linked')">Linked Pair</button>
+    </div>
+    <div style="height:12px"></div>
+    <div class="row"><span class="lbl">Latitude bands</span><span class="val" id="v-bands">8</span></div>
+    <input type="range" id="s-bands" min="3" max="14" value="8">
+    <div class="row"><span class="lbl">Fibers per band</span><span class="val" id="v-fib">10</span></div>
+    <input type="range" id="s-fib" min="4" max="36" value="10">
+    <div class="row"><span class="lbl">Tube radius</span><span class="val" id="v-tube">medium</span></div>
+    <input type="range" id="s-tube" min="1" max="5" value="3">
+    <div class="row"><span class="lbl">Auto-rotate speed</span><span class="val" id="v-spd">1.0×</span></div>
+    <input type="range" id="s-spd" min="0" max="40" value="10">
+    <div class="btns" style="margin-top:2px">
+      <button id="b-sphere" onclick="toggleSphere()">Base S²</button>
+      <button id="b-pause" onclick="togglePause()">Pause</button>
+      <button onclick="resetView()">Reset view</button>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title">What is this?</div>
+    <p class="prose">The <em>Hopf fibration</em> is a map h : S³ → S² from the 3-sphere to the 2-sphere. Every point on S² has exactly one <em>fiber</em> above it — a great circle in S³.</p>
+    <div class="math">h(z₁,z₂) = (2Re(z₁z̄₂), 2Im(z₁z̄₂), |z₁|²−|z₂|²)<br>
+where (z₁,z₂) ∈ ℂ² with |z₁|²+|z₂|² = 1</div>
+    <p class="prose">This 3D picture is <em>stereographic projection</em> from S³ ⊂ ℝ⁴ into ℝ³. The fiber over the south pole becomes a straight line through ∞.</p>
+    <div class="linkinfo">Any two fibers over <strong>distinct base points</strong> are <strong>linked exactly once</strong> — like a chain of rings. The fibers over an entire latitude circle form a <strong>torus</strong>. These tori nest together and fill all of ℝ³.</div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title">Why it matters</div>
+    <p class="prose">Hopf fibration is the generator of π₃(S²) = ℤ — it proved that higher homotopy groups of spheres can be non-trivial, launching modern algebraic topology.</p>
+    <p class="prose" style="margin-top:7px">In quantum mechanics, the state space of a <em>qubit</em> is S³ (unit vectors in ℂ²). The <em>Bloch sphere</em> is S². The map h is exactly the projection that forgets global phase — because |ψ⟩ and e^{iα}|ψ⟩ are the same physical state.</p>
+    <div class="math">|ψ⟩ = α|0⟩ + β|1⟩,  |α|²+|β|² = 1 ← S³<br>
+physical state ← point on S² (Bloch sphere)<br>
+U(1) phase freedom ← the S¹ fiber</div>
+    <p class="prose">The Hopf bundle IS the gauge symmetry of quantum mechanics, made geometric.</p>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title">Deep thought</div>
+    <p class="prose">The Hopf fibration is <em>irreducible</em>: S³ cannot be split into S²×S¹, even though it locally looks that way. This "twisting" is measured by the Hopf invariant, which equals 1. In 4 dimensions, there are only <strong>three</strong> Hopf-like fibrations with Hopf invariant 1 (corresponding to ℝ, ℂ, ℍ, 𝕆 — real, complex, quaternion, octonion division algebras). The octonion case (S¹⁵ → S⁸) is the last one — a deep theorem of Adams (1960) says no others exist. The only normed division algebras in existence are ℝ, ℂ, ℍ, 𝕆. Hopf fibration reflects the classification of <em>all possible ways numbers can multiply</em>.</p>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title">Tags</div>
+    <span class="tag">topology</span>
+    <span class="tag">fiber bundle</span>
+    <span class="tag">qubit · Bloch sphere</span>
+    <span class="tag">π₃(S²)=ℤ</span>
+    <span class="tag">division algebras</span>
+    <span class="tag">stereographic projection</span>
+  </div>
+</div>
+<div id="hint">drag to rotate &nbsp;·&nbsp; scroll to zoom &nbsp;·&nbsp; <span style="color:rgba(100,180,100,0.5)">colors = latitude on S²</span></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+"use strict";
+
+// ─── Canvas & Renderer ────────────────────────────────────────────────────────
+const canvas = document.getElementById('cv');
+const UI_W = 310;
+let W = window.innerWidth - UI_W, H = window.innerHeight;
+
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setSize(W, H);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setClearColor(0x04040f, 1);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(52, W/H, 0.05, 200);
+camera.position.set(0, 0, 6);
+
+// Lights
+scene.add(new THREE.AmbientLight(0x1a1a44, 2));
+const lA = new THREE.PointLight(0x4466ff, 3, 25); lA.position.set(4, 3, 4); scene.add(lA);
+const lB = new THREE.PointLight(0xff3399, 2, 20); lB.position.set(-4, -3, 2); scene.add(lB);
+const lC = new THREE.PointLight(0x44ffaa, 1.5, 20); lC.position.set(0, 4, -3); scene.add(lC);
+
+// ─── Mouse/Trackball ──────────────────────────────────────────────────────────
+const world = new THREE.Group(); scene.add(world);
+let drag = false, lx = 0, ly = 0;
+const rotQ = new THREE.Quaternion();
+
+canvas.addEventListener('mousedown', e => { drag = true; lx = e.clientX; ly = e.clientY; });
+window.addEventListener('mouseup', () => drag = false);
+window.addEventListener('mousemove', e => {
+  if (!drag) return;
+  const dx = e.clientX - lx, dy = e.clientY - ly; lx = e.clientX; ly = e.clientY;
+  const spd = Math.sqrt(dx*dx + dy*dy);
+  if (spd < 0.5) return;
+  const ax = new THREE.Vector3(-dy, dx, 0).normalize();
+  rotQ.premultiply(new THREE.Quaternion().setFromAxisAngle(ax, spd * 0.005));
+  world.quaternion.copy(rotQ);
+});
+
+let zd = 6;
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  zd = Math.max(2, Math.min(15, zd + e.deltaY * 0.012));
+}, { passive: false });
+
+// Touch support
+let tc = null;
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault(); const t = e.touches[0]; drag = true; lx = t.clientX; ly = t.clientY; tc = null;
+  if (e.touches.length === 2) { tc = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY); }
+}, { passive: false });
+canvas.addEventListener('touchend', () => { drag = false; tc = null; });
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (e.touches.length === 2) {
+    const nd = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
+    if (tc) zd = Math.max(2, Math.min(15, zd * (tc/nd)));
+    tc = nd; return;
+  }
+  const t = e.touches[0];
+  const dx = t.clientX - lx, dy = t.clientY - ly; lx = t.clientX; ly = t.clientY;
+  const spd = Math.sqrt(dx*dx+dy*dy);
+  if (spd < 0.5) return;
+  const ax = new THREE.Vector3(-dy, dx, 0).normalize();
+  rotQ.premultiply(new THREE.Quaternion().setFromAxisAngle(ax, spd * 0.006));
+  world.quaternion.copy(rotQ);
+}, { passive: false });
+
+// ─── Hopf Geometry ────────────────────────────────────────────────────────────
+// Base point on S²: (sinθ cosφ, sinθ sinφ, cosθ)
+// Fiber over this point, parameterized by t ∈ [0,2π):
+//   z₁ = cos(θ/2) · exp(i(t + φ/2))
+//   z₂ = sin(θ/2) · exp(i(t − φ/2))
+// In ℝ⁴: (x1,x2,x3,x4) = (Re z₁, Im z₁, Re z₂, Im z₂)
+// Stereographic from (0,0,0,1): X=x1/(1−x4), Y=x2/(1−x4), Z=x3/(1−x4)
+
+function hopfPt(theta, phi, t) {
+  const ct = Math.cos(theta * 0.5), st = Math.sin(theta * 0.5);
+  const a = t + phi * 0.5, b = t - phi * 0.5;
+  const x1 = ct * Math.cos(a), x2 = ct * Math.sin(a);
+  const x3 = st * Math.cos(b), x4 = st * Math.sin(b);
+  const d = 1.0 - x4;
+  if (Math.abs(d) < 1e-5) return null;
+  return [x1/d, x2/d, x3/d];
+}
+
+// Fiber as array of THREE.Vector3, closed
+function fiberPts(theta, phi, nSeg) {
+  const pts = [];
+  for (let i = 0; i <= nSeg; i++) {
+    const t = (i / nSeg) * Math.PI * 2;
+    const p = hopfPt(theta, phi, t);
+    if (p) pts.push(new THREE.Vector3(p[0], p[1], p[2]));
+  }
+  return pts;
+}
+
+// HSL color by latitude θ: north (0)=blue, equator=green, south(π)=red
+function latCol(theta) {
+  const h = 0.66 - (theta / Math.PI) * 0.66; // 0.66→0
+  return new THREE.Color().setHSL(h, 0.88, 0.6);
+}
+
+// Tube geometry around a fiber
+function makeTube(theta, phi, rad, nSeg, nRad) {
+  const pts = fiberPts(theta, phi, nSeg);
+  if (pts.length < 4) return null;
+  const curve = new THREE.CatmullRomCurve3(pts, true, 'centripetal');
+  return new THREE.TubeGeometry(curve, nSeg, rad, nRad, true);
+}
+
+// ─── Scene Groups ─────────────────────────────────────────────────────────────
+const gTori   = new THREE.Group(); world.add(gTori);
+const gFibers = new THREE.Group(); world.add(gFibers);
+const gLinked = new THREE.Group(); world.add(gLinked);
+const gSphere = new THREE.Group(); world.add(gSphere);
+
+let mode = 'tori', sphereOn = false, paused = false, autoSpd = 0.001;
+
+const tubeRadii = [0.012, 0.018, 0.024, 0.034, 0.048];
+
+function clearGroup(g) { while (g.children.length) { const c = g.children[0]; if (c.geometry) c.geometry.dispose(); g.remove(c); } }
+
+function buildSphere() {
+  clearGroup(gSphere);
+  const geo = new THREE.SphereGeometry(1.25, 36, 28);
+  gSphere.add(new THREE.Mesh(geo, new THREE.MeshPhongMaterial({ color:0x112244, transparent:true, opacity:0.09, side:THREE.DoubleSide })));
+  gSphere.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color:0x223366, wireframe:true, transparent:true, opacity:0.09 })));
+  gSphere.visible = sphereOn;
+}
+
+function buildTori() {
+  clearGroup(gTori);
+  const nBands = +document.getElementById('s-bands').value;
+  const nFib   = +document.getElementById('s-fib').value;
+  const rad    = tubeRadii[+document.getElementById('s-tube').value - 1];
+
+  for (let b = 0; b < nBands; b++) {
+    const theta = ((b + 0.5) / nBands) * Math.PI;
+    const col   = latCol(theta);
+
+    // Torus surface: sample (phi, t) grid
+    const nPhi = 72, nT = 72;
+    const pos = new Float32Array((nPhi+1)*(nT+1)*3);
+    let vi = 0;
+    for (let i = 0; i <= nPhi; i++) {
+      const phi = (i / nPhi) * Math.PI * 2;
+      for (let j = 0; j <= nT; j++) {
+        const t = (j / nT) * Math.PI * 2;
+        const p = hopfPt(theta, phi, t) || [0,0,0];
+        pos[vi++] = p[0]; pos[vi++] = p[1]; pos[vi++] = p[2];
+      }
+    }
+    const idx = [];
+    for (let i = 0; i < nPhi; i++) {
+      for (let j = 0; j < nT; j++) {
+        const a = i*(nT+1)+j, c = (i+1)*(nT+1)+j;
+        idx.push(a, c, a+1, c, c+1, a+1);
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setIndex(idx); geo.computeVertexNormals();
+    gTori.add(new THREE.Mesh(geo, new THREE.MeshPhongMaterial({
+      color: col, emissive: col, emissiveIntensity: 0.1,
+      transparent: true, opacity: 0.18, side: THREE.DoubleSide
+    })));
+
+    // Wire fibers along torus
+    const nWire = Math.min(nFib, 24);
+    for (let f = 0; f < nWire; f++) {
+      const phi = (f / nWire) * Math.PI * 2;
+      const geo2 = makeTube(theta, phi, rad * 0.55, 80, 5);
+      if (!geo2) continue;
+      gTori.add(new THREE.Mesh(geo2, new THREE.MeshPhongMaterial({
+        color: col, emissive: col, emissiveIntensity: 0.45,
+        transparent: true, opacity: 0.72
+      })));
+    }
+  }
+}
+
+function buildFibers() {
+  clearGroup(gFibers);
+  const nBands = +document.getElementById('s-bands').value;
+  const nFib   = +document.getElementById('s-fib').value;
+  const rad    = tubeRadii[+document.getElementById('s-tube').value - 1];
+
+  for (let b = 0; b < nBands; b++) {
+    const theta = ((b + 0.5) / nBands) * Math.PI;
+    const col   = latCol(theta);
+    for (let f = 0; f < nFib; f++) {
+      const phi = (f / nFib) * Math.PI * 2;
+      const geo = makeTube(theta, phi, rad, 100, 6);
+      if (!geo) continue;
+      gFibers.add(new THREE.Mesh(geo, new THREE.MeshPhongMaterial({
+        color: col, emissive: col, emissiveIntensity: 0.4,
+        transparent: true, opacity: 0.82
+      })));
+    }
+  }
+}
+
+function buildLinked() {
+  clearGroup(gLinked);
+  // Two fibers over antipodal base points: (θ=π/4,φ=0) and (θ=3π/4,φ=π)
+  // They should be linked once (Hopf invariant = 1)
+  const pairs = [
+    { theta: Math.PI*0.25, phi: 0,        col: new THREE.Color(0x4488ff), label: 'Fiber A' },
+    { theta: Math.PI*0.75, phi: Math.PI,  col: new THREE.Color(0xff4488), label: 'Fiber B' },
+    // A third fiber from an orthogonal latitude
+    { theta: Math.PI*0.5,  phi: Math.PI*0.5, col: new THREE.Color(0x44ffaa), label: 'Fiber C' },
+  ];
+  const rad = 0.04;
+  for (const p of pairs) {
+    const geo = makeTube(p.theta, p.phi, rad, 120, 8);
+    if (!geo) continue;
+    gLinked.add(new THREE.Mesh(geo, new THREE.MeshPhongMaterial({
+      color: p.col, emissive: p.col, emissiveIntensity: 0.6,
+      transparent: false, opacity: 1.0
+    })));
+  }
+}
+
+function rebuild() {
+  buildTori(); buildFibers(); buildLinked(); buildSphere();
+  gTori.visible   = mode === 'tori';
+  gFibers.visible = mode === 'fibers';
+  gLinked.visible = mode === 'linked';
+  gSphere.visible = sphereOn;
+}
+
+function setMode(m) {
+  mode = m;
+  ['tori','fibers','linked'].forEach(x =>
+    document.getElementById('b-'+x).classList.toggle('on', x === m));
+  gTori.visible   = m === 'tori';
+  gFibers.visible = m === 'fibers';
+  gLinked.visible = m === 'linked';
+}
+
+function toggleSphere() {
+  sphereOn = !sphereOn;
+  gSphere.visible = sphereOn;
+  document.getElementById('b-sphere').classList.toggle('on', sphereOn);
+}
+
+function togglePause() {
+  paused = !paused;
+  const b = document.getElementById('b-pause');
+  b.textContent = paused ? 'Resume' : 'Pause';
+  b.classList.toggle('on', paused);
+}
+
+function resetView() {
+  rotQ.set(0,0,0,1); world.quaternion.copy(rotQ); zd = 6;
+}
+
+// Slider wiring
+document.getElementById('s-bands').addEventListener('input', function() {
+  document.getElementById('v-bands').textContent = this.value; rebuild();
+});
+document.getElementById('s-fib').addEventListener('input', function() {
+  document.getElementById('v-fib').textContent = this.value; rebuild();
+});
+document.getElementById('s-tube').addEventListener('input', function() {
+  const nm = ['thin','slim','medium','thick','wide'];
+  document.getElementById('v-tube').textContent = nm[this.value-1]; rebuild();
+});
+document.getElementById('s-spd').addEventListener('input', function() {
+  const v = (this.value/10).toFixed(1);
+  document.getElementById('v-spd').textContent = v+'×';
+  autoSpd = this.value * 0.0001;
+});
+
+// ─── Animation ────────────────────────────────────────────────────────────────
+let clock = 0;
+function animate() {
+  requestAnimationFrame(animate);
+  clock += 0.016;
+
+  // Smooth zoom
+  camera.position.z += (zd - camera.position.z) * 0.06;
+  camera.updateProjectionMatrix();
+
+  if (!paused && !drag) {
+    world.rotation.y += autoSpd;
+    world.rotation.x = Math.sin(clock * 0.07) * 0.08;
+  }
+
+  // Animate lights
+  lA.position.set(4*Math.cos(clock*0.4), 3*Math.sin(clock*0.25), 4*Math.sin(clock*0.4));
+  lB.position.set(-4*Math.sin(clock*0.3), -3*Math.cos(clock*0.2), 2*Math.cos(clock*0.35));
+
+  renderer.render(scene, camera);
+}
+
+window.addEventListener('resize', () => {
+  W = window.innerWidth - UI_W; H = window.innerHeight;
+  camera.aspect = W/H; camera.updateProjectionMatrix();
+  renderer.setSize(W, H);
+});
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+rebuild();
+animate();
+</script>
+</body>
+</html>

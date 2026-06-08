@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Newton Fractal Explorer — Night Lab</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #020208; overflow: hidden; font-family: 'Courier New', monospace; cursor: crosshair; color: #aab; }
+canvas { display: block; position: fixed; inset: 0; }
+
+#ui {
+  position: fixed; top: 20px; left: 20px;
+  background: rgba(6,6,18,0.90);
+  border: 1px solid rgba(80,80,160,0.35);
+  border-radius: 14px; padding: 18px 20px;
+  backdrop-filter: blur(12px);
+  width: 248px; z-index: 10;
+  box-shadow: 0 4px 32px rgba(0,0,0,0.5);
+}
+#ui h2 { color: #c8d8ff; font-size: 12px; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 16px; }
+.row { margin: 11px 0; }
+.lbl { font-size: 10px; color: #667; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px; }
+.lbl span { color: #88a; float: right; font-size: 10px; }
+
+.deg-group { display: flex; gap: 4px; flex-wrap: wrap; }
+.dbtn {
+  padding: 5px 9px; border-radius: 6px;
+  border: 1px solid rgba(80,80,160,0.28);
+  background: rgba(28,28,62,0.55); color: #99b;
+  font-size: 12px; cursor: pointer; font-family: inherit;
+  transition: all 0.12s;
+}
+.dbtn:hover { background: rgba(50,50,105,0.75); color: #bbf; }
+.dbtn.active { background: rgba(55,65,185,0.80); color: #ddf; border-color: rgba(120,130,255,0.55); }
+
+input[type=range] { width: 100%; accent-color: #6688ff; margin-top: 3px; cursor: pointer; }
+
+.cmode { display: flex; gap: 4px; }
+.cbtn {
+  flex: 1; padding: 5px 2px; border-radius: 6px; text-align: center;
+  border: 1px solid rgba(80,80,160,0.28);
+  background: rgba(28,28,62,0.55); color: #99b;
+  font-size: 11px; cursor: pointer; font-family: inherit;
+  transition: all 0.12s;
+}
+.cbtn:hover { background: rgba(50,50,105,0.75); }
+.cbtn.active { background: rgba(55,65,185,0.80); color: #ddf; border-color: rgba(120,130,255,0.55); }
+
+.sep { border: none; border-top: 1px solid rgba(80,80,160,0.18); margin: 13px 0; }
+.hint { font-size: 10px; color: #445; line-height: 1.6; }
+.hint b { color: #556; }
+
+#info {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: rgba(5,5,15,0.90);
+  border-top: 1px solid rgba(60,60,120,0.22);
+  padding: 10px 22px; z-index: 10;
+  backdrop-filter: blur(10px);
+}
+#formula { font-size: 13px; color: #8899cc; margin-bottom: 4px; letter-spacing: 0.5px; }
+#insight { font-size: 11px; color: #4a5a70; font-style: italic; line-height: 1.5; }
+
+#coords {
+  position: fixed; top: 20px; right: 20px;
+  font-size: 10px; color: rgba(70,80,120,0.55);
+  z-index: 10; text-align: right; line-height: 1.6;
+  pointer-events: none;
+}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="ui">
+  <h2>Newton Fractal</h2>
+
+  <div class="row">
+    <div class="lbl">Polynomial</div>
+    <div class="deg-group" id="degGroup"></div>
+  </div>
+
+  <div class="row">
+    <div class="lbl">Max iterations <span id="iterVal">60</span></div>
+    <input type="range" id="iterSlider" min="10" max="200" value="60">
+  </div>
+
+  <div class="row">
+    <div class="lbl">Coloring</div>
+    <div class="cmode">
+      <button class="cbtn active" data-mode="0">Basin</button>
+      <button class="cbtn" data-mode="1">Smooth</button>
+      <button class="cbtn" data-mode="2">Trap</button>
+    </div>
+  </div>
+
+  <hr class="sep">
+  <div class="hint">
+    <b>Scroll</b> to zoom &nbsp;·&nbsp; <b>Drag</b> to pan<br>
+    <b>Double-click</b> to reset view
+  </div>
+</div>
+
+<div id="info">
+  <div id="formula">f(z) = z³ − 1,&nbsp;&nbsp; roots: 1, ω, ω²&nbsp; (ω = e^{2πi/3})</div>
+  <div id="insight">The boundary between any two basins is simultaneously the boundary of ALL basins — every neighborhood of a boundary point contains points of all three colors. (Julia, 1918)</div>
+</div>
+
+<div id="coords"></div>
+
+<script>
+// ─── Shaders ────────────────────────────────────────────────────────────────
+
+const VS = `#version 300 es
+in vec2 a_pos;
+void main() { gl_Position = vec4(a_pos, 0.0, 1.0); }
+`;
+
+const FS = `#version 300 es
+precision highp float;
+
+uniform vec2  u_center;
+uniform float u_scale;
+uniform vec2  u_res;
+uniform int   u_deg;
+uniform int   u_maxIter;
+uniform int   u_cmode;   // 0=basin, 1=smooth, 2=orbit-trap
+
+out vec4 fragColor;
+
+const float PI  = 3.14159265359;
+const float EPS = 0.00007;
+
+// ── Complex arithmetic ───────────────────────────────────────────────────────
+vec2 cmul(vec2 a, vec2 b) {
+  return vec2(a.x*b.x - a.y*b.y, a.x*b.y + a.y*b.x);
+}
+vec2 cdiv(vec2 a, vec2 b) {
+  float d = dot(b, b);
+  if (d < 1e-28) return vec2(0.0);
+  return vec2(dot(a,b), a.y*b.x - a.x*b.y) / d;
+}
+vec2 cpow(vec2 z, int n) {
+  if (n == 0) return vec2(1.0, 0.0);
+  vec2 r = z;
+  for (int i = 1; i < 16; i++) {
+    if (i >= n) break;
+    r = cmul(r, z);
+  }
+  return r;
+}
+
+// ── HSL → RGB ────────────────────────────────────────────────────────────────
+vec3 hsl2rgb(float h, float s, float l) {
+  float c = (1.0 - abs(2.0*l - 1.0)) * s;
+  float h6 = mod(h * 6.0, 6.0);
+  float x  = c * (1.0 - abs(mod(h6, 2.0) - 1.0));
+  vec3 rgb;
+  if      (h6 < 1.0) rgb = vec3(c, x, 0);
+  else if (h6 < 2.0) rgb = vec3(x, c, 0);
+  else if (h6 < 3.0) rgb = vec3(0, c, x);
+  else if (h6 < 4.0) rgb = vec3(0, x, c);
+  else if (h6 < 5.0) rgb = vec3(x, 0, c);
+  else               rgb = vec3(c, 0, x);
+  return clamp(rgb + l - c * 0.5, 0.0, 1.0);
+}
+
+// ── Main ─────────────────────────────────────────────────────────────────────
+void main() {
+  // Map pixel → complex plane
+  vec2 uv = (gl_FragCoord.xy / u_res - 0.5) * vec2(u_res.x / u_res.y, -1.0);
+  vec2 z   = uv * u_scale + u_center;
+
+  int   n           = u_deg;
+  float fn          = float(n);
+  int   basin       = -1;
+  int   iters       = u_maxIter;
+  float minOrbDist  = 1e9;
+  float finalDist   = 1e9;
+
+  for (int i = 0; i < 250; i++) {
+    if (i >= u_maxIter) break;
+
+    // Newton step: z ← z − f(z)/f′(z)
+    // f(z)  = zⁿ − 1
+    // f′(z) = n·z^(n−1)
+    vec2 zn   = cpow(z, n);
+    vec2 zn1  = cpow(z, n - 1);
+    vec2 fz   = zn - vec2(1.0, 0.0);
+    vec2 dfz  = fn * zn1;
+    z = z - cdiv(fz, dfz);
+
+    // Orbit trap: distance to the unit circle (roots lie on it)
+    float od = abs(length(z) - 1.0);
+    if (od < minOrbDist) minOrbDist = od;
+
+    // Check convergence to root k
+    for (int k = 0; k < 12; k++) {
+      if (k >= n) break;
+      float ang  = 2.0 * PI * float(k) / fn;
+      vec2  root = vec2(cos(ang), sin(ang));
+      float d    = distance(z, root);
+      if (d < EPS) {
+        basin      = k;
+        iters      = i + 1;
+        finalDist  = d;
+        break;
+      }
+    }
+    if (basin >= 0) break;
+  }
+
+  // Unconverged → near-black
+  if (basin < 0) {
+    fragColor = vec4(0.02, 0.02, 0.05, 1.0);
+    return;
+  }
+
+  // Base hue from basin index (offset per degree for palette variety)
+  float hue = mod((float(basin) + 0.5) / fn + float(n) * 0.065, 1.0);
+
+  // Normalised speed: 1 = converged immediately, 0 = barely converged
+  float t = 1.0 - float(iters) / float(u_maxIter);
+
+  float lightness, saturation;
+
+  if (u_cmode == 2) {
+    // Orbit-trap: exposes fine structure inside basins
+    float trap = exp(-minOrbDist * 9.0);
+    lightness   = 0.07 + 0.52 * t + 0.20 * trap;
+    saturation  = 0.72 + 0.28 * trap;
+
+  } else if (u_cmode == 1) {
+    // Smooth: gamma-corrected continuous brightness
+    float sm   = pow(max(t, 0.0), 0.42);
+    lightness  = 0.06 + 0.68 * sm;
+    saturation = 0.88;
+
+  } else {
+    // Basin: clean banded coloring
+    lightness  = 0.10 + 0.60 * t;
+    saturation = 0.80;
+  }
+
+  // Thin dark outline at basin boundaries (slow convergence → dark)
+  // Already handled by t: slow ⟹ small t ⟹ dark.
+
+  fragColor = vec4(hsl2rgb(hue, saturation, lightness), 1.0);
+}
+`;
+
+// ─── WebGL Setup ─────────────────────────────────────────────────────────────
+
+const canvas = document.getElementById('c');
+const gl = canvas.getContext('webgl2');
+
+if (!gl) {
+  document.body.style.background = '#111';
+  document.body.innerHTML = '<div style="color:#f88;padding:40px;font-family:monospace">WebGL2 is required for this demo.</div>';
+  throw new Error('No WebGL2');
+}
+
+function compileShader(type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS))
+    throw new Error(gl.getShaderInfoLog(s));
+  return s;
+}
+
+const prog = gl.createProgram();
+gl.attachShader(prog, compileShader(gl.VERTEX_SHADER,   VS));
+gl.attachShader(prog, compileShader(gl.FRAGMENT_SHADER, FS));
+gl.linkProgram(prog);
+if (!gl.getProgramParameter(prog, gl.LINK_STATUS))
+  throw new Error(gl.getProgramInfoLog(prog));
+gl.useProgram(prog);
+
+// Fullscreen triangle-strip quad
+const vao = gl.createVertexArray();
+gl.bindVertexArray(vao);
+const buf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+const locPos = gl.getAttribLocation(prog, 'a_pos');
+gl.enableVertexAttribArray(locPos);
+gl.vertexAttribPointer(locPos, 2, gl.FLOAT, false, 0, 0);
+
+const U = {
+  center:  gl.getUniformLocation(prog, 'u_center'),
+  scale:   gl.getUniformLocation(prog, 'u_scale'),
+  res:     gl.getUniformLocation(prog, 'u_res'),
+  deg:     gl.getUniformLocation(prog, 'u_deg'),
+  maxIter: gl.getUniformLocation(prog, 'u_maxIter'),
+  cmode:   gl.getUniformLocation(prog, 'u_cmode'),
+};
+
+// ─── State ───────────────────────────────────────────────────────────────────
+
+let cx = 0, cy = 0, viewScale = 3.0;
+let degree = 3, maxIter = 60, cmode = 0;
+let dirty = true;
+
+function resize() {
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+  gl.viewport(0, 0, canvas.width, canvas.height);
+  dirty = true;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ─── Render Loop ─────────────────────────────────────────────────────────────
+
+function render() {
+  if (dirty) {
+    dirty = false;
+    gl.useProgram(prog);
+    gl.uniform2f(U.center,  cx, cy);
+    gl.uniform1f(U.scale,   viewScale);
+    gl.uniform2f(U.res,     canvas.width, canvas.height);
+    gl.uniform1i(U.deg,     degree);
+    gl.uniform1i(U.maxIter, maxIter);
+    gl.uniform1i(U.cmode,   cmode);
+    gl.bindVertexArray(vao);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  }
+  requestAnimationFrame(render);
+}
+requestAnimationFrame(render);
+
+// ─── Pan / Zoom ──────────────────────────────────────────────────────────────
+
+function pixelToComplex(px, py) {
+  const ux =  (px / canvas.width  - 0.5) * canvas.width / canvas.height;
+  const uy = -(py / canvas.height - 0.5);
+  return [cx + ux * viewScale, cy + uy * viewScale];
+}
+
+let dragging = false, lastMX = 0, lastMY = 0;
+
+canvas.addEventListener('mousedown', e => {
+  dragging = true;
+  lastMX = e.clientX; lastMY = e.clientY;
+});
+window.addEventListener('mouseup',   () => dragging = false);
+
+window.addEventListener('mousemove', e => {
+  const [rx, ry] = pixelToComplex(e.clientX, e.clientY);
+  document.getElementById('coords').innerHTML =
+    `${rx >= 0 ? ' ' : ''}${rx.toFixed(5)}<br>` +
+    `${ry >= 0 ? '+' : ''}${ry.toFixed(5)}i`;
+
+  if (!dragging) return;
+  const dx = (e.clientX - lastMX) / canvas.height * viewScale;
+  const dy = (e.clientY - lastMY) / canvas.height * viewScale;
+  cx -= dx;  cy += dy;
+  lastMX = e.clientX; lastMY = e.clientY;
+  dirty = true;
+});
+
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const factor = e.deltaY > 0 ? 1.14 : 0.877;
+  const [rx, ry] = pixelToComplex(e.clientX, e.clientY);
+  viewScale *= factor;
+  cx = rx + (cx - rx) * factor;
+  cy = ry + (cy - ry) * factor;
+  dirty = true;
+}, { passive: false });
+
+canvas.addEventListener('dblclick', () => {
+  cx = 0; cy = 0; viewScale = 3.0;
+  dirty = true;
+});
+
+// ─── Touch (pinch-zoom) ───────────────────────────────────────────────────────
+
+let lastTouchDist = null;
+canvas.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) {
+    dragging = true;
+    lastMX = e.touches[0].clientX;
+    lastMY = e.touches[0].clientY;
+  }
+  if (e.touches.length === 2) {
+    dragging = false;
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    lastTouchDist = Math.hypot(dx, dy);
+  }
+}, { passive: true });
+
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (e.touches.length === 1 && dragging) {
+    const dx = (e.touches[0].clientX - lastMX) / canvas.height * viewScale;
+    const dy = (e.touches[0].clientY - lastMY) / canvas.height * viewScale;
+    cx -= dx; cy += dy;
+    lastMX = e.touches[0].clientX;
+    lastMY = e.touches[0].clientY;
+    dirty = true;
+  }
+  if (e.touches.length === 2 && lastTouchDist !== null) {
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    const dist = Math.hypot(dx, dy);
+    const factor = lastTouchDist / dist;
+    const mx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+    const my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+    const [rx, ry] = pixelToComplex(mx, my);
+    viewScale *= factor;
+    cx = rx + (cx - rx) * factor;
+    cy = ry + (cy - ry) * factor;
+    lastTouchDist = dist;
+    dirty = true;
+  }
+}, { passive: false });
+
+canvas.addEventListener('touchend', () => {
+  dragging = false; lastTouchDist = null;
+}, { passive: true });
+
+// ─── UI Content ──────────────────────────────────────────────────────────────
+
+const DEGS = [
+  { n: 3, label: 'z³−1',
+    formula: 'f(z) = z³ − 1,&nbsp;&nbsp; roots: 1, ω, ω²&nbsp; (ω = e^{2πi/3})',
+    insight: 'Three basins of attraction, separated by fractal boundaries. Julia\'s theorem (1918) states that at every boundary point, ALL three basins accumulate — the decision surface is infinitely entangled. The Hausdorff dimension of this boundary is strictly between 1 and 2.' },
+  { n: 4, label: 'z⁴−1',
+    formula: 'f(z) = z⁴ − 1,&nbsp;&nbsp; roots: 1, −1, i, −i',
+    insight: 'Four basins with 4-fold rotational symmetry. Notable: the origin is a critical point (f′(0) = 0), making it a "Fatou exceptional point." Orbits that land near 0 become chaotic — the thin dark tendrils near center show these boundary-region trajectories.' },
+  { n: 5, label: 'z⁵−1',
+    formula: 'f(z) = z⁵ − 1,&nbsp;&nbsp; roots: 5th roots of unity',
+    insight: 'Pentagonal 5-fold symmetry. The "correct" domain for this iteration is a Riemann surface with genus 4 — the complex plane is only a projection of a richer object. The fractal boundary is a branched cover of this surface.' },
+  { n: 6, label: 'z⁶−1',
+    formula: 'f(z) = z⁶ − 1,&nbsp;&nbsp; roots: 6th roots of unity',
+    insight: 'Six basins with hexagonal symmetry — the same arrangement as a honeycomb. Near the fractal boundary, you can see self-similar miniature copies of the full structure appearing at every scale: a hallmark of conformal self-similarity (Fatou sets are quasiconformally rigid).' },
+  { n: 7, label: 'z⁷−1',
+    formula: 'f(z) = z⁷ − 1,&nbsp;&nbsp; roots: 7th roots of unity',
+    insight: 'Seven basins in heptagonal symmetry. With prime degree n, the monodromy group of the root-finding map is the full symmetric group Sₙ — which is why no closed-form root formula exists for degree ≥ 5 (Abel–Ruffini theorem). This fractal is a visual fingerprint of that algebraic obstruction.' },
+  { n: 8, label: 'z⁸−1',
+    formula: 'f(z) = z⁸ − 1,&nbsp;&nbsp; roots: 8th roots of unity',
+    insight: '8-fold symmetry with particularly rich inner structure. Higher degree means more critical points (zeros of f′), each potentially spawning a separate Fatou component. Try Trap coloring and zoom into the boundary: orbit-distance contours reveal intricate nested rings invisible in the standard coloring.' },
+];
+
+// Build degree buttons
+const degGroup = document.getElementById('degGroup');
+DEGS.forEach((d, i) => {
+  const btn = document.createElement('button');
+  btn.className = 'dbtn' + (i === 0 ? ' active' : '');
+  btn.innerHTML = d.label;
+  btn.addEventListener('click', () => {
+    degree = d.n;
+    document.querySelectorAll('.dbtn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('formula').innerHTML = d.formula;
+    document.getElementById('insight').textContent = d.insight;
+    dirty = true;
+  });
+  degGroup.appendChild(btn);
+});
+
+// Iteration slider
+const iterSlider = document.getElementById('iterSlider');
+iterSlider.addEventListener('input', () => {
+  maxIter = +iterSlider.value;
+  document.getElementById('iterVal').textContent = maxIter;
+  dirty = true;
+});
+
+// Coloring mode buttons
+document.querySelectorAll('.cbtn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    cmode = +btn.dataset.mode;
+    document.querySelectorAll('.cbtn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    dirty = true;
+  });
+});
+</script>
+</body>
+</html>

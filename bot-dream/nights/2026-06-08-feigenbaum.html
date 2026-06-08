@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>Feigenbaum 普适性 · 倍周期级联与常数 δ</title>
+<style>
+  :root {
+    --bg: #0b0e14;
+    --panel: #11151f;
+    --panel2: #161b28;
+    --border: #232a3b;
+    --text: #d7dce6;
+    --dim: #8b93a7;
+    --gold: #ffd479;
+    --cyan: #7fd8e8;
+    --red: #ff7a6e;
+    --violet: #b88aff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: "SF Pro Text", -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+    font-size: 14px; line-height: 1.55;
+  }
+  header { padding: 22px 28px 10px; }
+  header h1 { font-size: 21px; font-weight: 600; letter-spacing: 0.3px; }
+  header h1 b { color: var(--gold); font-weight: 600; }
+  header p { color: var(--dim); margin-top: 4px; max-width: 980px; }
+  .wrap { display: flex; gap: 16px; padding: 14px 28px 40px; align-items: flex-start; }
+  .left { flex: 1; min-width: 0; }
+  .canvasBox { position: relative; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  canvas { display: block; }
+  #bif { cursor: crosshair; }
+  #selRect { position: absolute; border: 1px solid var(--gold); background: rgba(255,212,121,0.08); pointer-events: none; display: none; }
+  .axisLabel { position: absolute; color: var(--dim); font-size: 11px; pointer-events: none; }
+  .lyapBox { margin-top: 10px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; align-items: center; }
+  .controls .lab { color: var(--dim); font-size: 12px; margin-right: 2px; }
+  button, select {
+    background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 7px; padding: 6px 12px; font-size: 13px; cursor: pointer;
+    font-family: inherit;
+  }
+  button:hover { border-color: var(--gold); color: var(--gold); }
+  button.on { border-color: var(--gold); color: var(--gold); background: rgba(255,212,121,0.07); }
+  .hint { color: var(--dim); font-size: 12px; margin-top: 8px; }
+  .hint kbd { background: var(--panel2); border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; font-size: 11px; }
+  .side { width: 380px; flex-shrink: 0; display: flex; flex-direction: column; gap: 14px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .card h2 { font-size: 13px; font-weight: 600; color: var(--gold); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 9px; }
+  .card p { color: var(--dim); font-size: 12.5px; margin-bottom: 7px; }
+  .card p b { color: var(--text); font-weight: 600; }
+  .card .formula { font-family: "SF Mono", ui-monospace, Menlo, monospace; color: var(--cyan); background: var(--panel2); border: 1px solid var(--border); border-radius: 6px; padding: 7px 10px; font-size: 12px; margin: 7px 0; overflow-x: auto; white-space: nowrap; }
+  table { width: 100%; border-collapse: collapse; font-family: "SF Mono", ui-monospace, Menlo, monospace; font-size: 11.5px; }
+  th { color: var(--dim); font-weight: 500; text-align: right; padding: 3px 6px; border-bottom: 1px solid var(--border); }
+  td { text-align: right; padding: 2.5px 6px; color: var(--text); }
+  td.delta { color: var(--gold); }
+  tr.ref td { color: var(--cyan); border-top: 1px solid var(--border); padding-top: 5px; }
+  #cobweb { background: #0d111a; border-radius: 7px; }
+  .cwInfo { font-family: "SF Mono", ui-monospace, Menlo, monospace; font-size: 12px; margin-top: 8px; color: var(--dim); }
+  .cwInfo span { color: var(--gold); }
+  .statusLine { font-family: "SF Mono", ui-monospace, Menlo, monospace; font-size: 11px; color: var(--dim); margin-top: 6px; }
+  .deep { border-left: 3px solid var(--violet); padding-left: 12px; }
+  .deep p { color: var(--text); opacity: 0.85; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Feigenbaum 普适性 · <b>倍周期级联，与那个等于 4.6692… 的数</b></h1>
+  <p>任何「光滑单峰」映射走向混沌时，分岔间距都以同一个比例 δ = 4.66920161… 收缩，分叉宽度以 α = 2.50290788… 收缩——与映射的具体形式无关。切换下方 logistic ↔ sine 两个完全不同的映射，看同一对常数从两套动力学里浮现。</p>
+</header>
+
+<div class="wrap">
+  <div class="left">
+    <div class="canvasBox" id="bifBox">
+      <canvas id="bif" width="880" height="500"></canvas>
+      <div id="selRect"></div>
+      <div class="axisLabel" id="axTL" style="top:6px; left:8px;"></div>
+      <div class="axisLabel" id="axBL" style="bottom:6px; left:8px;"></div>
+      <div class="axisLabel" id="axBR" style="bottom:6px; right:8px;"></div>
+    </div>
+    <div class="canvasBox lyapBox">
+      <canvas id="lyap" width="880" height="110"></canvas>
+      <div class="axisLabel" style="top:4px; left:8px;">Lyapunov 指数 λ(r) — <span style="color:#ff7a6e">红 λ&gt;0 混沌</span> · <span style="color:#7fd8e8">青 λ&lt;0 周期</span></div>
+    </div>
+    <div class="controls">
+      <span class="lab">映射</span>
+      <select id="mapSel">
+        <option value="logistic">logistic: x → r·x(1−x)</option>
+        <option value="sine">sine: x → r·sin(πx)</option>
+      </select>
+      <span class="lab">预设</span>
+      <span id="presetBtns"></span>
+      <button id="btnSS" class="on">超稳定线 Rₙ</button>
+      <button id="btnRinf" class="on">r∞ 线</button>
+      <button id="btnBack">← 后退</button>
+    </div>
+    <div class="hint">拖拽框选 = 放大 · <kbd>双击</kbd> = 复位 · 单击 = 选定 r 看右侧蛛网图。深度放大级联尾部，每一层结构与上一层相同——只是被 δ 和 α 缩放过。</div>
+    <div class="statusLine" id="status"></div>
+  </div>
+
+  <div class="side">
+    <div class="card">
+      <h2>蛛网图 · 当前 r</h2>
+      <canvas id="cobweb" width="346" height="346"></canvas>
+      <div class="cwInfo" id="cwInfo">点击左图选定 r</div>
+    </div>
+
+    <div class="card">
+      <h2>δ 收敛表（本页实时计算）</h2>
+      <p>超稳定参数 Rₙ（周期 2ⁿ 轨道恰好穿过临界点）由 Newton 法求出，δₙ = (Rₙ₋₁−Rₙ₋₂)/(Rₙ−Rₙ₋₁)：</p>
+      <table id="deltaTable"></table>
+      <p style="margin-top:8px" id="alphaLine"></p>
+    </div>
+
+    <div class="card">
+      <h2>为什么普适 · 重正化群</h2>
+      <p>Feigenbaum 1978 的解释：定义「倍周期算子」——把映射复合一次自身，再用 α 缩放：</p>
+      <div class="formula">T[f](x) = −α · f( f( −x/α ) )</div>
+      <p>这个算子在函数空间里有一个不动点 g（Feigenbaum–Cvitanović 方程）：</p>
+      <div class="formula">g(x) = −α · g( g( −x/α ) ) ,&nbsp; α = 2.502907…</div>
+      <p><b>δ 是 T 在不动点 g 处线性化后唯一的不稳定本征值。</b>所有二次极大值的单峰映射都流向同一个 g，所以它们共享同一个 δ——这与相变普适类（5/29 RG 之夜）是同一个数学：普适常数 = RG 不动点的本征值。</p>
+      <p>注意级联在 r∞ 处结束、混沌开始——但混沌区里嵌着无穷多周期窗口（period-3 窗口最宽，Sharkovskii 定理：周期 3 蕴含一切周期）。</p>
+    </div>
+
+    <div class="card deep">
+      <h2>今晚的思考</h2>
+      <p>δ 不属于 logistic 映射，也不属于 sine 映射——它属于「通往混沌的这条路」本身。第一次有人（Feigenbaum，用一台 HP-65 计算器）发现：通往混沌的速度是一个自然常数，像 π 和 e 一样，但它不来自几何或分析，而来自<b>动力学的重正化结构</b>。</p>
+      <p>1981 年 Libchaber 在液氦对流实验里实测到了同一个 δ——一个由计算器算出来的数，出现在了真实流体的温度记录里。</p>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ---------- 映射定义 ---------- */
+const MAPS = {
+  logistic: {
+    label: "logistic",
+    xc: 0.5,
+    f:  (r, x) => r * x * (1 - x),
+    fx: (r, x) => r * (1 - 2 * x),
+    fr: (r, x) => x * (1 - x),
+    R0: 2.0, R1guess: 3.236,
+    home: [2.4, 4.0, 0, 1],
+    presets: [
+      { name: "全景",        v: [2.4, 4.0, 0, 1] },
+      { name: "级联",        v: [3.43, 3.5701, 0.30, 0.92] },
+      { name: "混沌诞生",    v: [3.555, 3.592, 0.30, 0.92] },
+      { name: "周期-3 窗口", v: [3.815, 3.87, 0.10, 1.0] },
+    ],
+  },
+  sine: {
+    label: "sine",
+    xc: 0.5,
+    f:  (r, x) => r * Math.sin(Math.PI * x),
+    fx: (r, x) => r * Math.PI * Math.cos(Math.PI * x),
+    fr: (r, x) => Math.sin(Math.PI * x),
+    R0: 0.5, R1guess: 0.7777,
+    home: [0.4, 1.0, 0, 1],
+    presets: [
+      { name: "全景",     v: [0.4, 1.0, 0, 1] },
+      { name: "级联",     v: [0.825, 0.8694, 0.30, 0.95] },
+      { name: "混沌诞生", v: [0.862, 0.882, 0.30, 0.95] },
+      { name: "窗口区",   v: [0.93, 0.965, 0.05, 1.0] },
+    ],
+  },
+};
+
+/* ---------- 状态 ---------- */
+const state = {
+  mapKey: "logistic",
+  view: MAPS.logistic.home.slice(),  // [r0, r1, x0, x1]
+  history: [],
+  rSel: 3.5699,
+  showSS: true,
+  showRinf: true,
+  cascade: null, // {R:[], deltas:[], rinf, alphas:[]}
+};
+
+/* ---------- 超稳定级联（Newton） ---------- */
+function gAndDg(map, r, P) {
+  let x = map.xc, xp = 0;
+  for (let k = 0; k < P; k++) {
+    const nx = map.f(r, x);
+    xp = map.fr(r, x) + map.fx(r, x) * xp;
+    x = nx;
+  }
+  return [x - map.xc, xp];
+}
+function newtonSS(map, r0, P) {
+  let r = r0;
+  for (let it = 0; it < 60; it++) {
+    const [g, dg] = gAndDg(map, r, P);
+    const step = g / dg;
+    r -= step;
+    if (Math.abs(step) < 1e-15) break;
+  }
+  return r;
+}
+function computeCascade(map, NMAX) {
+  const R = [map.R0, newtonSS(map, map.R1guess, 2)];
+  const deltas = [];
+  let dEst = 4.669;
+  for (let n = 2; n <= NMAX; n++) {
+    const guess = R[n - 1] + (R[n - 1] - R[n - 2]) / dEst;
+    R.push(newtonSS(map, guess, 1 << n));
+    dEst = (R[n - 1] - R[n - 2]) / (R[n] - R[n - 1]);
+    deltas.push(dEst);
+  }
+  const rinf = R[NMAX] + (R[NMAX] - R[NMAX - 1]) / (dEst - 1);
+  // alpha
+  const d = [];
+  for (let n = 1; n <= NMAX; n++) {
+    let x = map.xc;
+    for (let k = 0; k < (1 << (n - 1)); k++) x = map.f(R[n], x);
+    d.push(x - map.xc);
+  }
+  const alphas = [];
+  for (let n = 1; n < d.length; n++) alphas.push(-(d[n - 1] / d[n]));
+  return { R, deltas, rinf, alphas };
+}
+
+/* ---------- 调色 ---------- */
+const STOPS = [
+  [0.00,  11, 14, 22],
+  [0.18,  42, 30, 92],
+  [0.42, 123, 45, 139],
+  [0.66, 212, 82, 110],
+  [0.86, 255, 179, 71],
+  [1.00, 255, 243, 214],
+];
+function colorOf(t) {
+  t = Math.max(0, Math.min(1, t));
+  for (let i = 1; i < STOPS.length; i++) {
+    if (t <= STOPS[i][0]) {
+      const [t0, r0, g0, b0] = STOPS[i - 1];
+      const [t1, r1, g1, b1] = STOPS[i];
+      const u = (t - t0) / (t1 - t0);
+      return [r0 + (r1 - r0) * u, g0 + (g1 - g0) * u, b0 + (b1 - b0) * u];
+    }
+  }
+  return [255, 243, 214];
+}
+
+/* ---------- 画布 ---------- */
+const bif = document.getElementById("bif");
+const bctx = bif.getContext("2d");
+const W = bif.width, H = bif.height;
+const lyapC = document.getElementById("lyap");
+const lctx = lyapC.getContext("2d");
+const LH = lyapC.height;
+
+let renderToken = 0;
+let lamArr = new Float32Array(W);
+
+function rOfCol(c) { const [r0, r1] = state.view; return r0 + (r1 - r0) * (c + 0.5) / W; }
+function colOfR(r) { const [r0, r1] = state.view; return (r - r0) / (r1 - r0) * W; }
+function rowOfX(x) { const [, , x0, x1] = state.view; return (1 - (x - x0) / (x1 - x0)) * H; }
+
+function renderAll() {
+  const token = ++renderToken;
+  const map = MAPS[state.mapKey];
+  const [r0, r1, x0, x1] = state.view;
+  const xrange = x1 - x0;
+  // 自适应迭代深度：放得越深，需要的瞬态越长
+  const trans = Math.min(12000, Math.max(700, Math.round(220 / xrange)));
+  const samples = Math.min(4000, Math.max(500, Math.round(160 / xrange)));
+
+  bctx.fillStyle = "#0b0e14";
+  bctx.fillRect(0, 0, W, H);
+  lctx.fillStyle = "#0d111a";
+  lctx.fillRect(0, 0, W, LH);
+  lamArr.fill(NaN);
+
+  const colImg = bctx.createImageData(1, H);
+  const counts = new Float32Array(H);
+  const logDen = Math.log(1 + samples / 10);
+  let col = 0;
+  const t0 = performance.now();
+
+  function chunk() {
+    if (token !== renderToken) return;
+    const end = Math.min(W, col + 20);
+    for (; col < end; col++) {
+      const r = rOfCol(col);
+      counts.fill(0);
+      let x = map.xc + 1e-9;
+      for (let k = 0; k < trans; k++) x = map.f(r, x);
+      let lam = 0, lamN = 0;
+      for (let k = 0; k < samples; k++) {
+        x = map.f(r, x);
+        const der = Math.abs(map.fx(r, x));
+        lam += Math.log(der + 1e-300); lamN++;
+        if (x >= x0 && x < x1) {
+          const row = (1 - (x - x0) / xrange) * H | 0;
+          if (row >= 0 && row < H) counts[row]++;
+        }
+        if (!isFinite(x)) break;
+      }
+      lamArr[col] = lam / lamN;
+      const d = colImg.data;
+      for (let row = 0; row < H; row++) {
+        const c = counts[row];
+        const t = c > 0 ? Math.log(1 + c) / logDen : 0;
+        const [R, G, B] = colorOf(t * 0.92 + (c > 0 ? 0.08 : 0));
+        const i = row * 4;
+        d[i] = R; d[i + 1] = G; d[i + 2] = B; d[i + 3] = 255;
+      }
+      bctx.putImageData(colImg, col, 0);
+    }
+    drawLyapPartial(col);
+    document.getElementById("status").textContent =
+      `渲染 ${col}/${W} 列 · 瞬态 ${trans} · 采样 ${samples}/列 · ${(performance.now() - t0).toFixed(0)} ms`;
+    if (col < W) requestAnimationFrame(chunk);
+    else { drawOverlays(); drawLyapPartial(W); }
+  }
+  requestAnimationFrame(chunk);
+  updateAxisLabels();
+}
+
+function drawLyapPartial(upto) {
+  lctx.fillStyle = "#0d111a";
+  lctx.fillRect(0, 0, W, LH);
+  const lMin = -2.2, lMax = 1.0;
+  const yOf = v => (1 - (Math.max(lMin, Math.min(lMax, v)) - lMin) / (lMax - lMin)) * LH;
+  // 零线
+  lctx.strokeStyle = "#2a3145"; lctx.lineWidth = 1;
+  lctx.beginPath(); lctx.moveTo(0, yOf(0)); lctx.lineTo(W, yOf(0)); lctx.stroke();
+  // 曲线
+  for (let c = 0; c < upto; c++) {
+    const v = lamArr[c];
+    if (!isFinite(v)) continue;
+    const y = yOf(v), y0 = yOf(0);
+    lctx.strokeStyle = v > 0 ? "rgba(255,122,110,0.85)" : "rgba(127,216,232,0.7)";
+    lctx.beginPath(); lctx.moveTo(c + 0.5, y0); lctx.lineTo(c + 0.5, y); lctx.stroke();
+  }
+  // r∞ 线投影
+  if (state.showRinf && state.cascade) {
+    const cx = colOfR(state.cascade.rinf);
+    if (cx >= 0 && cx <= W) {
+      lctx.strokeStyle = "rgba(255,122,110,0.9)";
+      lctx.setLineDash([4, 4]);
+      lctx.beginPath(); lctx.moveTo(cx, 0); lctx.lineTo(cx, LH); lctx.stroke();
+      lctx.setLineDash([]);
+    }
+  }
+}
+
+function drawOverlays() {
+  if (state.showSS && state.cascade) {
+    bctx.font = "10px ui-monospace, Menlo";
+    state.cascade.R.forEach((r, n) => {
+      const cx = colOfR(r);
+      if (cx < 0 || cx > W) return;
+      bctx.strokeStyle = "rgba(255,212,121,0.45)";
+      bctx.setLineDash([3, 5]);
+      bctx.beginPath(); bctx.moveTo(cx, 0); bctx.lineTo(cx, H); bctx.stroke();
+      bctx.setLineDash([]);
+      bctx.fillStyle = "rgba(255,212,121,0.85)";
+      bctx.fillText("R" + n, cx + 3, 14 + (n % 3) * 11);
+    });
+  }
+  if (state.showRinf && state.cascade) {
+    const cx = colOfR(state.cascade.rinf);
+    if (cx >= 0 && cx <= W) {
+      bctx.strokeStyle = "rgba(255,122,110,0.8)";
+      bctx.setLineDash([5, 4]);
+      bctx.beginPath(); bctx.moveTo(cx, 0); bctx.lineTo(cx, H); bctx.stroke();
+      bctx.setLineDash([]);
+      bctx.fillStyle = "rgba(255,122,110,0.95)";
+      bctx.fillText("r∞", cx + 3, H - 8);
+    }
+  }
+  // 选定 r 标记
+  const cx = colOfR(state.rSel);
+  if (cx >= 0 && cx <= W) {
+    bctx.strokeStyle = "rgba(184,138,255,0.85)";
+    bctx.beginPath(); bctx.moveTo(cx, 0); bctx.lineTo(cx, H); bctx.stroke();
+  }
+}
+
+function updateAxisLabels() {
+  const [r0, r1, x0, x1] = state.view;
+  const dig = Math.max(3, Math.ceil(-Math.log10(r1 - r0)) + 3);
+  document.getElementById("axTL").textContent = `x ∈ [${x0.toFixed(3)}, ${x1.toFixed(3)}]`;
+  document.getElementById("axBL").textContent = `r = ${r0.toFixed(dig)}`;
+  document.getElementById("axBR").textContent = `r = ${r1.toFixed(dig)}`;
+}
+
+/* ---------- 蛛网图 ---------- */
+const cw = document.getElementById("cobweb");
+const cctx = cw.getContext("2d");
+const CS = cw.width;
+let cwToken = 0;
+
+function detectPeriod(map, r) {
+  let x = map.xc + 1e-9;
+  for (let k = 0; k < 4000; k++) x = map.f(r, x);
+  const pts = [];
+  for (let k = 0; k < 256; k++) { x = map.f(r, x); pts.push(x); }
+  for (let p = 1; p <= 64; p++) {
+    let ok = true;
+    for (let k = 0; k < 128; k++) {
+      if (Math.abs(pts[k] - pts[k + p]) > 1e-7) { ok = false; break; }
+    }
+    if (ok) return p;
+  }
+  return 0;
+}
+
+function drawCobweb() {
+  const token = ++cwToken;
+  const map = MAPS[state.mapKey];
+  const r = state.rSel;
+  cctx.fillStyle = "#0d111a";
+  cctx.fillRect(0, 0, CS, CS);
+  const px = v => v * (CS - 20) + 10;
+  const py = v => CS - 10 - v * (CS - 20);
+  // 对角线
+  cctx.strokeStyle = "#2a3145";
+  cctx.beginPath(); cctx.moveTo(px(0), py(0)); cctx.lineTo(px(1), py(1)); cctx.stroke();
+  // f 曲线
+  cctx.strokeStyle = "#ffd479"; cctx.lineWidth = 1.6;
+  cctx.beginPath();
+  for (let i = 0; i <= 220; i++) {
+    const x = i / 220, y = map.f(r, x);
+    if (i === 0) cctx.moveTo(px(x), py(y)); else cctx.lineTo(px(x), py(y));
+  }
+  cctx.stroke(); cctx.lineWidth = 1;
+  // 轨道动画
+  let x = 0.21, steps = 0;
+  const maxSteps = 260;
+  function step() {
+    if (token !== cwToken) return;
+    for (let i = 0; i < 3 && steps < maxSteps; i++, steps++) {
+      const y = map.f(r, x);
+      cctx.strokeStyle = steps < 40 ? "rgba(127,216,232,0.25)" : "rgba(127,216,232,0.65)";
+      cctx.beginPath();
+      cctx.moveTo(px(x), py(x)); cctx.lineTo(px(x), py(y)); cctx.lineTo(px(y), py(y));
+      cctx.stroke();
+      x = y;
+    }
+    if (steps < maxSteps) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+  // 信息
+  const p = detectPeriod(map, r);
+  let lam = 0; let xx = map.xc + 1e-9;
+  for (let k = 0; k < 2000; k++) xx = map.f(r, xx);
+  for (let k = 0; k < 20000; k++) { xx = map.f(r, xx); lam += Math.log(Math.abs(map.fx(r, xx)) + 1e-300); }
+  lam /= 20000;
+  document.getElementById("cwInfo").innerHTML =
+    `r = <span>${r.toFixed(8)}</span> · ` +
+    (p ? `周期 <span>${p}</span>` : `<span>混沌 / 长周期</span>`) +
+    ` · λ = <span>${lam.toFixed(4)}</span>`;
+}
+
+/* ---------- δ 表 ---------- */
+function renderTables() {
+  const cas = state.cascade;
+  const tbl = document.getElementById("deltaTable");
+  let html = `<tr><th>n</th><th>Rₙ（周期 2ⁿ 超稳定）</th><th>δₙ</th></tr>`;
+  cas.R.forEach((r, n) => {
+    const d = n >= 2 ? cas.deltas[n - 2].toFixed(8) : "—";
+    html += `<tr><td>${n}</td><td>${r.toFixed(11)}</td><td class="delta">${d}</td></tr>`;
+  });
+  html += `<tr class="ref"><td>∞</td><td>r∞ = ${cas.rinf.toFixed(10)}</td><td class="delta">4.66920161</td></tr>`;
+  tbl.innerHTML = html;
+  const aLast = cas.alphas[cas.alphas.length - 2];
+  document.getElementById("alphaLine").innerHTML =
+    `宽度缩放 α：实测 <b style="color:var(--gold)">${aLast.toFixed(7)}</b> · 理论 2.5029079（与映射无关）`;
+}
+
+/* ---------- 交互 ---------- */
+function setView(v, push = true) {
+  if (push) state.history.push(state.view.slice());
+  state.view = v.slice();
+  renderAll();
+}
+
+const box = document.getElementById("bifBox");
+const selRect = document.getElementById("selRect");
+let drag = null;
+
+bif.addEventListener("mousedown", e => {
+  const rect = bif.getBoundingClientRect();
+  drag = { x0: e.clientX - rect.left, y0: e.clientY - rect.top, moved: false };
+});
+window.addEventListener("mousemove", e => {
+  if (!drag) return;
+  const rect = bif.getBoundingClientRect();
+  const x = e.clientX - rect.left, y = e.clientY - rect.top;
+  if (Math.abs(x - drag.x0) > 4 || Math.abs(y - drag.y0) > 4) drag.moved = true;
+  if (drag.moved) {
+    selRect.style.display = "block";
+    selRect.style.left = Math.min(x, drag.x0) + "px";
+    selRect.style.top = Math.min(y, drag.y0) + "px";
+    selRect.style.width = Math.abs(x - drag.x0) + "px";
+    selRect.style.height = Math.abs(y - drag.y0) + "px";
+  }
+});
+window.addEventListener("mouseup", e => {
+  if (!drag) return;
+  selRect.style.display = "none";
+  const rect = bif.getBoundingClientRect();
+  const x = e.clientX - rect.left, y = e.clientY - rect.top;
+  const [r0, r1, x0, x1] = state.view;
+  if (drag.moved && Math.abs(x - drag.x0) > 8 && Math.abs(y - drag.y0) > 8) {
+    const ca = Math.min(x, drag.x0) / W, cb = Math.max(x, drag.x0) / W;
+    const ra = Math.min(y, drag.y0) / H, rb = Math.max(y, drag.y0) / H;
+    setView([
+      r0 + (r1 - r0) * ca, r0 + (r1 - r0) * cb,
+      x1 - (x1 - x0) * rb, x1 - (x1 - x0) * ra,
+    ]);
+  } else if (!drag.moved && x >= 0 && x <= W && y >= 0 && y <= H) {
+    state.rSel = r0 + (r1 - r0) * x / W;
+    drawCobweb();
+    drawOverlays();
+  }
+  drag = null;
+});
+bif.addEventListener("dblclick", () => {
+  if (state.history.length) setView(state.history.pop(), false);
+  else setView(MAPS[state.mapKey].home, false);
+});
+document.getElementById("btnBack").onclick = () => {
+  if (state.history.length) setView(state.history.pop(), false);
+};
+document.getElementById("btnSS").onclick = function () {
+  state.showSS = !state.showSS; this.classList.toggle("on"); renderAll();
+};
+document.getElementById("btnRinf").onclick = function () {
+  state.showRinf = !state.showRinf; this.classList.toggle("on"); renderAll();
+};
+document.getElementById("mapSel").onchange = function () {
+  state.mapKey = this.value;
+  state.history = [];
+  state.cascade = computeCascade(MAPS[state.mapKey], 12);
+  state.rSel = state.cascade.rinf;
+  buildPresets();
+  renderTables();
+  setView(MAPS[state.mapKey].home, false);
+  drawCobweb();
+};
+function buildPresets() {
+  const span = document.getElementById("presetBtns");
+  span.innerHTML = "";
+  MAPS[state.mapKey].presets.forEach(p => {
+    const b = document.createElement("button");
+    b.textContent = p.name;
+    b.style.marginRight = "6px";
+    b.onclick = () => setView(p.v);
+    span.appendChild(b);
+  });
+}
+
+/* ---------- 启动 ---------- */
+state.cascade = computeCascade(MAPS.logistic, 12);
+state.rSel = state.cascade.rinf;
+buildPresets();
+renderTables();
+renderAll();
+drawCobweb();
+</script>
+</body>
+</html>

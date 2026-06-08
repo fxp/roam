@@ -12,43 +12,28 @@
     font-family: 'SF Mono', 'Fira Code', monospace;
     display: flex;
     flex-direction: column;
-    height: 100vh;
-    overflow: hidden;
-  }
-  #header {
-    flex-shrink: 0;
-    padding: 8px 16px;
-    background: inherit;
-    border-bottom: 1px solid #1a1a2e;
+    align-items: center;
+    min-height: 100vh;
+    padding: 16px;
   }
   h1 {
     font-size: 1.3rem;
     font-weight: 400;
     color: #c8a8f5;
-    margin-bottom: 2px;
+    margin-bottom: 4px;
     letter-spacing: 0.05em;
   }
   .subtitle {
     font-size: 0.72rem;
     color: #445;
+    margin-bottom: 14px;
     letter-spacing: 0.08em;
   }
   .main-layout {
-    flex: 1;
     display: flex;
-    gap: 16px;
-    padding: 12px;
-    overflow: hidden;
-    align-items: stretch;
-    min-height: 0;
-  }
-  .canvas-area {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-    min-height: 0;
-    align-items: center;
+    gap: 18px;
+    align-items: flex-start;
+    flex-wrap: wrap;
     justify-content: center;
   }
   canvas#main {
@@ -56,10 +41,6 @@
     border-radius: 4px;
     background: #020308;
     display: block;
-    max-width: 100%;
-    max-height: 100%;
-    aspect-ratio: 1;
-    flex-shrink: 1;
   }
   .side-panel {
     display: flex;
@@ -222,14 +203,12 @@
 </style>
 </head>
 <body>
-<div id="header">
-  <h1>Swarmalators — 群振子</h1>
-  <div class="subtitle">O'Keeffe, Hong & Strogatz 2017 · 空间-相位耦合自组织</div>
-</div>
+<h1>Swarmalators — 群振子</h1>
+<div class="subtitle">O'Keeffe, Hong & Strogatz 2017 · 空间-相位耦合自组织</div>
 
 <div class="main-layout">
-  <div class="canvas-area">
-    <canvas id="main"></canvas>
+  <div>
+    <canvas id="main" width="560" height="560"></canvas>
     <div class="step-count" id="stepCount">t = 0.00</div>
   </div>
 
@@ -427,17 +406,7 @@ function simulate(steps) {
 // ─── Drawing ──────────────────────────────────────────────────────────────────
 const mainCanvas = document.getElementById('main');
 const ctx = mainCanvas.getContext('2d');
-let W = mainCanvas.width, H = mainCanvas.height;
-
-function resizeMain() {
-  const area = document.querySelector('.canvas-area');
-  const size = Math.min(area.clientWidth, area.clientHeight);
-  mainCanvas.width = size;
-  mainCanvas.height = size;
-  W = mainCanvas.width;
-  H = mainCanvas.height;
-}
-window.addEventListener('resize', resizeMain);
+const W = mainCanvas.width, H = mainCanvas.height;
 
 const phaseCanvas = document.getElementById('phaseChart');
 const pctx = phaseCanvas.getContext('2d');
@@ -637,7 +606,6 @@ document.getElementById('pauseBtn').addEventListener('click', function() {
 document.getElementById('resetBtn').addEventListener('click', () => initParticles());
 
 // ─── Main loop ────────────────────────────────────────────────────────────────
-resizeMain();
 loadPreset(3);
 
 function loop() {

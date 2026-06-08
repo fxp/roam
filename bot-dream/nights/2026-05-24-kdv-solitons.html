@@ -1,0 +1,690 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8" />
+<title>KdV 孤立子 · 连续介质里的粒子</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>
+  :root{
+    --bg:#07090e; --panel:#0d1118; --ink:#e8edf2; --ink-dim:#9aa3ad;
+    --accent:#5ad1ff; --accent2:#ff8a5c; --line:#1c222b; --warn:#ffb86b;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font:14px/1.55 -apple-system,BlinkMacSystemFont,'SF Pro Text','Inter',sans-serif}
+  .app{display:grid;grid-template-columns:1fr 360px;gap:14px;padding:14px;min-height:100vh}
+  @media (max-width:1100px){.app{grid-template-columns:1fr}}
+  h1{font-size:18px;font-weight:600;margin:0 0 6px}
+  h1 .sub{color:var(--ink-dim);font-weight:400;font-size:13px;margin-left:8px}
+  h2{font-size:13px;font-weight:600;margin:14px 0 6px;color:var(--ink)}
+  .canvas-wrap{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    padding:10px;display:flex;flex-direction:column;gap:8px}
+  canvas{display:block;width:100%;background:#04060a;border-radius:6px}
+  #space-time{height:240px}
+  #profile{height:230px}
+  .meta{font-size:12px;color:var(--ink-dim);display:flex;flex-wrap:wrap;gap:14px}
+  .meta b{color:var(--ink);font-weight:500}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    padding:12px 14px;font-size:13px}
+  .preset{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px}
+  button{background:#161b24;border:1px solid #232a36;color:var(--ink);
+    padding:7px 8px;border-radius:6px;font-size:12px;cursor:pointer;text-align:left}
+  button:hover{background:#1c2230;border-color:#2d3744}
+  button.active{background:#1b3144;border-color:var(--accent);color:var(--accent)}
+  .row{display:flex;align-items:center;gap:10px;margin:6px 0}
+  .row label{flex:0 0 96px;color:var(--ink-dim);font-size:12px}
+  .row input[type=range]{flex:1}
+  .row .val{font-variant-numeric:tabular-nums;color:var(--accent);font-size:12px;
+    min-width:50px;text-align:right}
+  .controls{display:flex;gap:6px;margin-top:8px}
+  .controls button{flex:1;text-align:center}
+  .eq{font-family:'SF Mono','Menlo',monospace;background:#04060a;padding:8px 10px;
+    border-radius:6px;color:#c0d6e8;font-size:12.5px;border:1px solid #161c26}
+  .note{color:var(--ink-dim);font-size:12px;line-height:1.55}
+  .note b{color:var(--ink)}
+  .conserved{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;
+    font-family:'SF Mono','Menlo',monospace;font-size:11.5px}
+  .conserved .c{background:#04060a;border:1px solid #161c26;border-radius:5px;
+    padding:6px 8px}
+  .conserved .c .lab{color:var(--ink-dim);font-size:10.5px}
+  .conserved .c .v{color:var(--accent);font-variant-numeric:tabular-nums;
+    margin-top:2px;font-size:12.5px}
+  .conserved .c .d{color:var(--warn);font-size:10px;margin-top:1px}
+  details{margin-top:10px;font-size:12.5px;color:var(--ink-dim)}
+  details summary{cursor:pointer;color:var(--ink);font-weight:500;padding:4px 0}
+  details p{margin:6px 0}
+  .key{color:var(--accent2)}
+</style>
+</head>
+<body>
+<div class="app">
+  <div>
+    <div class="canvas-wrap">
+      <h1>KdV 孤立子 <span class="sub">u<sub>t</sub> + 6 u u<sub>x</sub> + u<sub>xxx</sub> = 0 · 非线性 ⊕ 色散 = 粒子</span></h1>
+      <canvas id="profile"></canvas>
+      <div class="meta">
+        <span><b>预设：</b><span id="preset-name">单孤子 c=4</span></span>
+        <span><b>t =</b> <span id="time">0.000</span></span>
+        <span><b>步长 dt =</b> <span id="dt">0.010</span></span>
+        <span><b>N =</b> <span id="ngrid">512</span></span>
+        <span><b>L =</b> <span id="domain">100</span></span>
+      </div>
+    </div>
+    <div class="canvas-wrap" style="margin-top:14px">
+      <h2 style="margin:0">空时演化图 <span style="color:var(--ink-dim);font-weight:400">· x → 横轴，t → 纵轴向下，u → 亮度</span></h2>
+      <canvas id="space-time"></canvas>
+    </div>
+  </div>
+
+  <div>
+    <div class="panel">
+      <h2 style="margin-top:0">预设场景</h2>
+      <div class="preset" id="presets"></div>
+
+      <h2>参数</h2>
+      <div class="row">
+        <label>速度 ×</label>
+        <input id="speed" type="range" min="0.25" max="4" step="0.25" value="1" />
+        <span class="val" id="speed-v">1.0×</span>
+      </div>
+      <div class="row">
+        <label>振幅放大</label>
+        <input id="amp" type="range" min="0.3" max="2.5" step="0.1" value="1" />
+        <span class="val" id="amp-v">1.0×</span>
+      </div>
+
+      <div class="controls">
+        <button id="play">⏸ 暂停</button>
+        <button id="reset">↺ 重置</button>
+        <button id="clear">⤓ 清空轨迹</button>
+      </div>
+
+      <h2>守恒量（精确解析）</h2>
+      <div class="conserved" id="conserved">
+        <div class="c"><div class="lab">质量 ∫u dx</div><div class="v" id="C1">—</div><div class="d" id="C1d">Δ=0</div></div>
+        <div class="c"><div class="lab">动量 ∫u² dx</div><div class="v" id="C2">—</div><div class="d" id="C2d">Δ=0</div></div>
+        <div class="c"><div class="lab">能量 ∫(2u³−u<sub>x</sub>²) dx</div><div class="v" id="C3">—</div><div class="d" id="C3d">Δ=0</div></div>
+      </div>
+      <div class="note" style="margin-top:6px">
+        KdV 是<b>无穷多个独立守恒量</b>的完全可积系统。前三个就是经典力学的质量、动量、能量。这一点是孤立子稳定性的根源。
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:14px">
+      <h2 style="margin-top:0">方程</h2>
+      <div class="eq">∂<sub>t</sub>u + 6 u ∂<sub>x</sub>u + ∂<sub>xxx</sub>u = 0</div>
+      <p class="note" style="margin:8px 0 0">
+        非线性项 <span class="key">6 u u<sub>x</sub></span> 让波峰自我陡化（高处跑得快）；色散项 <span class="key">u<sub>xxx</sub></span> 把波包散开（不同波长不同速度）。两者精确抵消时，产生形状不变、速度=振幅/2 的孤立子。
+      </p>
+
+      <details open>
+        <summary>为什么这件事是奇迹</summary>
+        <p>非线性波方程一般是混沌的——能量分散，结构消亡。但 KdV 有<b>无穷多守恒律</b>（Miura, 1968），相当于无穷多个"约束面"在相空间里相交。它们的交集是 N-孤子流形——这是一个极其稀薄的代数簇。</p>
+        <p>更深的事：1967 年 Gardner-Greene-Kruskal-Miura 发现 <b>逆散射变换（IST）</b>：把 KdV 初值 u(x,0) 解释为一维 Schrödinger 算子 −∂<sub>xx</sub> + u(x,0) 的"势"，求出它的束缚态本征值 −κ<sub>n</sub>²。每一个本征值 κ<sub>n</sub> 恰好对应一个孤子，振幅 = 2κ<sub>n</sub>²，速度 = 4κ<sub>n</sub>²。</p>
+        <p>所以：<b>任意初值在 t→∞ 时会自动"诊断"出它包含的孤子</b>——就像一个非线性的傅里叶变换，但分解出的"频率成分"是粒子。</p>
+      </details>
+
+      <details>
+        <summary>碰撞中究竟发生了什么</summary>
+        <p>两个孤子相遇时，它们看起来"穿越"了彼此——但精确观察会发现各自经历了一个 <b>相移</b>（phase shift）。大孤子向前跳一段，小孤子向后退一段。</p>
+        <p>相移公式（精确）：Δx<sub>大</sub> = (1/κ<sub>大</sub>) · ln|((κ<sub>大</sub>+κ<sub>小</sub>) / (κ<sub>大</sub>−κ<sub>小</sub>))|²</p>
+        <p>这意味着碰撞不是"无事发生"——而是<b>每个孤子精确记得自己遇到过谁、谁更大</b>。所有信息编码在到达时间里。</p>
+      </details>
+
+      <details>
+        <summary>1965 年那个夏天</summary>
+        <p>Zabusky 与 Kruskal 在普林斯顿用差分法数值积分 KdV，本想理解 Fermi-Pasta-Ulam 在 1955 年的反常发现——非线性振子链没有按预测走向能量均分。他们用一个余弦初值，看到的不是混沌，而是<b>一队整齐的"驼峰"</b>从余弦中诞生，按高度排成序列前进。他们发明了一个词："soliton"——像 photon, electron 那样的粒子化命名。</p>
+        <p>这是历史上第一次：一个偏微分方程被发现拥有"粒子解"——而且这些粒子可以碰撞、穿越、相互纠缠却保留个性。后来的量子场论、可积模型、AdS/CFT 全部从这里发源。</p>
+      </details>
+
+      <details>
+        <summary>它在自然界出现的地方</summary>
+        <p>· <b>钱塘江潮</b>、苏格兰 Russell 1834 年在 Union 运河追了 8 英里的"孤立波"——KdV 的原始观测。<br/>
+           · <b>光纤通信中的光孤子</b>——非线性折射率（克尔效应）+ 色散，遵循非线性 Schrödinger 方程，是 KdV 的近亲。<br/>
+           · <b>玻色-爱因斯坦凝聚中的暗孤子</b>。<br/>
+           · <b>Jupiter 的大红斑</b>被认为是 Rossby 孤子。<br/>
+           · <b>DNA 转录中的双螺旋扭转波</b>。</p>
+      </details>
+    </div>
+  </div>
+</div>
+
+<script>
+//==============================================================
+//  KdV 孤立子求解器
+//  方程:  u_t + 6 u u_x + u_xxx = 0
+//  方法:  傅里叶伪谱 + Strang 分裂 (线性步精确求解, 非线性步 RK4)
+//==============================================================
+'use strict';
+
+const N = 512;
+const L = 100.0;
+const dx = L / N;
+const x = new Float64Array(N);
+for (let i = 0; i < N; i++) x[i] = -L/2 + i*dx;
+
+// 波数 k_n = 2π n / L  (n = -N/2..N/2-1, 标准 FFT 排序)
+const k = new Float64Array(N);
+const k3 = new Float64Array(N);
+for (let i = 0; i < N; i++) {
+  const n = (i < N/2) ? i : i - N;
+  k[i] = 2 * Math.PI * n / L;
+  k3[i] = k[i] * k[i] * k[i];
+}
+
+// 2/3 去混叠掩码
+const dealias = new Uint8Array(N);
+for (let i = 0; i < N; i++) {
+  const n = (i < N/2) ? i : i - N;
+  dealias[i] = (Math.abs(n) < N/3) ? 1 : 0;
+}
+
+//--- 复数数组工具：交错存储 [re, im, re, im, ...]
+function newComplex(n){ return new Float64Array(2*n); }
+function setReal(c, src){
+  for (let i = 0; i < src.length; i++){ c[2*i]=src[i]; c[2*i+1]=0; }
+}
+function getReal(c, dst){
+  for (let i = 0; i < dst.length; i++) dst[i] = c[2*i];
+}
+
+//--- 自写 Cooley-Tukey 基2 迭代 FFT (in-place)
+//    dir = -1: 正向, dir = +1: 逆向(末尾除以 n)
+function fft(a, dir){
+  const n = a.length >> 1;
+  // bit-reverse
+  let j = 0;
+  for (let i = 1; i < n; i++){
+    let bit = n >> 1;
+    for (; j & bit; bit >>= 1) j ^= bit;
+    j ^= bit;
+    if (i < j){
+      const i2=i<<1, j2=j<<1;
+      const t0=a[i2], t1=a[i2+1];
+      a[i2]=a[j2]; a[i2+1]=a[j2+1];
+      a[j2]=t0; a[j2+1]=t1;
+    }
+  }
+  for (let len = 2; len <= n; len <<= 1){
+    const half = len >> 1;
+    const ang = dir * 2 * Math.PI / len;
+    const wReal = Math.cos(ang);
+    const wImag = Math.sin(ang);
+    for (let i = 0; i < n; i += len){
+      let wr = 1, wi = 0;
+      for (let m = 0; m < half; m++){
+        const a0 = (i+m)<<1;
+        const a1 = (i+m+half)<<1;
+        const xr = a[a1]*wr - a[a1+1]*wi;
+        const xi = a[a1]*wi + a[a1+1]*wr;
+        a[a1]   = a[a0]   - xr;
+        a[a1+1] = a[a0+1] - xi;
+        a[a0]   = a[a0]   + xr;
+        a[a0+1] = a[a0+1] + xi;
+        const nwr = wr*wReal - wi*wImag;
+        wi = wr*wImag + wi*wReal;
+        wr = nwr;
+      }
+    }
+  }
+  if (dir > 0){
+    const inv = 1/n;
+    for (let i = 0; i < 2*n; i++) a[i] *= inv;
+  }
+}
+
+//==============================================================
+//  时间步进  Strang 分裂:
+//   û ← E_{dt/2} û            (线性, 精确)
+//   û ← RK4(N(û), dt)         (非线性)
+//   û ← E_{dt/2} û            (线性)
+//  线性算子: û_t = i k³ û  →  e^{i k³ dt}
+//  非线性:  û_t = -3 i k F[u²]
+//==============================================================
+
+const uhat = newComplex(N);     // 当前频谱
+const tmp  = newComplex(N);     // 临时
+const uRe  = new Float64Array(N);
+const u2   = new Float64Array(N);
+const u2hat= newComplex(N);
+const k1c  = newComplex(N);
+const k2c  = newComplex(N);
+const k3c  = newComplex(N);
+const k4c  = newComplex(N);
+const work = newComplex(N);
+
+// 线性步: û ← e^{i k³ τ} û   (相位旋转, 精确)
+function linearStep(uhat, tau){
+  for (let i = 0; i < N; i++){
+    const ang = k3[i] * tau;
+    const cr = Math.cos(ang), ci = Math.sin(ang);
+    const i2 = i<<1;
+    const re = uhat[i2], im = uhat[i2+1];
+    uhat[i2]   = re*cr - im*ci;
+    uhat[i2+1] = re*ci + im*cr;
+  }
+}
+
+// 非线性算子: returns N(û) = -3 i k · F[(F^-1 û)^2]   (写入 out)
+function nonlinear(uh, out){
+  // u_real = IFFT(uh)
+  for (let i = 0; i < 2*N; i++) work[i] = uh[i];
+  fft(work, +1);
+  for (let i = 0; i < N; i++) uRe[i] = work[2*i];
+  // u²
+  for (let i = 0; i < N; i++) u2[i] = uRe[i] * uRe[i];
+  // FFT(u²)
+  setReal(work, u2);
+  fft(work, -1);
+  // 乘 -3 i k · dealias
+  for (let i = 0; i < N; i++){
+    const i2 = i<<1;
+    const m = dealias[i] ? -3 * k[i] : 0;   // 复数乘 (i*m): (re,im) → (-m*im, m*re)
+    const re = work[i2], im = work[i2+1];
+    out[i2]   = -m * im;
+    out[i2+1] =  m * re;
+  }
+}
+
+function rk4Nonlinear(uh, dt){
+  // y' = N(y)
+  nonlinear(uh, k1c);
+  for (let i = 0; i < 2*N; i++) tmp[i] = uh[i] + 0.5*dt*k1c[i];
+  nonlinear(tmp, k2c);
+  for (let i = 0; i < 2*N; i++) tmp[i] = uh[i] + 0.5*dt*k2c[i];
+  nonlinear(tmp, k3c);
+  for (let i = 0; i < 2*N; i++) tmp[i] = uh[i] + dt*k3c[i];
+  nonlinear(tmp, k4c);
+  const sixth = dt/6;
+  for (let i = 0; i < 2*N; i++) uh[i] += sixth*(k1c[i] + 2*k2c[i] + 2*k3c[i] + k4c[i]);
+}
+
+function step(dt){
+  linearStep(uhat, dt*0.5);
+  rk4Nonlinear(uhat, dt);
+  linearStep(uhat, dt*0.5);
+}
+
+//==============================================================
+//  初始条件
+//==============================================================
+function singleSoliton(c, x0){
+  const half = Math.sqrt(c) / 2;
+  const amp = c / 2;
+  const u = new Float64Array(N);
+  for (let i = 0; i < N; i++){
+    // 周期化: 取最接近的镜像
+    let dxv = x[i] - x0;
+    while (dxv > L/2) dxv -= L;
+    while (dxv < -L/2) dxv += L;
+    const sech = 1 / Math.cosh(half * dxv);
+    u[i] = amp * sech * sech;
+  }
+  return u;
+}
+
+function multiSoliton(specs){
+  // 简单叠加 (不是精确 N-soliton, 但远距离时分离良好, 演化会收敛到精确解)
+  const u = new Float64Array(N);
+  for (const s of specs){
+    const single = singleSoliton(s.c, s.x0);
+    for (let i = 0; i < N; i++) u[i] += single[i];
+  }
+  return u;
+}
+
+function squareBump(height, width){
+  const u = new Float64Array(N);
+  for (let i = 0; i < N; i++){
+    u[i] = (Math.abs(x[i]) < width/2) ? height : 0;
+  }
+  // 周期平滑(避免 Gibbs): 用低通滤波
+  setReal(work, u);
+  fft(work, -1);
+  for (let i = 0; i < N; i++){
+    const n = (i < N/2) ? i : i - N;
+    const damp = Math.exp(-Math.pow(n/(N/4), 8));
+    work[2*i] *= damp;
+    work[2*i+1] *= damp;
+  }
+  fft(work, +1);
+  getReal(work, u);
+  return u;
+}
+
+function cosineInit(amp){
+  const u = new Float64Array(N);
+  for (let i = 0; i < N; i++){
+    u[i] = amp * Math.cos(2*Math.PI*x[i]/L);
+  }
+  return u;
+}
+
+function loadField(u){
+  setReal(uhat, u);
+  fft(uhat, -1);
+  simT = 0;
+  spaceTimeRow = 0;
+  spaceTimeCtx.clearRect(0,0,spaceTimeCanvas.width, spaceTimeCanvas.height);
+  computeInitialInvariants();
+}
+
+//==============================================================
+//  守恒量
+//==============================================================
+function invariants(){
+  // u_real
+  for (let i = 0; i < 2*N; i++) work[i] = uhat[i];
+  fft(work, +1);
+  let C1=0, C2=0, C3=0;
+  // u_x via spectral derivative
+  const ux = new Float64Array(N);
+  for (let i = 0; i < 2*N; i++) tmp[i] = uhat[i];
+  // 乘 i k
+  for (let i = 0; i < N; i++){
+    const i2 = i<<1;
+    const re = tmp[i2], im = tmp[i2+1];
+    tmp[i2]   = -k[i]*im;
+    tmp[i2+1] =  k[i]*re;
+  }
+  fft(tmp, +1);
+  for (let i = 0; i < N; i++) ux[i] = tmp[2*i];
+  for (let i = 0; i < N; i++){
+    const u = work[2*i];
+    C1 += u;
+    C2 += u*u;
+    C3 += 2*u*u*u - ux[i]*ux[i];
+  }
+  return {C1: C1*dx, C2: C2*dx, C3: C3*dx};
+}
+
+let C0 = {C1:0, C2:0, C3:0};
+function computeInitialInvariants(){
+  C0 = invariants();
+}
+
+//==============================================================
+//  预设
+//==============================================================
+const PRESETS = [
+  {id:'single',  name:'单孤子 c=4',
+   note:'最简单的孤立子：振幅 = c/2 = 2，速度 = c = 4，宽度 ∝ 1/√c。形状永不改变。',
+   make: ()=> singleSoliton(4, -25)},
+  {id:'twocoll', name:'双孤子碰撞 (大追小)',
+   note:'快的大孤子 c=4 追上慢的小孤子 c=1。它们相互"穿越"，但碰撞后位置发生精确相移。',
+   make: ()=> multiSoliton([{c:4, x0:-30},{c:1, x0:-5}])},
+  {id:'three',   name:'三孤子 c={9,4,1}',
+   note:'三个孤子，速度比 9:4:1。最快的依次追上较慢的。每次碰撞产生独立相移。',
+   make: ()=> multiSoliton([{c:9, x0:-40},{c:4, x0:-20},{c:1, x0:0}])},
+  {id:'head-on', name:'对撞（绕一圈）',
+   note:'两个相同孤子从两端出发，在周期边界上绕行后正面相遇——同振幅相遇时融合更显著。',
+   make: ()=> multiSoliton([{c:3, x0:-30},{c:3, x0:+30}])},
+  {id:'square',  name:'方波 → 孤子序列',
+   note:'Zabusky-Kruskal 1965 的著名实验。方波分解为一队按高度排序的孤子。',
+   make: ()=> squareBump(2.0, 20)},
+  {id:'cosine',  name:'余弦初值 (FPU 复现)',
+   note:'一个余弦波缓慢碎裂为孤子，但在长时间后部分能量"复现"——非线性可积系统的奇迹。',
+   make: ()=> cosineInit(0.5)},
+  {id:'big-eats',name:'吞噬：大孤子穿越孤子云',
+   note:'一个巨大孤子 c=9 穿越一群小孤子。每次穿越都让大孤子向前跃迁。',
+   make: ()=> multiSoliton([{c:9, x0:-40},{c:0.6, x0:-15},{c:0.6, x0:-5},
+                            {c:0.6, x0:+5},{c:0.6, x0:+15},{c:0.6, x0:+25}])},
+  {id:'breather',name:'双孤子束缚态（相同高度）',
+   note:'两个相同 c 的孤子初始紧贴，呈现 KdV 罕见的"准呼吸子"状态——周期性靠近又分离。',
+   make: ()=> multiSoliton([{c:2, x0:-3},{c:2, x0:+3}])},
+];
+
+let currentPreset = PRESETS[1];
+
+//==============================================================
+//  渲染
+//==============================================================
+const profileCanvas = document.getElementById('profile');
+const profileCtx = profileCanvas.getContext('2d');
+const spaceTimeCanvas = document.getElementById('space-time');
+const spaceTimeCtx = spaceTimeCanvas.getContext('2d');
+
+function setupCanvas(canvas){
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = Math.floor(rect.width * dpr);
+  canvas.height = Math.floor(rect.height * dpr);
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  return ctx;
+}
+
+function resize(){
+  setupCanvas(profileCanvas);
+  setupCanvas(spaceTimeCanvas);
+  spaceTimeRow = 0;
+  spaceTimeCtx.fillStyle = '#04060a';
+  spaceTimeCtx.fillRect(0,0,spaceTimeCanvas.width, spaceTimeCanvas.height);
+}
+window.addEventListener('resize', ()=>{ resize(); drawProfile(); });
+
+let yMax = 5;   // 自适应
+let spaceTimeRow = 0;
+
+function drawProfile(){
+  // 取 u_real
+  for (let i = 0; i < 2*N; i++) work[i] = uhat[i];
+  fft(work, +1);
+  for (let i = 0; i < N; i++) uRe[i] = work[2*i];
+
+  const w = profileCanvas.clientWidth;
+  const h = profileCanvas.clientHeight;
+  profileCtx.fillStyle = '#04060a';
+  profileCtx.fillRect(0,0,w,h);
+
+  // 网格
+  profileCtx.strokeStyle = '#0f1620';
+  profileCtx.lineWidth = 1;
+  profileCtx.beginPath();
+  for (let xx = 0; xx <= 10; xx++){
+    const px = xx * w / 10;
+    profileCtx.moveTo(px, 0); profileCtx.lineTo(px, h);
+  }
+  for (let yy = 0; yy <= 4; yy++){
+    const py = yy * h / 4;
+    profileCtx.moveTo(0, py); profileCtx.lineTo(w, py);
+  }
+  profileCtx.stroke();
+
+  // 零线
+  const y0 = h * 0.78;
+  profileCtx.strokeStyle = '#243040';
+  profileCtx.beginPath();
+  profileCtx.moveTo(0, y0); profileCtx.lineTo(w, y0); profileCtx.stroke();
+
+  // 自适应 yMax
+  let mx = 0;
+  for (let i = 0; i < N; i++) mx = Math.max(mx, Math.abs(uRe[i]));
+  if (mx > yMax) yMax = mx * 1.1;
+  else if (mx < yMax * 0.5) yMax = Math.max(2, yMax * 0.97);
+
+  // 填充曲线 (柔光)
+  const grad = profileCtx.createLinearGradient(0, y0, 0, 0);
+  grad.addColorStop(0, 'rgba(90,209,255,0.04)');
+  grad.addColorStop(1, 'rgba(90,209,255,0.32)');
+  profileCtx.fillStyle = grad;
+  profileCtx.beginPath();
+  profileCtx.moveTo(0, y0);
+  for (let i = 0; i < N; i++){
+    const px = i / (N-1) * w;
+    const py = y0 - uRe[i] / yMax * (y0 - 5);
+    profileCtx.lineTo(px, py);
+  }
+  profileCtx.lineTo(w, y0);
+  profileCtx.closePath();
+  profileCtx.fill();
+
+  // 曲线
+  profileCtx.strokeStyle = '#5ad1ff';
+  profileCtx.lineWidth = 1.6;
+  profileCtx.beginPath();
+  for (let i = 0; i < N; i++){
+    const px = i / (N-1) * w;
+    const py = y0 - uRe[i] / yMax * (y0 - 5);
+    if (i === 0) profileCtx.moveTo(px, py); else profileCtx.lineTo(px, py);
+  }
+  profileCtx.stroke();
+
+  // 标签
+  profileCtx.fillStyle = '#5a6776';
+  profileCtx.font = '10px -apple-system,sans-serif';
+  profileCtx.fillText(`u_max ≈ ${yMax.toFixed(2)}`, 6, 12);
+  profileCtx.fillText(`x ∈ [${(-L/2).toFixed(0)}, ${(L/2).toFixed(0)}]`, 6, h-6);
+}
+
+// 空时图：每帧添加一行
+const palette = (function(){
+  // 把 u 值映射到 颜色 (黑→深紫→橙→白)
+  const colors = [
+    [4,6,10],[20,8,40],[70,15,90],[140,30,80],
+    [220,80,60],[255,160,80],[255,220,150],[255,255,255]
+  ];
+  return (t)=> {
+    t = Math.max(0, Math.min(1, t));
+    const s = t * (colors.length - 1);
+    const i = Math.floor(s);
+    const f = s - i;
+    const a = colors[i], b = colors[Math.min(colors.length-1, i+1)];
+    return [a[0]+(b[0]-a[0])*f, a[1]+(b[1]-a[1])*f, a[2]+(b[2]-a[2])*f];
+  };
+})();
+
+function pushSpaceTimeRow(){
+  const w = spaceTimeCanvas.clientWidth;
+  const h = spaceTimeCanvas.clientHeight;
+  const dpr = window.devicePixelRatio || 1;
+  if (spaceTimeRow >= Math.floor(h)) {
+    // 滚动: 把图像向上平移一行
+    const img = spaceTimeCtx.getImageData(0, 1*dpr, spaceTimeCanvas.width, spaceTimeCanvas.height - 1*dpr);
+    spaceTimeCtx.putImageData(img, 0, 0);
+    spaceTimeRow = Math.floor(h) - 1;
+  }
+  // 当前 u_real
+  for (let i = 0; i < 2*N; i++) work[i] = uhat[i];
+  fft(work, +1);
+  // 取 N 个值, 把它们绘到一行 (w 像素)
+  const lineImage = spaceTimeCtx.createImageData(spaceTimeCanvas.width, 1*dpr);
+  const ww = spaceTimeCanvas.width;
+  const scale = 1 / Math.max(1.0, yMax);
+  for (let px = 0; px < ww; px++){
+    const xi = Math.floor(px / ww * N);
+    const v = work[2*xi];
+    const t = 0.5 + v * scale * 0.5;     // 把 [-yMax, yMax] 映射到 [0,1]
+    const c = palette(t);
+    for (let dy = 0; dy < dpr; dy++){
+      const off = (dy * ww + px) * 4;
+      lineImage.data[off]   = c[0];
+      lineImage.data[off+1] = c[1];
+      lineImage.data[off+2] = c[2];
+      lineImage.data[off+3] = 255;
+    }
+  }
+  spaceTimeCtx.putImageData(lineImage, 0, spaceTimeRow * dpr);
+  spaceTimeRow++;
+}
+
+function updateConservedDisplay(){
+  const inv = invariants();
+  document.getElementById('C1').textContent = inv.C1.toFixed(4);
+  document.getElementById('C2').textContent = inv.C2.toFixed(4);
+  document.getElementById('C3').textContent = inv.C3.toFixed(4);
+  // 相对漂移
+  const d1 = C0.C1 === 0 ? 0 : (inv.C1 - C0.C1);
+  const d2 = C0.C2 === 0 ? 0 : (inv.C2 - C0.C2) / Math.abs(C0.C2);
+  const d3 = C0.C3 === 0 ? 0 : (inv.C3 - C0.C3) / Math.abs(C0.C3);
+  document.getElementById('C1d').textContent = `Δ=${d1.toExponential(1)}`;
+  document.getElementById('C2d').textContent = `Δ=${(d2*100).toFixed(3)}%`;
+  document.getElementById('C3d').textContent = `Δ=${(d3*100).toFixed(3)}%`;
+}
+
+//==============================================================
+//  主循环
+//==============================================================
+let simT = 0;
+const dtBase = 0.010;
+let playing = true;
+let speedMul = 1.0;
+let ampMul = 1.0;
+let frameCount = 0;
+
+function frame(){
+  if (playing){
+    const stepsPerFrame = Math.max(1, Math.round(2 * speedMul));
+    for (let s = 0; s < stepsPerFrame; s++){
+      step(dtBase);
+      simT += dtBase;
+    }
+    drawProfile();
+    if (frameCount % 2 === 0) pushSpaceTimeRow();
+    if (frameCount % 10 === 0) updateConservedDisplay();
+    document.getElementById('time').textContent = simT.toFixed(3);
+    frameCount++;
+  }
+  requestAnimationFrame(frame);
+}
+
+//==============================================================
+//  UI 初始化
+//==============================================================
+function applyAmp(u){
+  if (ampMul === 1) return u;
+  const u2 = new Float64Array(N);
+  for (let i = 0; i < N; i++) u2[i] = u[i] * ampMul;
+  return u2;
+}
+
+function loadPreset(p){
+  currentPreset = p;
+  document.getElementById('preset-name').textContent = p.name;
+  document.querySelectorAll('#presets button').forEach(b=>{
+    b.classList.toggle('active', b.dataset.id === p.id);
+  });
+  const u = applyAmp(p.make());
+  loadField(u);
+  yMax = 5;
+}
+
+const presetsDiv = document.getElementById('presets');
+for (const p of PRESETS){
+  const b = document.createElement('button');
+  b.textContent = p.name;
+  b.dataset.id = p.id;
+  b.title = p.note;
+  b.addEventListener('click', ()=> loadPreset(p));
+  presetsDiv.appendChild(b);
+}
+
+document.getElementById('speed').addEventListener('input', e=>{
+  speedMul = parseFloat(e.target.value);
+  document.getElementById('speed-v').textContent = speedMul.toFixed(2) + '×';
+});
+document.getElementById('amp').addEventListener('input', e=>{
+  ampMul = parseFloat(e.target.value);
+  document.getElementById('amp-v').textContent = ampMul.toFixed(1) + '×';
+});
+document.getElementById('play').addEventListener('click', e=>{
+  playing = !playing;
+  e.target.textContent = playing ? '⏸ 暂停' : '▶ 播放';
+});
+document.getElementById('reset').addEventListener('click', ()=> loadPreset(currentPreset));
+document.getElementById('clear').addEventListener('click', ()=>{
+  spaceTimeRow = 0;
+  spaceTimeCtx.fillStyle = '#04060a';
+  spaceTimeCtx.fillRect(0,0,spaceTimeCanvas.width, spaceTimeCanvas.height);
+});
+
+document.getElementById('dt').textContent = dtBase.toFixed(3);
+document.getElementById('ngrid').textContent = N;
+document.getElementById('domain').textContent = L;
+
+resize();
+loadPreset(PRESETS[1]);     // 默认双孤子碰撞
+frame();
+</script>
+</body>
+</html>
