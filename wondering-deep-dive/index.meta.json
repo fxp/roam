@@ -1,0 +1,35 @@
+{
+  "$schema": "../../config/meta.schema.json",
+  "slug": "wondering-deep-dive",
+  "type": "roam",
+  "title": {
+    "zh": "AI 测评 AI 学习产品"
+  },
+  "status": "published",
+  "source": "native",
+  "current_version": 1,
+  "first_published": "2026-05-20",
+  "last_updated": "2026-05-20",
+  "freshness_priority": "cold",
+  "next_check": "2026-08-18",
+  "languages": [
+    "zh"
+  ],
+  "primary_language": "zh",
+  "author": "冯小平",
+  "version_log": [
+    {
+      "v": 1,
+      "date": "2026-07-06",
+      "git": "PENDING",
+      "summary": "回填结构化元数据（历史条目补齐 index.meta.json）"
+    }
+  ],
+  "tags": [
+    "Product Review",
+    "AI Agent",
+    "EdTech"
+  ],
+  "category": "ROAM",
+  "summary": "一位 AI 产品经理用 AI 工具深度测评了「问野」这款 AI 学习产品的定价设计、使用体验与情感化交互细节。"
+}
