@@ -155,19 +155,24 @@ fetch('chapters.json?t=' + Date.now())
     document.title = (data.title || '连载') + ' · AI 日更连载 — 问野 · Roam';
     const o = data.origin || {};
     if (o.logline) document.getElementById('logline').textContent = o.logline;
-    if (o.url) {
-      const host = o.url.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    if (o.url || o.reader) {
       const box = document.getElementById('origin');
       box.style.display = 'block';
-      box.innerHTML = '<div class="o-label">这本书是为谁写的</div>'
-        + '<div class="o-row">故事的设定，来自读者提交的一个网址：'
-        + '<a href="' + o.url + '" target="_blank" rel="noopener">' + host + '</a>。'
-        + 'AI 读过它，推断出这个人在意什么，然后据此设计了主角、城市与语调。</div>'
-        + (o.reader ? '<div class="o-row" style="margin-top:8px">读到的这个人：<b>' + o.reader + '</b></div>' : '')
+      let html = '<div class="o-label">这本书是怎么来的</div>';
+      if (o.url) {
+        const host = o.url.replace(/^https?:\/\//, '').replace(/\/$/, '');
+        html += '<div class="o-row">故事的设定，来自读者提交的一个网址：'
+          + '<a href="' + o.url + '" target="_blank" rel="noopener">' + host + '</a>。'
+          + 'AI 读过它，推断出这个人在意什么，然后据此设计了主角、城市与语调。</div>';
+      } else {
+        html += '<div class="o-row">这本书的设定，是读者直接向 AI 提出的要求。</div>';
+      }
+      html += (o.reader ? '<div class="o-row" style="margin-top:8px">' + (o.url ? '读到的这个人：' : '读者的想法：') + '<b>' + o.reader + '</b></div>' : '')
         + (o.keywords && o.keywords.length
             ? '<div class="o-row">' + o.keywords.map(k => '<span class="kw">' + k + '</span>').join('') + '</div>'
             : '')
         + (o.why ? '<div class="o-row" style="margin-top:8px">' + o.why + '</div>' : '');
+      box.innerHTML = html;
     }
     const toc = document.getElementById('toc');
     const box = document.getElementById('chapters');
