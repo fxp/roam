@@ -76,6 +76,15 @@
     margin: 0 0 1.2em; text-align: justify;
   }
   .divider { text-align: center; color: var(--ink-faint); margin: 56px 0 0; letter-spacing: 0.6em; }
+  .endnote {
+    margin: 28px auto 0; max-width: 420px; padding: 22px 24px;
+    border: 1px dashed var(--line); text-align: center;
+    font-family: var(--serif); font-size: 14px; line-height: 2.1; color: var(--ink-soft);
+  }
+  .endnote .en-label {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.18em;
+    text-transform: uppercase; color: var(--accent); margin-bottom: 10px;
+  }
 
   footer {
     margin-top: 72px; padding-top: 16px; border-top: 1px solid var(--line);
@@ -99,9 +108,10 @@
     每一章写于它标注的那一天，当天真实发生的新闻，会作为背景出现在他经过的街角。
   </div>
   <div class="howline">
-    <b>全自动连载</b> · 每日由 AI 自主续写一章 → 抓取当天真实新闻标题织入场景 →
+    <b>全自动连载</b> · 每日由 AI 自主续写 → 抓取当天真实新闻标题织入场景 →
     发布到本页，并同步推送到一块 4.7″ 电子墨水屏阅读器（M5Paper S3）上。
-    读者在墨水屏上翻到结尾时，下一章才开始生成——故事被阅读的速度所驱动。
+    读者在墨水屏上翻到结尾时，下一章才开始生成——但每天有更新上限：
+    故事与现实严格同步，读到尽头，就只能等现实世界继续发生。
   </div>
 
   <div class="toc">
@@ -144,6 +154,13 @@ fetch('chapters.json?t=' + Date.now())
     div.className = 'divider'; div.textContent = '· · ·';
     div.title = '未完待续';
     box.appendChild(div);
+    const en = document.createElement('div');
+    en.className = 'endnote';
+    en.innerHTML = '<div class="en-label">已连载至与现实同步的位置</div>'
+      + '接下来的情节，发生在还没有到来的时间里。<br>'
+      + '等现实世界走到那儿，它才会被写下。<br>'
+      + '<span style="font-family:var(--mono);font-size:11px;color:var(--ink-faint)">明天，这一页会自己长出新的章节</span>';
+    box.appendChild(en);
   })
   .catch(e => { document.getElementById('status').textContent = '加载失败：' + e; });
 </script>
