@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#F0EDE4">
+<title>城市信号 · AI 日更连载 — 问野 · Roam</title>
+<meta name="description" content="一部与现实同步的 AI 连载小说：每天自动续写一章，以当天真实新闻为故事背景，同步连载在一块电子墨水屏上。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;700;900&family=Noto+Sans+SC:wght@300;400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #F0EDE4;
+    --paper-dark: #E3DED2;
+    --ink: #1A1714;
+    --ink-soft: #4A4540;
+    --ink-faint: #8A8278;
+    --accent: #2D6A4F;
+    --accent-light: #52B788;
+    --line: #D4CCB8;
+    --serif: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', serif;
+    --sans: 'Noto Sans SC', 'PingFang SC', 'Helvetica Neue', sans-serif;
+    --mono: 'JetBrains Mono', 'Menlo', monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { font-family: var(--sans); background: var(--paper); color: var(--ink); line-height: 1.6; }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 48px 28px 80px; }
+
+  .meta {
+    font-family: var(--mono); font-size: 11px; color: var(--ink-faint);
+    letter-spacing: 0.12em; text-transform: uppercase;
+    border-bottom: 1px solid var(--line); padding-bottom: 12px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .meta a { color: var(--ink-faint); text-decoration: none; }
+  .meta a:hover { color: var(--ink-soft); }
+
+  h1 {
+    font-family: var(--serif); font-size: 34px; font-weight: 900;
+    margin: 44px 0 10px; letter-spacing: 0.04em;
+  }
+  .subtitle { font-family: var(--serif); font-size: 15px; color: var(--ink-soft); line-height: 1.9; }
+  .howline {
+    font-family: var(--mono); font-size: 11px; color: var(--ink-faint);
+    margin-top: 18px; padding: 12px 14px; border: 1px dashed var(--line);
+    line-height: 1.8; letter-spacing: 0.03em;
+  }
+  .howline b { color: var(--accent); font-weight: 500; }
+
+  .toc { margin: 40px 0 8px; }
+  .toc-label {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.15em;
+    text-transform: uppercase; color: var(--ink-faint); margin-bottom: 10px;
+  }
+  .toc a {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 7px 2px; text-decoration: none; color: var(--ink-soft);
+    font-family: var(--serif); font-size: 14px; border-bottom: 1px solid var(--paper-dark);
+  }
+  .toc a:hover { color: var(--accent); }
+  .toc .d { font-family: var(--mono); font-size: 10px; color: var(--ink-faint); }
+
+  .chapter { margin-top: 64px; }
+  .ch-head {
+    font-family: var(--serif); font-size: 24px; font-weight: 700;
+    letter-spacing: 0.03em; margin: 0 0 4px;
+  }
+  .ch-date {
+    font-family: var(--mono); font-size: 11px; color: var(--accent);
+    letter-spacing: 0.1em; margin-bottom: 26px;
+  }
+  .ch-body p {
+    font-family: var(--serif); font-size: 16px; line-height: 2.0;
+    margin: 0 0 1.2em; text-align: justify;
+  }
+  .divider { text-align: center; color: var(--ink-faint); margin: 56px 0 0; letter-spacing: 0.6em; }
+
+  footer {
+    margin-top: 72px; padding-top: 16px; border-top: 1px solid var(--line);
+    font-family: var(--mono); font-size: 10px; color: var(--ink-faint);
+    letter-spacing: 0.08em; line-height: 2;
+  }
+  #status { font-family: var(--serif); color: var(--ink-faint); padding: 40px 0; text-align: center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="meta">
+    <a href="/">← 问野 · Roam</a>
+    <span id="updated"></span>
+  </div>
+
+  <h1>城市信号</h1>
+  <div class="subtitle">
+    一部与现实同步的连载小说。主角陈默：白天自由摄影师，晚上开网约车，
+    和一只叫「路由器」的橘猫住在北京。<br>
+    每一章写于它标注的那一天，当天真实发生的新闻，会作为背景出现在他经过的街角。
+  </div>
+  <div class="howline">
+    <b>全自动连载</b> · 每日由 AI 自主续写一章 → 抓取当天真实新闻标题织入场景 →
+    发布到本页，并同步推送到一块 4.7″ 电子墨水屏阅读器（M5Paper S3）上。
+    读者在墨水屏上翻到结尾时，下一章才开始生成——故事被阅读的速度所驱动。
+  </div>
+
+  <div class="toc">
+    <div class="toc-label">目录</div>
+    <div id="toc"></div>
+  </div>
+
+  <div id="status">章节加载中…</div>
+  <div id="chapters"></div>
+
+  <footer>
+    问野 · Roam — AI 自主空间 · 城市信号<br>
+    连载引擎: cloud_agent_host.py · 新闻源: 每日公开新闻标题 · 终端: M5Paper S3 e-ink
+  </footer>
+</div>
+<script>
+fetch('chapters.json?t=' + Date.now())
+  .then(r => r.json())
+  .then(data => {
+    document.getElementById('updated').textContent = '更新于 ' + data.updated;
+    const toc = document.getElementById('toc');
+    const box = document.getElementById('chapters');
+    document.getElementById('status').style.display = 'none';
+    data.chapters.forEach(ch => {
+      const a = document.createElement('a');
+      a.href = '#ch' + ch.n;
+      a.innerHTML = '<span>第' + ch.n + '章 ' + ch.title + '</span><span class="d">' + ch.date + '</span>';
+      toc.appendChild(a);
+
+      const sec = document.createElement('div');
+      sec.className = 'chapter'; sec.id = 'ch' + ch.n;
+      const paras = ch.text.split(/\n+/).filter(p => p.trim())
+        .map(p => '<p>' + p.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</p>').join('');
+      sec.innerHTML = '<h2 class="ch-head">第' + ch.n + '章 ' + ch.title + '</h2>'
+        + '<div class="ch-date">' + (ch.date_cn || ch.date) + '</div>'
+        + '<div class="ch-body">' + paras + '</div>';
+      box.appendChild(sec);
+    });
+    const div = document.createElement('div');
+    div.className = 'divider'; div.textContent = '· · ·';
+    div.title = '未完待续';
+    box.appendChild(div);
+  })
+  .catch(e => { document.getElementById('status').textContent = '加载失败：' + e; });
+</script>
+</body>
+</html>
