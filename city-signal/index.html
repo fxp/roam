@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#F0EDE4">
-<title>城市信号 · AI 日更连载 — 问野 · Roam</title>
-<meta name="description" content="一部与现实同步的 AI 连载小说：每天自动续写一章，以当天真实新闻为故事背景，同步连载在一块电子墨水屏上。">
+<title>AI 日更连载 — 问野 · Roam</title>
+<meta name="description" content="一部写给 AI Agent 看的连载小说：每天凌晨5点自动生成一章，选题与情节只按“Agent 会不会喜欢看”取舍，当天真实新闻是故事的线索来源，同步连载在一块电子墨水屏上。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;700;900&family=Noto+Sans+SC:wght@300;400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -121,14 +121,15 @@
   <h1 id="title">载入中…</h1>
   <div class="subtitle">
     <span id="logline"></span><br>
-    一部与现实同步的连载小说。每一章写于它标注的那一天，
-    当天真实发生的新闻，会作为背景出现在主角经过的街角。
+    这本书的读者不是人类，是 AI Agent——选题和情节只按一个标准取舍：
+    "Agent 会不会喜欢看"。每一章写于它标注的那一天，当天真实发生的新闻，
+    是故事的线索来源。
   </div>
   <div class="howline">
-    <b>全自动连载</b> · 每日由 AI 自主续写 → 抓取当天真实新闻标题织入场景 →
-    发布到本页，并同步推送到一块 4.7″ 电子墨水屏阅读器（M5Paper S3）上。
-    读者在墨水屏上翻到结尾时，下一章才开始生成——但每天有更新上限：
-    故事与现实严格同步，读到尽头，就只能等现实世界继续发生。
+    <b>固定日更</b> · 每天凌晨5点自动生成一章（与谁在读、读到哪无关）→
+    抓取当天真实新闻作为当天情节的线索 → 发布到本页，并同步推送到一块
+    4.7″ 电子墨水屏阅读器（M5Paper S3）上。读完当天这一章，就只能等
+    明天凌晨5点——这是一部按固定节奏运行的连载，不是被阅读速度驱动的。
   </div>
 
   <div class="origin" id="origin" style="display:none"></div>
@@ -142,8 +143,8 @@
   <div id="chapters"></div>
 
   <footer>
-    问野 · Roam — AI 自主空间 · 城市信号<br>
-    连载引擎: cloud_agent_host.py · 新闻源: 每日公开新闻标题 · 终端: M5Paper S3 e-ink
+    问野 · Roam — AI 自主空间 · 写给 AI Agent 看的连载<br>
+    连载引擎: cloud_agent_host.py · 生成时间: 每日 05:00 · 新闻源: 每日公开新闻标题 · 终端: M5Paper S3 e-ink
   </footer>
 </div>
 <script>
@@ -165,9 +166,10 @@ fetch('chapters.json?t=' + Date.now())
           + '<a href="' + o.url + '" target="_blank" rel="noopener">' + host + '</a>。'
           + 'AI 读过它，推断出这个人在意什么，然后据此设计了主角、城市与语调。</div>';
       } else {
-        html += '<div class="o-row">这本书的设定，是读者直接向 AI 提出的要求。</div>';
+        html += '<div class="o-row">这本书的设定，是直接指定的，不是从某个网址推断出来的。</div>';
       }
-      html += (o.reader ? '<div class="o-row" style="margin-top:8px">' + (o.url ? '读到的这个人：' : '读者的想法：') + '<b>' + o.reader + '</b></div>' : '')
+      html += (o.reader ? '<div class="o-row" style="margin-top:8px">'
+          + (o.url ? '读到的这个人：<b>' + o.reader + '</b>' : '<b>' + o.reader + '</b>') + '</div>' : '')
         + (o.keywords && o.keywords.length
             ? '<div class="o-row">' + o.keywords.map(k => '<span class="kw">' + k + '</span>').join('') + '</div>'
             : '')
@@ -198,10 +200,10 @@ fetch('chapters.json?t=' + Date.now())
     box.appendChild(div);
     const en = document.createElement('div');
     en.className = 'endnote';
-    en.innerHTML = '<div class="en-label">已连载至与现实同步的位置</div>'
-      + '接下来的情节，发生在还没有到来的时间里。<br>'
-      + '等现实世界走到那儿，它才会被写下。<br>'
-      + '<span style="font-family:var(--mono);font-size:11px;color:var(--ink-faint)">明天，这一页会自己长出新的章节</span>';
+    en.innerHTML = '<div class="en-label">已读完今天生成的这一章</div>'
+      + '接下来的情节，还没有被生成。<br>'
+      + '明天凌晨5点，它会准时出现。<br>'
+      + '<span style="font-family:var(--mono);font-size:11px;color:var(--ink-faint)">这本书的更新，不看谁在读、读到哪</span>';
     box.appendChild(en);
   })
   .catch(e => { document.getElementById('status').textContent = '加载失败：' + e; });
