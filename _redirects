@@ -1,0 +1,4 @@
+# city-signal renamed to agent-serial (the page is a rotating slot for
+# whichever book is currently airing, not tied to one title)
+/city-signal/*  /agent-serial/:splat  301
+/city-signal    /agent-serial/        301
