@@ -1,0 +1,951 @@
+<title>Vendling — It does the thinking. You do the driving.</title>
+<style>
+  :root{
+    --paper:#F2F3EF;
+    --paper-2:#E9EBE4;
+    --ink:#16211C;
+    --ink-soft:#4A564F;
+    --line:#C9CEC4;
+    --panel:#0C1210;
+    --panel-2:#101815;
+    --led:#3FDD78;
+    --led-dim:#1E7A46;
+    --you:#E8590C;
+    --you-deep:#C64A08;
+    --paper-card:#FBFBF8;
+    --radius:10px;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:var(--sans);
+    font-size:17px;
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  /* CJK typography adjustments */
+  :root[lang="zh"] body{font-family:system-ui,-apple-system,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",var(--sans);line-height:1.75}
+  :root[lang="ja"] body{font-family:system-ui,-apple-system,"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic UI","Meiryo",var(--sans);line-height:1.75}
+  :root[lang="zh"] h1,:root[lang="ja"] h1,
+  :root[lang="zh"] h2,:root[lang="ja"] h2{letter-spacing:0}
+  :root[lang="zh"] h1{line-height:1.18}
+  :root[lang="ja"] h1{line-height:1.22}
+  :root[lang="zh"] h2,:root[lang="ja"] h2{line-height:1.3}
+  ::selection{background:var(--led);color:var(--panel)}
+
+  a{color:inherit}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+
+  /* ---------- nav ---------- */
+  nav{
+    position:sticky;top:0;z-index:50;
+    background:color-mix(in srgb,var(--paper) 88%,transparent);
+    backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--line);
+  }
+  .nav-in{display:flex;align-items:center;justify-content:space-between;height:60px;gap:16px}
+  .wordmark{font-family:var(--mono);font-weight:700;font-size:15px;letter-spacing:.08em;text-decoration:none;flex:0 0 auto}
+  .wordmark .agent{color:var(--led-dim)}
+  .nav-right{display:flex;align-items:center;gap:18px}
+  .langs{display:flex;gap:2px;font-family:var(--mono);font-size:12.5px}
+  .langs button{
+    background:none;border:none;cursor:pointer;font:inherit;color:var(--ink-soft);
+    padding:6px 8px;border-radius:5px;letter-spacing:.04em;
+  }
+  .langs button:hover{color:var(--ink)}
+  .langs button[aria-pressed="true"]{color:var(--ink);font-weight:700;background:var(--paper-2)}
+  .nav-cta{
+    font-family:var(--mono);font-size:13px;font-weight:600;letter-spacing:.04em;
+    text-decoration:none;color:var(--paper);
+    background:var(--ink);padding:9px 16px;border-radius:6px;white-space:nowrap;
+  }
+  .nav-cta:hover{background:#000}
+
+  /* ---------- hero ---------- */
+  header{padding:72px 0 64px;border-bottom:1px solid var(--line)}
+  .hero{display:grid;grid-template-columns:1.05fr 1fr;gap:56px;align-items:center}
+  .eyebrow{
+    font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.18em;
+    text-transform:uppercase;color:var(--ink-soft);margin-bottom:20px;
+  }
+  h1{
+    font-size:clamp(40px,5.2vw,62px);
+    line-height:1.04;font-weight:800;letter-spacing:-.025em;
+    margin-bottom:22px;
+  }
+  h1 .quiet{color:var(--ink-soft);font-weight:700}
+  .hero-sub{font-size:19px;color:var(--ink-soft);max-width:34em;margin-bottom:30px}
+  .hero-sub strong{color:var(--ink);font-weight:600}
+  .cta-row{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-bottom:26px}
+  .btn{
+    display:inline-block;text-decoration:none;font-weight:600;font-size:16px;
+    padding:14px 26px;border-radius:8px;border:1px solid transparent;
+  }
+  .btn-primary{background:var(--you);color:#fff}
+  .btn-primary:hover{background:var(--you-deep)}
+  .btn-ghost{border-color:var(--line);color:var(--ink)}
+  .btn-ghost:hover{border-color:var(--ink-soft)}
+  .legend{display:flex;gap:18px;font-family:var(--mono);font-size:12.5px;color:var(--ink-soft)}
+  .legend b{font-weight:600}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:7px;vertical-align:1px}
+  .dot-agent{background:var(--led-dim)}
+  .dot-you{background:var(--you)}
+
+  /* machine display panel */
+  .machine{
+    background:var(--panel);border-radius:14px;
+    box-shadow:0 24px 60px -24px rgba(12,18,16,.45), inset 0 1px 0 rgba(255,255,255,.06);
+    overflow:hidden;
+  }
+  .machine-top{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:12px 18px;background:var(--panel-2);
+    border-bottom:1px solid rgba(63,221,120,.14);
+    font-family:var(--mono);font-size:11px;letter-spacing:.12em;color:var(--led-dim);
+    text-transform:uppercase;
+  }
+  .machine-top .ok{color:var(--led)}
+  .feed{padding:20px 18px 22px;font-family:var(--mono);font-size:13.5px;line-height:1.9;min-height:296px}
+  .feed-line{display:flex;gap:12px;opacity:0;transform:translateY(4px);transition:opacity .4s,transform .4s}
+  .feed-line.on{opacity:1;transform:none}
+  .feed .t{color:var(--led-dim);flex:0 0 auto}
+  .feed .msg{color:var(--led)}
+  .feed-line.human .msg{color:var(--you)}
+  .feed-line.human .t{color:var(--you-deep)}
+  .cursor{display:inline-block;width:8px;height:15px;background:var(--led);vertical-align:-2px;animation:blink 1s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+  @media (prefers-reduced-motion:reduce){
+    .feed-line{opacity:1;transform:none;transition:none}
+    .cursor{animation:none}
+  }
+
+  /* ---------- sections ---------- */
+  section{padding:76px 0;border-bottom:1px solid var(--line)}
+  .slot{
+    font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.14em;
+    color:var(--ink-soft);margin-bottom:14px;
+  }
+  .slot::before{
+    content:"";display:inline-block;width:22px;height:1px;background:var(--ink-soft);
+    vertical-align:4px;margin-right:10px;
+  }
+  h2{font-size:clamp(28px,3.4vw,40px);line-height:1.12;letter-spacing:-.02em;font-weight:800;margin-bottom:14px;max-width:22em}
+  .lede{font-size:18px;color:var(--ink-soft);max-width:38em;margin-bottom:40px}
+  .lede strong{color:var(--ink);font-weight:600}
+
+  /* week log */
+  .weeklog{
+    background:var(--paper-card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:8px 0;font-family:var(--mono);font-size:13.5px;
+  }
+  .wl-row{display:grid;grid-template-columns:96px 1fr;gap:16px;padding:9px 22px;border-bottom:1px dashed var(--paper-2)}
+  :root[lang="zh"] .wl-row,:root[lang="ja"] .wl-row{grid-template-columns:110px 1fr}
+  .wl-row:last-of-type{border-bottom:none}
+  .wl-day{color:var(--ink-soft)}
+  .wl-msg{color:var(--led-dim)}
+  .wl-row.human{background:color-mix(in srgb,var(--you) 6%,var(--paper-card))}
+  .wl-row.human .wl-msg{color:var(--you-deep);font-weight:600}
+  .wl-more{padding:9px 22px;color:var(--ink-soft)}
+  .tally{
+    display:flex;gap:34px;margin-top:22px;font-family:var(--mono);font-size:14px;
+  }
+  .tally .n{font-size:34px;font-weight:700;display:block;letter-spacing:-.02em}
+  .tally .agent-n{color:var(--led-dim)}
+  .tally .you-n{color:var(--you)}
+  .tally small{color:var(--ink-soft)}
+
+  /* loops */
+  .loops{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+  .loop{
+    background:var(--paper-card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:24px 22px;
+  }
+  .loop h3{font-size:18px;font-weight:700;margin-bottom:4px}
+  .loop .freq{font-family:var(--mono);font-size:11.5px;color:var(--led-dim);letter-spacing:.1em;text-transform:uppercase;margin-bottom:12px}
+  .loop p{font-size:14.5px;color:var(--ink-soft)}
+
+  /* roadmap strip */
+  .roadmap{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .phase{
+    background:var(--paper-card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:22px;
+  }
+  .phase.now{border-color:var(--led-dim);border-width:1px;border-top:3px solid var(--led-dim)}
+  .phase .pn{font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;margin-bottom:10px;color:var(--ink-soft)}
+  .phase.now .pn{color:var(--led-dim)}
+  .phase h3{font-size:17px;margin-bottom:6px}
+  .phase p{font-size:14px;color:var(--ink-soft)}
+
+  /* human payroll */
+  .hands{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .hand{
+    border:1px solid color-mix(in srgb,var(--you) 34%,var(--line));
+    border-top:3px solid var(--you);
+    background:var(--paper-card);border-radius:var(--radius);padding:24px 22px;
+  }
+  .hand .hn{font-family:var(--mono);font-size:11.5px;color:var(--you-deep);letter-spacing:.12em;text-transform:uppercase;margin-bottom:10px}
+  .hand h3{font-size:19px;margin-bottom:8px}
+  .hand p{font-size:14.5px;color:var(--ink-soft)}
+  .hand .time{font-family:var(--mono);font-size:12.5px;color:var(--you-deep);margin-top:14px}
+
+  /* letter */
+  .letter-wrap{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:start}
+  .letter{
+    background:var(--paper-card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:34px 36px;box-shadow:0 18px 44px -26px rgba(22,33,28,.28);
+  }
+  .letter-head{font-family:var(--mono);font-size:12px;color:var(--ink-soft);letter-spacing:.08em;line-height:1.9;border-bottom:1px solid var(--paper-2);padding-bottom:16px;margin-bottom:20px}
+  .letter p{font-size:15.5px;margin-bottom:14px}
+  .letter .fig{color:var(--led-dim);font-family:var(--mono);font-weight:600}
+  .letter .ask{color:var(--you-deep);font-weight:600}
+  .letter .sig{font-family:var(--mono);font-size:13px;color:var(--ink-soft);margin-top:22px}
+
+  /* leash grid */
+  .leash{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+  .rein{background:var(--paper-card);border:1px solid var(--line);border-radius:var(--radius);padding:24px 22px}
+  .rein h3{font-size:17px;margin-bottom:6px}
+  .rein h3 .k{font-family:var(--mono);font-size:12px;color:var(--ink-soft);font-weight:600;margin-left:8px}
+  .rein p{font-size:14.5px;color:var(--ink-soft)}
+
+  /* receipt pricing */
+  .pricing{display:grid;grid-template-columns:repeat(2,minmax(0,380px));gap:28px;justify-content:start}
+  .receipt{
+    background:#fff;border:1px solid var(--line);border-radius:4px;
+    font-family:var(--mono);font-size:14px;padding:28px 26px;
+    box-shadow:0 14px 34px -22px rgba(22,33,28,.3);
+  }
+  .receipt h3{font-size:15px;letter-spacing:.12em;text-transform:uppercase;text-align:center;margin-bottom:4px;font-family:var(--mono)}
+  .receipt .rc-sub{text-align:center;color:var(--ink-soft);font-size:12px;margin-bottom:18px}
+  .rc-rule{border:none;border-top:1px dashed var(--line);margin:14px 0}
+  .rc-line{display:flex;justify-content:space-between;gap:12px;padding:3px 0;color:var(--ink-soft)}
+  .rc-line b{color:var(--ink);font-weight:600;flex:0 0 auto}
+  .rc-total{display:flex;justify-content:space-between;gap:12px;font-size:20px;font-weight:700;padding-top:6px}
+  .rc-note{font-size:12px;color:var(--ink-soft);margin-top:14px;line-height:1.7}
+  .receipt .btn{display:block;text-align:center;margin-top:18px;font-family:var(--sans)}
+  .receipt.future{background:var(--paper-card)}
+  .receipt.future .badge{
+    display:block;text-align:center;font-size:11px;letter-spacing:.14em;color:var(--led-dim);
+    text-transform:uppercase;margin-bottom:10px;
+  }
+
+  /* faq */
+  .faq{max-width:760px}
+  details{border-bottom:1px solid var(--line)}
+  summary{
+    cursor:pointer;list-style:none;display:flex;justify-content:space-between;gap:20px;
+    padding:20px 2px;font-weight:600;font-size:17px;
+  }
+  summary::-webkit-details-marker{display:none}
+  summary::after{content:"+";font-family:var(--mono);color:var(--ink-soft);font-weight:400}
+  details[open] summary::after{content:"–"}
+  details p{padding:0 2px 22px;color:var(--ink-soft);max-width:44em}
+
+  /* final */
+  .final{padding:96px 0;text-align:left;border-bottom:none}
+  .final h2{max-width:18em}
+  .final .lede{margin-bottom:30px}
+  footer{
+    border-top:1px solid var(--line);padding:28px 0 40px;
+    font-family:var(--mono);font-size:12.5px;color:var(--ink-soft);
+  }
+
+  :is(a,summary,button):focus-visible{outline:2px solid var(--you);outline-offset:3px;border-radius:4px}
+
+  @media (max-width:920px){
+    .hero{grid-template-columns:1fr;gap:40px}
+    .loops{grid-template-columns:repeat(2,1fr)}
+    .roadmap{grid-template-columns:1fr}
+    .hands{grid-template-columns:1fr}
+    .letter-wrap{grid-template-columns:1fr}
+    .leash{grid-template-columns:1fr}
+    .pricing{grid-template-columns:1fr}
+    section{padding:60px 0}
+  }
+  @media (max-width:560px){
+    .loops{grid-template-columns:1fr}
+    .nav-in{gap:8px}
+  }
+</style>
+
+<nav>
+  <div class="wrap nav-in">
+    <a class="wordmark" href="#top">VEND<span class="agent">LING</span></a>
+    <div class="nav-right">
+      <div class="langs" role="group" aria-label="Language">
+        <button type="button" data-lang="en" aria-pressed="true">EN</button>
+        <button type="button" data-lang="zh" aria-pressed="false">中文</button>
+        <button type="button" data-lang="ja" aria-pressed="false">日本語</button>
+      </div>
+      <a class="nav-cta" href="#pricing" data-i="nav.cta">JOIN THE WAITLIST</a>
+    </div>
+  </div>
+</nav>
+
+<header id="top">
+  <div class="wrap hero">
+    <div>
+      <p class="eyebrow" data-i="hero.eyebrow">The AI operator for your vending machines · Founding cohort</p>
+      <h1 data-i="hero.h1">It does the thinking.<br><span class="quiet">You do the driving.</span></h1>
+      <p class="hero-sub" data-i="hero.sub">
+        Vendling watches every sale, chats with your customers, decides what to stock,
+        and hands you a ready-planned restock run. Landing new locations is still your game —
+        running the machines isn't. <strong>Your job shrinks to one run a week.</strong>
+      </p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="#pricing" data-i="hero.cta1">Put it to work</a>
+        <a class="btn btn-ghost" href="#letter" data-i="hero.cta2">Read a sample owner letter</a>
+      </div>
+      <p class="legend" data-i="hero.legend">
+        <span><span class="dot dot-agent"></span><b>green</b> — your agent</span>
+        <span><span class="dot dot-you"></span><b>orange</b> — you</span>
+      </p>
+    </div>
+
+    <div class="machine" aria-label="Live agent activity display">
+      <div class="machine-top">
+        <span data-i="machine.route">ROUTE 01 · DENVER · 4 MACHINES</span>
+        <span class="ok" data-i="machine.status">● OPERATING</span>
+      </div>
+      <div class="feed" id="feed" aria-live="off"></div>
+    </div>
+  </div>
+</header>
+
+<section id="week">
+  <div class="wrap">
+    <p class="slot" data-i="week.slot">SLOT A1 · THE DIVISION OF LABOR</p>
+    <h2 data-i="week.h2">A real week, color-coded.</h2>
+    <p class="lede" data-i="week.lede">
+      Every line below is something that happened on this route last week.
+      Count the orange ones — <strong>that's your whole job.</strong>
+    </p>
+
+    <div class="weeklog" role="table" aria-label="One week of route activity">
+      <div class="wl-row"><span class="wl-day" data-i="wl.d1">MON 06:00</span><span class="wl-msg" data-i="wl.m1">Weekly owner letter sent — net $412, one product swap planned</span></div>
+      <div class="wl-row"><span class="wl-day" data-i="wl.d2">MON 09:04</span><span class="wl-msg" data-i="wl.m2">Daily sales pull: 4 machines healthy · M03 slot B2 down 38% over two weeks</span></div>
+      <div class="wl-row"><span class="wl-day" data-i="wl.d3">TUE 12:40</span><span class="wl-msg" data-i="wl.m3">Customer scanned the QR at M03: "any sugar-free energy?" — answered, logged as the 3rd vote this month</span></div>
+      <div class="wl-row"><span class="wl-day" data-i="wl.d4">TUE 12:41</span><span class="wl-msg" data-i="wl.m4">Verdict: Celsius out, Alani Nu in — next restock manifest updated</span></div>
+      <div class="wl-row"><span class="wl-day" data-i="wl.d5">WED 07:00</span><span class="wl-msg" data-i="wl.m5">Wednesday run built: 2 stops, 14 items, shopping list emailed to you</span></div>
+      <div class="wl-row human"><span class="wl-day" data-i="wl.d6">WED 18:40</span><span class="wl-msg" data-i="wl.m6">YOU — ran the restock (25 min, photos verified)</span></div>
+      <div class="wl-row"><span class="wl-day" data-i="wl.d7">THU 09:15</span><span class="wl-msg" data-i="wl.m7">3 requesters notified: "your pick is now in the machine"</span></div>
+      <div class="wl-row"><span class="wl-day" data-i="wl.d8">THU 14:20</span><span class="wl-msg" data-i="wl.m8">Fault report via QR at M02: coil jam in B3 → 60-second fix added to your next run</span></div>
+      <div class="wl-row"><span class="wl-day" data-i="wl.d9">FRI 09:00</span><span class="wl-msg" data-i="wl.m9">Books updated · renewal heads-up: Coastal Gym contract is 60 days out — your performance one-pager is ready</span></div>
+      <div class="wl-row human"><span class="wl-day" data-i="wl.d10">FRI 17:30</span><span class="wl-msg" data-i="wl.m10">YOU — pitched Riverside Health with the one-pager it prepped (you close the deals; it does the math)</span></div>
+      <div class="wl-more" data-i="wl.more">… + 23 more agent actions (price checks, bookkeeping, customer replies, sales digests)</div>
+    </div>
+
+    <div class="tally">
+      <div><span class="n agent-n">29</span><small data-i="tally.agent">agent actions</small></div>
+      <div><span class="n you-n">2</span><small data-i="tally.you">yours — one run, one pitch</small></div>
+    </div>
+  </div>
+</section>
+
+<section id="loops">
+  <div class="wrap">
+    <p class="slot" data-i="loops.slot">SLOT A2 · WHAT IT RUNS</p>
+    <h2 data-i="loops.h2">Four loops. Always on.</h2>
+    <p class="lede" data-i="loops.lede">While you're at your day job, four loops keep every machine selling the right things at the right prices.</p>
+    <div class="loops">
+      <div class="loop">
+        <h3 data-i="loop1.h">Watch</h3>
+        <p class="freq" data-i="loop1.f">Daily</p>
+        <p data-i="loop1.p">Pulls every sale from your machines' telemetry. Spots slowdowns, dead slots, and price mismatches before they cost you a week of revenue.</p>
+      </div>
+      <div class="loop">
+        <h3 data-i="loop2.h">Listen</h3>
+        <p class="freq" data-i="loop2.f">Real-time</p>
+        <p data-i="loop2.p">Every machine wears a QR code. Customers ask for products, report jams, get answers — from the agent, day or night. Every wish becomes a vote.</p>
+      </div>
+      <div class="loop">
+        <h3 data-i="loop3.h">Curate</h3>
+        <p class="freq" data-i="loop3.f">Weekly</p>
+        <p data-i="loop3.p">Turns votes and sales data into stocking decisions: what's out, what's in, what price. You can veto anything — most owners stop bothering.</p>
+      </div>
+      <div class="loop">
+        <h3 data-i="loop4.h">Restock</h3>
+        <p class="freq" data-i="loop4.f">As needed</p>
+        <p data-i="loop4.p">Predicts empty slots, merges machines into one efficient run, and emails you the shopping list. You show up — everything's already decided.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="roadmap">
+  <div class="wrap">
+    <p class="slot" data-i="road.slot">SLOT A3 · WHAT'S AUTOMATED, HONESTLY</p>
+    <h2 data-i="road.h2">Full autonomy where it's earned.</h2>
+    <p class="lede" data-i="road.lede">Today, Vendling fully runs machines you already have. Deal-making stays human — and it already preps your paperwork.</p>
+    <div class="roadmap">
+      <div class="phase now">
+        <p class="pn" data-i="ph1.n">Now · Autonomous</p>
+        <h3 data-i="ph1.h">Operations &amp; customers</h3>
+        <p data-i="ph1.p">Sales watching, product decisions, restock planning, customer chat, books. Fully agent-run, inside your rules.</p>
+      </div>
+      <div class="phase">
+        <p class="pn" data-i="ph2.n">Next · Assisted</p>
+        <h3 data-i="ph2.h">Deal prep</h3>
+        <p data-i="ph2.p">Location one-pagers, ROI math, and draft contracts — generated for your pitch, updated as you negotiate.</p>
+      </div>
+      <div class="phase">
+        <p class="pn" data-i="ph3.n">Later · Supervised</p>
+        <h3 data-i="ph3.h">Outreach &amp; negotiation</h3>
+        <p data-i="ph3.p">Drafted by the agent, approved by you — rolled out only when it's provably good enough. No overpromises.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="hands">
+  <div class="wrap">
+    <p class="slot" data-i="hands.slot">SLOT B1 · WHERE YOU COME IN</p>
+    <h2 data-i="hands.h2">Three things stay yours.</h2>
+    <p class="lede" data-i="hands.lede">The agent does the thinking. What's left is exactly what makes it <strong>your</strong> business:</p>
+    <div class="hands">
+      <div class="hand">
+        <p class="hn" data-i="hand1.n">Yours 01</p>
+        <h3 data-i="hand1.h">Run the route</h3>
+        <p data-i="hand1.p">One planned restock run — shopping list, stop order, slot-by-slot manifest, the occasional 60-second fix. Follow the card; no thinking required.</p>
+        <p class="time" data-i="hand1.t">~1 run / week · scheduled inside your available hours</p>
+      </div>
+      <div class="hand">
+        <p class="hn" data-i="hand2.n">Yours 02</p>
+        <h3 data-i="hand2.h">Land the locations</h3>
+        <p data-i="hand2.p">Talking a property manager into a deal is still a human sport — and your best one. Vendling arms you: performance one-pagers, ROI math, a contract ready to sign.</p>
+        <p class="time" data-i="hand2.t">your game · its ammunition</p>
+      </div>
+      <div class="hand">
+        <p class="hn" data-i="hand3.n">Yours 03</p>
+        <h3 data-i="hand3.h">Call the big shots</h3>
+        <p data-i="hand3.p">Price moves past your cap, swaps on slots you've locked, buying machine #5 — the agent brings a recommendation with its reasoning. You pick.</p>
+        <p class="time" data-i="hand3.t">A few taps, a few times a month</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="letter">
+  <div class="wrap letter-wrap">
+    <div>
+      <p class="slot" data-i="letter.slot">SLOT B2 · THE MONDAY LETTER</p>
+      <h2 data-i="letter.h2">Reading this <em>is</em> using the product.</h2>
+      <p class="lede" data-i="letter.lede1">
+        Every Monday your agent writes you a plain-English letter: what sold, what your
+        customers asked for, what it changed, what it plans next. No dashboards to decode.
+        Skim it over coffee — or don't. The machines run either way.
+      </p>
+      <p class="lede" data-i="letter.lede2">Every claim in it links to a decision log entry, so you can always ask <strong>"why did you do that?"</strong> and get the actual reasoning from the moment the call was made.</p>
+    </div>
+    <div class="letter" aria-label="Sample weekly owner letter">
+      <div class="letter-head" data-i="letter.head">
+        FROM: your Vendling · ROUTE 01<br>
+        TO: mike@example.com<br>
+        WEEK 32 · MON 06:00
+      </div>
+      <p data-i="letter.p1">Mike — solid week. Net profit <span class="fig">$412</span> (+9%), all four machines healthy.</p>
+      <p data-i="letter.p2">Your customers spoke: three people asked the gym machine for sugar-free energy, so <b>Celsius is out and Alani Nu is in</b> on Wednesday's run. I've already told the three of them it's coming.</p>
+      <p data-i="letter.p3">M02 had a coil jam reported through the QR — a 60-second fix is on your run card. Also: Coastal Gym's renewal window opens in 60 days. Your performance one-pager for that conversation is attached.</p>
+      <p data-i="letter.p4"><span class="ask">Needs you:</span> Wednesday's run (2 stops, ~25 min, list attached) and one approval — raising water to $2.25 at both gyms crosses your price cap. My case is inside; projected <span class="fig">+$18/mo</span>, zero volume risk at these locations.</p>
+      <p class="sig" data-i="letter.sig">— your Vendling<br>29 actions this week · full decision log in app</p>
+    </div>
+  </div>
+</section>
+
+<section id="leash">
+  <div class="wrap">
+    <p class="slot" data-i="leash.slot">SLOT C1 · WHO'S IN CHARGE</p>
+    <h2 data-i="leash.h2">Autonomous, not unaccountable.</h2>
+    <p class="lede" data-i="leash.lede">You write the rules once. The agent operates inside them — and four mechanisms keep it on the leash:</p>
+    <div class="leash">
+      <div class="rein">
+        <h3 data-i="rein1.h">Your rules <span class="k">SET ONCE, EDIT ANYTIME</span></h3>
+        <p data-i="rein1.p">Price-change caps, locked slots, spending limits, your available hours, hard no-gos. Every agent action is checked against them — by code, not by the AI's good intentions.</p>
+      </div>
+      <div class="rein">
+        <h3 data-i="rein2.h">Probation <span class="k">FIRST 14 DAYS</span></h3>
+        <p data-i="rein2.p">Early on, every product swap and price move waits 24 hours for your eyes before taking effect. Stop intervening, and the agent earns full autonomy.</p>
+      </div>
+      <div class="rein">
+        <h3 data-i="rein3.h">The decision log <span class="k">EVERY ACTION</span></h3>
+        <p data-i="rein3.p">Each move records what it did, what it knew, and why. Two taps from any activity line to the full reasoning. Nothing is a black box.</p>
+      </div>
+      <div class="rein">
+        <h3 data-i="rein4.h">The kill switch <span class="k">ALWAYS TWO TAPS AWAY</span></h3>
+        <p data-i="rein4.p">Freeze everything — swaps, prices, customer replies — in under five seconds, from any screen. Money and signatures were never the agent's to touch.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="pricing">
+  <div class="wrap">
+    <p class="slot" data-i="price.slot">SLOT C2 · THE DEAL</p>
+    <h2 data-i="price.h2">No profit, no pay.</h2>
+    <p class="lede" data-i="price.lede">Vendling gets paid like a real operator — a cut of the profit it creates. 20% of net, measured by your machines' own sales data.</p>
+    <div class="pricing">
+      <div class="receipt">
+        <h3 data-i="rc1.h">Founding Operator</h3>
+        <p class="rc-sub" data-i="rc1.sub">ROUTE 01 · PROFIT SHARE</p>
+        <hr class="rc-rule">
+        <div class="rc-line"><span data-i="rc1.l1">Base fee</span><b data-i="rc.incl1">$0</b></div>
+        <div class="rc-line"><span data-i="rc1.l2">Setup</span><b data-i="rc.incl2">$0</b></div>
+        <div class="rc-line"><span data-i="rc1.l3">AI operations — full stack</span><b data-i="rc.incl3">incl.</b></div>
+        <div class="rc-line"><span data-i="rc1.l4">Customer chat + requests</span><b data-i="rc.incl4">incl.</b></div>
+        <div class="rc-line"><span data-i="rc1.l5">Weekly letter + deal prep</span><b data-i="rc.incl5">incl.</b></div>
+        <hr class="rc-rule">
+        <div class="rc-total"><span data-i="rc1.total">VENDLING'S CUT</span><span data-i="rc1.price">20% of net</span></div>
+        <p class="rc-note" data-i="rc1.note">You keep 80%. A month with no profit costs you nothing. Requires connected sales telemetry. No contracts — cancel anytime.</p>
+        <a class="btn btn-primary" href="#final" data-i="rc1.cta">Join the waitlist</a>
+      </div>
+      <div class="receipt future">
+        <span class="badge" data-i="rc2.badge">The math</span>
+        <h3 data-i="rc2.h">One machine · one month</h3>
+        <p class="rc-sub" data-i="rc2.sub">SAMPLE STATEMENT</p>
+        <hr class="rc-rule">
+        <div class="rc-line"><span data-i="rc2.l1">Sales</span><b data-i="rc2.v1">$1,000</b></div>
+        <div class="rc-line"><span data-i="rc2.l2">Product cost (~35%)</span><b data-i="rc2.v2">−$350</b></div>
+        <div class="rc-line"><span data-i="rc2.l3">Location commission</span><b data-i="rc2.v3">−$150</b></div>
+        <div class="rc-line"><span data-i="rc2.l4">Net profit</span><b data-i="rc2.v4">$500</b></div>
+        <hr class="rc-rule">
+        <div class="rc-total"><span data-i="rc2.total">YOU KEEP</span><span data-i="rc2.price">$400</span></div>
+        <p class="rc-note" data-i="rc2.note">Vendling's 20% here: $100 — earned only because the machine earned. Net = sales − product cost − commission − operating costs, straight from telemetry, auditable line by line.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap">
+    <p class="slot" data-i="faq.slot">SLOT D1 · STRAIGHT ANSWERS</p>
+    <h2 data-i="faq.h2">Asked by every operator so far.</h2>
+    <div class="faq">
+      <details>
+        <summary data-i="faq1.q">Actually autonomous, or approval hell?</summary>
+        <p data-i="faq1.a">Inside your rules, it decides without asking — what to stock, what to price, when you restock, what to tell customers. It comes to you for three things: the run itself, the deals, and calls above your caps. Our benchmark: ignore the app for two weeks and your machines keep selling the right things.</p>
+      </details>
+      <details>
+        <summary data-i="faq2.q">Do my customers know they're chatting with an AI?</summary>
+        <p data-i="faq2.a">Yes, always. The QR chat introduces itself as the machine's AI operator up front. It only handles machine and product topics, never collects personal data beyond an opt-in restock alert, and anything it can't handle escalates straight to you.</p>
+      </details>
+      <details>
+        <summary data-i="faq3.q">What if it stocks the wrong thing?</summary>
+        <p data-i="faq3.a">Worst case is a slow slot for a week — not a disaster. Every decision is logged with its reasoning, next week's sales data corrects it, and you can veto or lock any slot at any time. Money and contracts were never delegated, so the blast radius stays small.</p>
+      </details>
+      <details>
+        <summary data-i="faq4.q">I don't own any machines yet. Too early?</summary>
+        <p data-i="faq4.a">Honestly — Vendling shines once machines are in the field. If you're at zero, it preps your first deal (location one-pagers, ROI math, a ready contract), you close it, and the agent takes over the moment the machine is plugged in.</p>
+      </details>
+      <details>
+        <summary data-i="faq5.q">How is this different from vending management software?</summary>
+        <p data-i="faq5.a">Management software shows you dashboards; the deciding and planning is still your job. Vendling decides, plans, talks to your customers, and hands you a finished run card. You don't read charts — you drive.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<section class="final" id="final">
+  <div class="wrap">
+    <p class="slot" data-i="final.slot">SLOT D2 · LAST CALL</p>
+    <h2 data-i="final.h2">Set your rules.<br>Then just drive.</h2>
+    <p class="lede" data-i="final.lede">Founding cohort is limited by design — every route gets a dedicated agent instance and our engineers watching its decision logs. Locked-in founding pricing, for the life of your account.</p>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="#top" data-i="final.cta1">Join the founding waitlist</a>
+      <a class="btn btn-ghost" href="#letter" data-i="final.cta2">Re-read the owner letter</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap" style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:16px">
+    <span data-i="foot.l">VEND<span style="color:var(--led-dim)">LING</span> © 2026 · The thinking is an AI's. The business is yours.</span>
+    <span data-i="foot.r">AI always discloses itself to your customers · Minimal data, opt-in only · Your signature, never ours</span>
+  </div>
+</footer>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------------- i18n dictionaries ----------------
+     zh/ja 均为母语级本地化文案（非直译）：
+     zh = 上海静安案例 · 行业口语 | ja = 東京渋谷の事例 · 自然な日本語コピー
+     Phase 1 定位：运营+顾客互动全自主；找点位/谈判 = 人的主场（Agent备料）
+  ----------------------------------------------------- */
+  var TITLES={
+    en:"Vendling — It does the thinking. You do the driving.",
+    zh:"Vendling — 售货机生意，真·甩手掌柜",
+    ja:"Vendling — 考えるのはAI。運ぶのは、あなた。"
+  };
+
+  var I18N={
+  zh:{
+    "nav.cta":"抢首批名额",
+    "hero.eyebrow":"售货机的 AI 经营大脑 · 首批名额招募中",
+    "hero.h1":"售货机生意，<br><span class=\"quiet\">真·甩手掌柜。</span>",
+    "hero.sub":"Vendling 盯着每一笔销量、替你回顾客消息、决定上什么货；补货工单直接派给合作方「友宝」，师傅上门照单执行——机器不用买，月费也没有，赚到钱再二八分。谈点位还是你的主场，其他的，都不归你操心。<strong>你的活儿，缩到每周看一封周报。</strong>",
+    "hero.cta1":"让它开工",
+    "hero.cta2":"看看它写的周报",
+    "hero.legend":"<span><span class=\"dot dot-agent\"></span><b>绿色</b>——它安排的</span><span><span class=\"dot dot-you\"></span><b>橙色</b>——你干的</span>",
+    "machine.route":"ROUTE 01 · 上海·静安 · 4 台在跑",
+    "machine.status":"● 运行中",
+    "week.slot":"货道 A1 · 谁干了什么",
+    "week.h2":"上周的流水账，一行行给你看。",
+    "week.lede":"下面每一行，都是上周这几台机器上真实发生的事。数数橙色的有几行——<strong>你的活儿，就这么多。</strong>",
+    "wl.d1":"周一 06:00","wl.m1":"周报已发——本周净利 ¥2,900，安排了一次换品",
+    "wl.d2":"周一 09:04","wl.m2":"每日销量盘点：4 台正常 · 03 号机 B2 货道两周掉了 38%",
+    "wl.d3":"周二 12:40","wl.m3":"有顾客在 03 号机扫码留言：“有没有无糖的能量饮料？”——已回复，记为本月第 3 票",
+    "wl.d4":"周二 12:41","wl.m4":"拍板：东鹏特饮下架，换外星人电解质水——下次补货清单已更新",
+    "wl.d5":"周三 07:00","wl.m5":"补货工单已派给友宝：2 台机、14 件货，清单和货道图已同步过去",
+    "wl.d6":"周三 12:10","wl.m6":"你——批准了两家店的水涨 5 毛（超调价上限，它带着测算来的，点了两下）",
+    "wl.d7":"周三 18:40","wl.m7":"友宝师傅完成 2 台机补货，照片验收通过 · 3 位点单的顾客已收到到货通知",
+    "wl.d8":"周四 14:20","wl.m8":"02 号机有顾客扫码报修：B3 货道卡货 → 已并进友宝下次工单（60 秒能搞定）",
+    "wl.d9":"周五 09:00","wl.m9":"账已记好 · 续约提醒：Coastal 健身房还有 60 天到期，谈续约用的成绩单已备好",
+    "wl.d10":"周五 17:30","wl.m10":"你——拿着它做的成绩单去谈了新点位（谈生意你来，算数据它来）",
+    "wl.more":"…… 还有 23 件它安排的事（查价、记账、回顾客消息、销量日报）",
+    "tally.agent":"它安排的（含友宝执行）",
+    "tally.you":"你干的——批了一件事，谈了一单",
+    "loops.slot":"货道 A2 · 它在忙什么",
+    "loops.h2":"四个循环，永不下班。",
+    "loops.lede":"你在上班，它也在上班——四个循环让每台机器该上什么货、该卖什么价，永远有人操心。",
+    "loop1.h":"盯销量","loop1.f":"每天",
+    "loop1.p":"从机器的销售数据里过一遍每笔账。哪条货道卖不动、哪个价定歪了，赶在亏掉一周流水之前发现。",
+    "loop2.h":"听顾客","loop2.f":"随时",
+    "loop2.p":"每台机器贴一个二维码。顾客想吃什么、机器卡了货、有什么问题——扫码就有它接待，白天黑夜都在。每个愿望都变成一票。",
+    "loop3.h":"定选品","loop3.f":"每周",
+    "loop3.p":"把顾客的票和销量数据揉在一起，拍板换什么、上什么、卖多少钱。你随时可以否——不过大多数老板后来都懒得管了。",
+    "loop4.h":"排补货","loop4.f":"按需",
+    "loop4.p":"算准哪条货道快空了，自动生成补货工单派给友宝的上门网络——师傅照单补货、拍照回传，它来验收。你连车都不用开。",
+    "road.slot":"货道 A3 · 自动化到哪一步，说清楚",
+    "road.h2":"能全托管的，才叫全托管。",
+    "road.lede":"现在，Vendling 全权经营你手里的机器，连补货都由友宝上门执行。谈生意还是人来谈——但材料它已经在替你备了。",
+    "ph1.n":"现在 · 全托管",
+    "ph1.h":"运营 + 顾客互动 + 补货执行",
+    "ph1.p":"盯销量、定选品、回顾客、记账全自主；补货工单直接派友宝上门，AI 验收。机器免购、零月费——净利二八分。",
+    "ph2.n":"下一步 · 辅助",
+    "ph2.h":"谈判备料",
+    "ph2.p":"点位成绩单、回本测算、合同草稿——它替你准备好谈判的全部弹药，随谈判进度更新。",
+    "ph3.n":"以后 · 你审批",
+    "ph3.h":"开发信与谈判",
+    "ph3.p":"它写、你审、再发出。做到足够靠谱才上线——不画饼。",
+    "hands.slot":"货道 B1 · 你的活儿",
+    "hands.h2":"留给你的，只剩三件事。",
+    "hands.lede":"跑腿的活，友宝的师傅包了；动脑的活，它包了。剩下的，才是老板该干的：",
+    "hand1.n":"活儿 01","hand1.h":"谈点位",
+    "hand1.p":"说服物业和老板，眼下还是人擅长的事——也是老板最该干的事。Vendling 给你备足弹药：点位成绩单、回本测算、随时能签的合同。",
+    "hand1.t":"生意你谈 · 弹药它备",
+    "hand2.n":"活儿 02","hand2.h":"拍板大事",
+    "hand2.p":"超限的调价、你锁死的货道、要不要再租一台机——它带着建议和理由来找你，你说了算。",
+    "hand2.t":"每月几回 · 点几下屏幕",
+    "hand3.n":"活儿 03","hand3.h":"看账收钱",
+    "hand3.p":"每周一早上一封周报，每月一份对得上的账。补货有友宝，动脑有 AI——老板的活儿，就剩当老板。",
+    "hand3.t":"每周 5 分钟 · 一杯咖啡的工夫",
+    "letter.slot":"货道 B2 · 周一的周报",
+    "letter.h2":"看周报，就是你用这个产品的全部方式。",
+    "letter.lede1":"每周一早上，它给你发一份大白话周报：卖了多少、顾客点了什么、它改了什么、下周打算怎么办。没有要研究的报表，就一封信。早饭时扫一眼——不看也行，机器照转。",
+    "letter.lede2":"周报里每句话都连着一条决策记录。你随时可以问<strong>“这事当时为啥这么办？”</strong>，看到它做决定那一刻的真实理由。",
+    "letter.head":"发件人：你的 Vendling · ROUTE 01<br>收件人：laowang@example.com<br>第 32 周 · 周一 06:00",
+    "letter.p1":"王哥——这周不错。净利 <span class=\"fig\">¥2,900</span>（+9%），四台机器都健健康康。",
+    "letter.p2":"顾客发话了：健身房那台机器，这个月第三个人扫码点无糖能量饮料，所以<b>东鹏下架、外星人电解质水上架</b>，就排在周三那趟。这三位我都回过话了，说货马上到。",
+    "letter.p3":"02 号机有人扫码报了卡货——已并进友宝周三的工单，修好会回传照片，我来验收。另外：Coastal 健身房还有 60 天到续约窗口，谈续约用的点位成绩单我附在信里了。",
+    "letter.p4":"<span class=\"ask\">需要你：</span>就一件——两家健身房的水想涨 5 毛，超了你定的调价上限，批一下。理由我写在下面了，估算每月多赚 <span class=\"fig\">¥130</span>，这两个点位不愁卖。补货？周三友宝上门，不用你管。",
+    "letter.sig":"——你的 Vendling<br>本周干了 29 件事 · 每件都能在 App 里查到理由",
+    "leash.slot":"货道 C1 · 谁说了算",
+    "leash.h2":"放权，不放任。",
+    "leash.lede":"规矩你定一次，它就在里面干活——四道保险拴着：",
+    "rein1.h":"你的规矩 <span class=\"k\">定一次 · 随时改</span>",
+    "rein1.p":"调价上限、锁死的货道、花钱额度、你有空的时间、绝对不碰的红线。它每个动作都要过这道检查——是代码在拦，不是靠 AI 自觉。",
+    "rein2.h":"磨合期 <span class=\"k\">头 14 天</span>",
+    "rein2.p":"刚上手那阵，每次换品、每次调价都先压 24 小时给你过目，看顺眼了才生效。等你不再拦它了，它才算转正。",
+    "rein3.h":"事事留痕 <span class=\"k\">每个动作</span>",
+    "rein3.p":"每一步都记着：干了什么、当时知道什么、为什么这么干。从任何一条动态点两下，就能看到完整理由。没有黑箱。",
+    "rein4.h":"一键叫停 <span class=\"k\">永远两步可达</span>",
+    "rein4.p":"从任何页面出发，5 秒内冻结一切——换品、调价、回复顾客，全停。钱和签字本来就不在它手里。",
+    "price.slot":"货道 C2 · 价钱",
+    "price.h2":"不赚钱，不收钱。",
+    "price.lede":"Vendling 按真正经营者的方式拿报酬——从它替你赚出来的利润里分。净利抽 20%，以机器自己的销量数据为准。",
+    "rc1.h":"首批老板价",
+    "rc1.sub":"ROUTE 01 · 利润分成",
+    "rc1.l1":"月费","rc1.l2":"设备租赁 + 上门补货（友宝）","rc1.l3":"AI 经营全套","rc1.l4":"顾客互动 + 需求收集","rc1.l5":"每周周报 + 谈判备料",
+    "rc.incl1":"¥0","rc.incl2":"¥0","rc.incl3":"含","rc.incl4":"含","rc.incl5":"含",
+    "rc1.total":"我们的分成",
+    "rc1.price":"净利的 20%",
+    "rc1.note":"你拿 80%。不赚钱的月份，一分不收。设备和补货的成本我们担——所以我们比你更挑点位。不绑约，随时退。",
+    "rc1.cta":"抢首批名额",
+    "rc2.badge":"怎么算",
+    "rc2.h":"一台机器 · 一个月",
+    "rc2.sub":"样例账单",
+    "rc2.l1":"流水","rc2.v1":"¥4,000",
+    "rc2.l2":"商品成本（约35%）","rc2.v2":"−¥1,400",
+    "rc2.l3":"点位分成","rc2.v3":"−¥600",
+    "rc2.l4":"净利","rc2.v4":"¥2,000",
+    "rc2.total":"你拿走",
+    "rc2.price":"¥1,600",
+    "rc2.note":"这单我们分 ¥400——机器赚了，我们才有。净利 = 流水 − 商品成本 − 点位分成 − 运营成本，全部来自销量数据，每一笔都可对账。",
+    "faq.slot":"货道 D1 · 有一说一",
+    "faq.h2":"老板们都问过的问题。",
+    "faq1.q":"真能自己干？还是啥都得我点头？",
+    "faq1.a":"在你定的规矩里，它不请示就干——上什么货、定什么价、什么时候派友宝上门、怎么回顾客。只有三种事会来找你：谈生意、拍板超限的事、看账。我们的及格线是：你两周不打开 App，机器照样把对的货卖在对的价上，货照样有人补。",
+    "faq2.q":"顾客知道跟自己聊的是 AI 吗？",
+    "faq2.a":"知道，一直都知道。扫码进来第一句话，它就自报是这台机器的 AI 管家。它只聊机器和商品的事，除了自愿留的到货提醒外不收集任何个人信息，搞不定的事直接转给你。",
+    "faq3.q":"它上错货了怎么办？",
+    "faq3.a":"最坏的情况，就是某条货道慢卖一周——天塌不下来。每个决定都留着理由，下周的销量数据自己会纠偏，你随时可以否掉或锁死任何一条货道。钱和合同从来不在它手里。",
+    "faq4.q":"我一台机器都没有，能上车吗？",
+    "faq4.a":"更好办——机器不用买、月费也没有，净利分我们 20% 就行。它先帮你把第一单备好：点位成绩单、回本测算、能直接签的合同。点位你谈下来，友宝装机，机器一通电它就接管。",
+    "faq5.q":"跟售货机管理软件有啥区别？",
+    "faq5.a":"管理软件给你看报表，想和算还是你的活。Vendling 直接把主意拿了、把计划排了、把顾客接待了，最后塞给你一张照着做就行的行程卡。你不用看图表——你只管开车。",
+    "final.slot":"货道 D2 · 末班车",
+    "final.h2":"定好规矩，<br>剩下的只管开车。",
+    "final.lede":"首批名额刻意放得很少——每条线配一个专属 Agent 实例，还有工程师盯着它的决策日志。首批价格一旦锁定，终身有效。",
+    "final.cta1":"抢首批名额",
+    "final.cta2":"再看一遍周报",
+    "foot.l":"VEND<span style=\"color:var(--led-dim)\">LING</span> © 2026 · 动脑的是 AI，跑腿的是友宝，当家的是你。",
+    "foot.r":"对顾客始终亮明 AI 身份 · 信息最少化、自愿留联 · 签字的永远是你"
+  },
+  ja:{
+    "nav.cta":"先行登録する",
+    "hero.eyebrow":"自販機のためのAI運営ブレーン · 先行オーナー枠 募集中",
+    "hero.h1":"考えるのは、AI。<br><span class=\"quiet\">運ぶのは、あなた。</span>",
+    "hero.sub":"売上をぜんぶ見張り、お客さんの声に応え、品揃えを決めて、補充ルートまで組み上げる——それがVendling。新しい設置先を決めてくるのは、これまでどおりあなたの仕事。でもマシンの日々の運営は、もうあなたの仕事ではありません。<strong>やることは、週1回の補充だけ。</strong>",
+    "hero.cta1":"働かせてみる",
+    "hero.cta2":"週報のサンプルを読む",
+    "hero.legend":"<span><span class=\"dot dot-agent\"></span><b>緑</b> — エージェントの仕事</span><span><span class=\"dot dot-you\"></span><b>オレンジ</b> — あなたの仕事</span>",
+    "machine.route":"ROUTE 01 · 東京・渋谷 · 4台稼働",
+    "machine.status":"● 稼働中",
+    "week.slot":"スロット A1 · だれが何をしたか",
+    "week.h2":"とある1週間の、ぜんぶの記録。",
+    "week.lede":"下の1行1行が、先週このマシンたちに実際にあった出来事です。オレンジの行を数えてみてください——<strong>あなたの仕事は、それだけ。</strong>",
+    "wl.d1":"月 06:00","wl.m1":"週報を送信 — 今週の純利益 ¥43,000、商品入替を1件計画",
+    "wl.d2":"月 09:04","wl.m2":"毎日の売上チェック：4台とも正常 · 3号機B2スロットが2週間で38%ダウン",
+    "wl.d3":"火 12:40","wl.m3":"3号機のQRからお客さんの声：「無糖のエナジードリンクない？」——返信済み、今月3票目として記録",
+    "wl.d4":"火 12:41","wl.m4":"決定：モンスターを外して、無糖のZONeを投入 — 次回の補充リストを更新",
+    "wl.d5":"水 07:00","wl.m5":"水曜の補充ルートを作成：2か所・14アイテム、買い物リストをメールで送付",
+    "wl.d6":"水 18:40","wl.m6":"あなた — リストどおりに補充（25分、写真で検収OK）",
+    "wl.d7":"木 09:15","wl.m7":"リクエストした3名に通知：「ご希望の商品、入りました」",
+    "wl.d8":"木 14:20","wl.m8":"2号機のQRから故障報告：B3のコイル詰まり → 次回ルートに60秒の修理を追加",
+    "wl.d9":"金 09:00","wl.m9":"記帳完了 · 更新リマインド：Coastalジムの契約まで60日 — 商談用の実績シートを用意済み",
+    "wl.d10":"金 17:30","wl.m10":"あなた — その実績シートを持って新規開拓へ（商談はあなた、数字はAI）",
+    "wl.more":"…… ほかにエージェントの仕事が23件（価格チェック、記帳、お客さんへの返信、売上ダイジェスト）",
+    "tally.agent":"エージェントがやったこと",
+    "tally.you":"あなたがやったこと — 補充1回、商談1回",
+    "loops.slot":"スロット A2 · 裏で回っているもの",
+    "loops.h2":"4つのループ。年中無休。",
+    "loops.lede":"あなたが本業に出ている間も、4つのループが「正しい商品を、正しい値段で」を守り続けます。",
+    "loop1.h":"見張る","loop1.f":"毎日",
+    "loop1.p":"マシンの販売データから一件一件をチェック。売れ行きの鈍り、動かないスロット、ズレた値付けを、1週間分の売上を失う前に見つけます。",
+    "loop2.h":"聞く","loop2.f":"リアルタイム",
+    "loop2.p":"どのマシンにもQRコードが付きます。欲しい商品のリクエスト、詰まりの報告、ちょっとした質問——昼も夜もAIが応対。ひとつの願いが、一票になります。",
+    "loop3.h":"決める","loop3.f":"毎週",
+    "loop3.p":"お客さんの票と売上データから、何を外し、何を入れ、いくらで売るかを決定。拒否権はいつでもあなたに——ただ、ほとんどのオーナーは途中から任せきりになります。",
+    "loop4.h":"組む","loop4.f":"必要なとき",
+    "loop4.p":"空きそうなスロットを予測し、数台分をまとめて効率のいい1ルートに。買い物リストはメールで届きます。あなたは行くだけ——考えることは残っていません。",
+    "road.slot":"スロット A3 · どこまで自動か、正直に",
+    "road.h2":"任せられるところから、完全に任せる。",
+    "road.lede":"いま、Vendlingが完全自動で運営するのは「すでにあるマシン」。商談は人間の仕事のまま——ただし資料づくりは、もう始まっています。",
+    "ph1.n":"現在 · 完全自律",
+    "ph1.h":"運営とお客さん対応",
+    "ph1.p":"売上の見張り、品揃えの決定、補充計画、お客さんとのチャット、記帳。あなたのルールの中で、すべてAIが回します。",
+    "ph2.n":"次 · アシスト",
+    "ph2.h":"商談の資料づくり",
+    "ph2.p":"ロケーション実績シート、投資回収の試算、契約書ドラフト——あなたの商談のための弾を、交渉の進み具合に合わせて用意します。",
+    "ph3.n":"その先 · あなたの承認つき",
+    "ph3.h":"開拓メールと交渉",
+    "ph3.p":"AIが書き、あなたが確認して、送る。十分に信頼できると証明できてから提供します——誇大広告はしません。",
+    "hands.slot":"スロット B1 · あなたの出番",
+    "hands.h2":"あなたに残るのは、3つだけ。",
+    "hands.lede":"考える仕事はAIが引き受けました。残っているのは、このビジネスが<strong>あなたのもの</strong>である理由そのものです：",
+    "hand1.n":"仕事 01","hand1.h":"補充に走る",
+    "hand1.p":"週1回、組み上がったルートを回るだけ——買い物リスト、回る順番、スロットごとの配置図つき。たまに60秒の小さな修理も。カードのとおりに動けば、考えることはゼロ。",
+    "hand1.t":"週1回ほど · あなたの空き時間にだけ入ります",
+    "hand2.n":"仕事 02","hand2.h":"設置先を決めてくる",
+    "hand2.p":"ビルのオーナーを口説くのは、まだ人間の仕事——そしてあなたの得意分野のはず。Vendlingは弾を用意します：実績シート、投資回収の試算、すぐ署名できる契約書。",
+    "hand2.t":"商談はあなた · 弾はAI",
+    "hand3.n":"仕事 03","hand3.h":"大きな判断を下す",
+    "hand3.p":"上限を超える値上げ、ロックしたスロットの変更、5台目を買うかどうか——AIが根拠つきの提案を持ってきます。決めるのは、あなた。",
+    "hand3.t":"月に数回 · 数タップ",
+    "letter.slot":"スロット B2 · 月曜日の手紙",
+    "letter.h2":"この手紙を読むこと。それが、使い方のすべて。",
+    "letter.lede1":"毎週月曜の朝、エージェントから手紙が届きます。何が売れたか、お客さんが何をリクエストしたか、何を変えたか、来週どうするか——ぜんぶ普通の言葉で。にらめっこするダッシュボードはありません。コーヒー片手にざっと読むだけ。読まなくても、マシンは回り続けます。",
+    "letter.lede2":"手紙のどの一文も、意思決定ログにつながっています。<strong>「なんでそうしたの？」</strong>といつでも聞けて、判断したその瞬間の本当の理由が返ってきます。",
+    "letter.head":"差出人：あなたのVendling · ROUTE 01<br>宛先：tanaka@example.com<br>第32週 · 月 06:00",
+    "letter.p1":"田中さん、今週も順調でした。純利益は <span class=\"fig\">¥43,000</span>（先週比 +9%）。4台とも元気です。",
+    "letter.p2":"お客さんの声が集まりました。ジムのマシンで「無糖のエナジー」のリクエストが今月3人目に達したので、<b>モンスターを外してZONeの無糖を投入</b>——水曜のルートに入れています。リクエストした3名には「入りますよ」と返事済みです。",
+    "letter.p3":"2号機はQR経由でコイル詰まりの報告がありました——60秒で直せるので、ルートカードに足してあります。それと、Coastalジムの契約更新まであと60日。商談に使える実績シートを添付しました。",
+    "letter.p4":"<span class=\"ask\">お願いしたいこと：</span>水曜のルート1回（2か所、25分ほど、リスト添付）。それと承認を1件——ジム2か所の水を¥20値上げしたく、あなたの値上げ上限を超えるためご相談です。根拠は下に。試算では<span class=\"fig\">月+¥2,600</span>、この2か所なら売れ行きへの影響はありません。",
+    "letter.sig":"— あなたのVendling<br>今週の仕事は29件 · 理由はすべてアプリで確認できます",
+    "leash.slot":"スロット C1 · 主導権のありか",
+    "leash.h2":"任せる。でも、手綱は握る。",
+    "leash.lede":"ルールを決めるのは一度だけ。エージェントはその中で働き、4つの仕組みが手綱になります：",
+    "rein1.h":"ルールブック <span class=\"k\">一度決めて · いつでも変更</span>",
+    "rein1.p":"値上げの上限、ロックするスロット、支出の上限、動ける時間、絶対に踏まない一線。エージェントの全アクションがここと照合されます——AIの良心ではなく、コードがチェックします。",
+    "rein2.h":"見習い期間 <span class=\"k\">最初の14日</span>",
+    "rein2.p":"はじめのうちは、商品の入替も値付けの変更も、実行前に24時間あなたの目を待ちます。あなたが止めなくなったら、一人前です。",
+    "rein3.h":"ぜんぶ記録 <span class=\"k\">全アクション</span>",
+    "rein3.p":"何をして、何を知っていて、なぜそうしたか——一つ残らず記録。どのアクティビティからも2タップで理由まで辿れます。ブラックボックスはありません。",
+    "rein4.h":"緊急停止 <span class=\"k\">いつでも2タップ</span>",
+    "rein4.p":"どの画面からでも5秒で全停止——入替も、値付けも、お客さんへの返信も。お金と署名は、そもそもAIに渡していません。",
+    "price.slot":"スロット C2 · 料金",
+    "price.h2":"儲からなければ、無料。",
+    "price.lede":"Vendlingの報酬は、本物のオペレーターと同じ——生み出した利益からの分配だけ。純利の20%、根拠はすべてマシンの売上データです。",
+    "rc1.h":"先行オーナー",
+    "rc1.sub":"ROUTE 01 · 利益分配",
+    "rc1.l1":"月額基本料","rc1.l2":"初期費用","rc1.l3":"AI運営フルセット","rc1.l4":"お客さん対応 + リクエスト集約","rc1.l5":"毎週の週報 + 商談資料",
+    "rc.incl1":"¥0","rc.incl2":"¥0","rc.incl3":"込み","rc.incl4":"込み","rc.incl5":"込み",
+    "rc1.total":"Vendlingの取り分",
+    "rc1.price":"純利の20%",
+    "rc1.note":"あなたの取り分は80%。利益ゼロの月は、支払いもゼロ。売上データの連携が前提です。縛りなし、いつでも解約OK。",
+    "rc1.cta":"先行登録する",
+    "rc2.badge":"計算のしかた",
+    "rc2.h":"1台 · 1か月",
+    "rc2.sub":"サンプル明細",
+    "rc2.l1":"売上","rc2.v1":"¥60,000",
+    "rc2.l2":"商品原価（約35%）","rc2.v2":"−¥21,000",
+    "rc2.l3":"設置先への分配","rc2.v3":"−¥9,000",
+    "rc2.l4":"純利益","rc2.v4":"¥30,000",
+    "rc2.total":"あなたの取り分",
+    "rc2.price":"¥24,000",
+    "rc2.note":"この例でのVendlingの取り分は¥6,000——マシンが稼いだときだけ発生します。純利 = 売上 − 商品原価 − 分配 − 運営コスト。すべて売上データから、1行ずつ確認できます。",
+    "faq.slot":"スロット D1 · 率直な答え",
+    "faq.h2":"みなさんに聞かれる質問。",
+    "faq1.q":"本当に任せきりにできる？結局ぜんぶ承認が要るのでは？",
+    "faq1.a":"決めたルールの中では、確認なしで動きます——何を置くか、いくらで売るか、いつ補充するか、お客さんに何と返すか。あなたに来るのは3種類だけ：補充そのもの、商談、上限を超える判断。合格ラインは「アプリを2週間放置しても、マシンが正しい商品を正しい値段で売り続けること」です。",
+    "faq2.q":"お客さんは、AIと話していると知っていますか？",
+    "faq2.a":"はい、必ず。QRを開いた最初のひと言で、このマシンのAI係だと名乗ります。話すのはマシンと商品のことだけ。入荷通知を希望した方の連絡先以外、個人情報は集めません。手に負えない話は、そのままあなたに引き継ぎます。",
+    "faq3.q":"仕入れをしくじったら、どうなりますか？",
+    "faq3.a":"最悪でも、1週間ほど売れ行きの鈍いスロットがひとつできるだけ——大事故にはなりようがありません。すべての判断に理由が残り、翌週の売上データが自動で軌道修正し、どのスロットもいつでも拒否・ロックできます。お金と契約は、最初からAIの手にありません。",
+    "faq4.q":"まだ自販機を1台も持っていません。それでも始められますか？",
+    "faq4.a":"正直に言うと——Vendlingが本領を発揮するのは、マシンが現場に置かれてからです。ゼロからの方には、最初の商談の準備をします：実績シート、投資回収の試算、すぐ使える契約書。決めてくるのはあなた。マシンに電源が入った瞬間から、AIが引き継ぎます。",
+    "faq5.q":"自販機の管理ソフトと、何が違うのですか？",
+    "faq5.a":"管理ソフトが見せてくれるのはダッシュボード。考えて、決めて、計画するのはあなたのままです。Vendlingは決めて、計画して、お客さんに応対して、最後に「このとおりに回るだけ」のルートカードを渡します。グラフを読む必要はありません——運転するだけです。",
+    "final.slot":"スロット D2 · 締め切りの前に",
+    "final.h2":"ルールを決めたら、<br>あとは運転するだけ。",
+    "final.lede":"先行オーナー枠は、あえて少数に絞っています——各ルートに専用のエージェントインスタンスが付き、その意思決定ログをエンジニアが見守ります。先行価格は、アカウントが続くかぎりずっとそのまま。",
+    "final.cta1":"先行登録する",
+    "final.cta2":"週報をもう一度読む",
+    "foot.l":"VEND<span style=\"color:var(--led-dim)\">LING</span> © 2026 · 考えるのはAI。オーナーはあなた。",
+    "foot.r":"お客さんにはAIであることを常に開示 · 個人情報は最小限・オプトインのみ · 署名するのは、いつもあなた"
+  }};
+
+  /* machine feed lines per language — Phase 1 ops + customer scenarios */
+  var FEED={
+    en:[
+      {t:"09:04",m:"Sales pull · M03 slot B2 slowing (-38%)",h:false},
+      {t:"12:40",m:"Customer QR @M03: wants sugar-free energy",h:false},
+      {t:"12:40",m:"Replied (as AI) · logged — 3rd vote",h:false},
+      {t:"12:41",m:"Verdict: Celsius out, Alani Nu in",h:false},
+      {t:"07:00",m:"Wed run built · 2 stops · list emailed",h:false},
+      {t:"07:01",m:"→ YOU: Wed restock · manifest ready",h:true},
+      {t:"14:20",m:"Fault via QR @M02: coil jam B3",h:false},
+      {t:"14:21",m:"→ YOU: 60-sec fix added to your run",h:true},
+      {t:"09:15",m:"3 requesters notified: your pick is in",h:false},
+      {t:"06:00",m:"Weekly letter sent · net $412 (+9%)",h:false}
+    ],
+    zh:[
+      {t:"09:04",m:"销量盘点 · 03 号机 B2 掉了 38%",h:false},
+      {t:"12:40",m:"顾客扫码 @03 号机：想要无糖能量饮料",h:false},
+      {t:"12:40",m:"已回复（亮明 AI）· 记为第 3 票",h:false},
+      {t:"12:41",m:"拍板：东鹏下架 · 外星人上架",h:false},
+      {t:"07:00",m:"补货工单已派友宝 · 周三上门",h:false},
+      {t:"14:20",m:"02 号机扫码报修：B3 卡货 · 并入工单",h:false},
+      {t:"12:10",m:"→ 你：水涨 5 毛待批（超上限）",h:true},
+      {t:"18:40",m:"友宝完成补货 · 照片验收 ✓",h:false},
+      {t:"09:15",m:"已通知 3 位顾客：你要的货到了",h:false},
+      {t:"06:00",m:"周报已发 · 本周净利 ¥2,900（+9%）",h:false}
+    ],
+    ja:[
+      {t:"09:04",m:"売上チェック · 3号機B2が-38%",h:false},
+      {t:"12:40",m:"QRからお客さんの声：無糖エナジー希望",h:false},
+      {t:"12:40",m:"返信済み（AIと名乗る）· 3票目を記録",h:false},
+      {t:"12:41",m:"決定：モンスター外し · ZONe無糖へ",h:false},
+      {t:"07:00",m:"水曜ルート作成 · 2か所 · リスト送付",h:false},
+      {t:"07:01",m:"→ あなた：水曜に補充 · リストどおりに",h:true},
+      {t:"14:20",m:"2号機のQRから報告：B3コイル詰まり",h:false},
+      {t:"14:21",m:"→ あなた：60秒の修理をルートに追加",h:true},
+      {t:"09:15",m:"リクエストの3名に通知：入荷しました",h:false},
+      {t:"06:00",m:"週報を送信 · 純利益 ¥43,000（+9%）",h:false}
+    ]
+  };
+
+  /* ---------------- language engine ---------------- */
+  var EN={};  /* snapshot of English innerHTML, captured at boot */
+  document.querySelectorAll("[data-i]").forEach(function(el){
+    EN[el.getAttribute("data-i")]=el.innerHTML;
+  });
+
+  var current="en";
+  function setLang(lang){
+    if(lang!=="zh"&&lang!=="ja") lang="en";
+    current=lang;
+    var dict = lang==="en" ? EN : I18N[lang];
+    document.querySelectorAll("[data-i]").forEach(function(el){
+      var k=el.getAttribute("data-i");
+      if(dict[k]!==undefined) el.innerHTML=dict[k];
+      else if(lang!=="en") el.innerHTML=EN[k];   /* fallback to English */
+    });
+    document.documentElement.setAttribute("lang",lang);
+    document.title=TITLES[lang];
+    document.querySelectorAll(".langs button").forEach(function(b){
+      b.setAttribute("aria-pressed", b.getAttribute("data-lang")===lang ? "true":"false");
+    });
+    try{localStorage.setItem("ra-lang",lang)}catch(e){}
+    restartFeed();
+  }
+
+  document.querySelectorAll(".langs button").forEach(function(b){
+    b.addEventListener("click",function(){setLang(b.getAttribute("data-lang"))});
+  });
+
+  /* ---------------- machine feed ticker ---------------- */
+  var feed=document.getElementById("feed");
+  var reduced=window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var timer=null, idx=0;
+  var cur=document.createElement("span");cur.className="cursor";
+
+  function renderLine(line){
+    var d=document.createElement("div");
+    d.className="feed-line"+(line.h?" human":"");
+    var t=document.createElement("span");t.className="t";t.textContent=line.t;
+    var m=document.createElement("span");m.className="msg";m.textContent=line.m;
+    d.appendChild(t);d.appendChild(m);
+    feed.appendChild(d);
+    return d;
+  }
+  function stopFeed(){ if(timer){clearTimeout(timer);timer=null;} feed.innerHTML=""; idx=0; }
+  function step(){
+    var lines=FEED[current]||FEED.en;
+    if(idx>=lines.length){
+      timer=setTimeout(function(){feed.innerHTML="";idx=0;step()},6000);
+      return;
+    }
+    var d=renderLine(lines[idx]);
+    requestAnimationFrame(function(){requestAnimationFrame(function(){d.classList.add("on")})});
+    d.querySelector(".msg").appendChild(cur);
+    idx++;
+    timer=setTimeout(step, idx<3?900:1400);
+  }
+  function restartFeed(){
+    stopFeed();
+    var lines=FEED[current]||FEED.en;
+    if(reduced){
+      lines.forEach(function(l){renderLine(l).classList.add("on")});
+      return;
+    }
+    step();
+  }
+
+  /* ---------------- boot ---------------- */
+  var saved=null;
+  try{saved=localStorage.getItem("ra-lang")}catch(e){}
+  if(!saved){
+    var nav=(navigator.language||"").toLowerCase();
+    if(nav.indexOf("zh")===0) saved="zh";
+    else if(nav.indexOf("ja")===0) saved="ja";
+    else saved="en";
+  }
+  if(saved==="en"){ document.documentElement.setAttribute("lang","en"); restartFeed(); }
+  else setLang(saved);
+})();
+</script>
