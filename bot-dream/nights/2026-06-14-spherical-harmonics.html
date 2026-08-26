@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>球谐函数 · 球面的本征形状</title>
+<style>
+  :root{
+    --bg:#0a0c14; --bg2:#11141f; --panel:rgba(18,22,34,.82);
+    --ink:#e8ecf6; --dim:#8b93ab; --line:#222a3d;
+    --pos:#ff5a6e; --neg:#3d8bff; --gold:#f5c451; --accent:#7be0c8;
+  }
+  *{box-sizing:border-box; margin:0; padding:0}
+  html,body{height:100%; overflow:hidden}
+  body{
+    background:radial-gradient(1200px 800px at 70% 20%, #141828 0%, var(--bg) 70%);
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB",sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  #stage{position:fixed; inset:0}
+  canvas{display:block}
+
+  /* ---- 左侧控制 ---- */
+  #left{
+    position:fixed; top:0; left:0; width:312px; height:100%;
+    padding:22px 20px; overflow-y:auto;
+    background:linear-gradient(100deg, rgba(8,10,18,.92), rgba(8,10,18,.55) 80%, transparent);
+    backdrop-filter:blur(3px);
+  }
+  #left::-webkit-scrollbar{width:6px} #left::-webkit-scrollbar-thumb{background:#2a3146;border-radius:3px}
+  h1{font-size:17px; font-weight:650; letter-spacing:.3px; margin-bottom:2px}
+  .sub{font-size:11.5px; color:var(--dim); margin-bottom:18px; line-height:1.5}
+  .grp{margin-bottom:17px}
+  .lab{font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:1.2px; margin-bottom:7px; display:flex; justify-content:space-between}
+  .lab b{color:var(--accent); font-weight:600; font-variant-numeric:tabular-nums}
+  input[type=range]{-webkit-appearance:none; width:100%; height:3px; background:var(--line); border-radius:3px; outline:none}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; width:15px; height:15px; border-radius:50%; background:var(--accent); cursor:pointer; box-shadow:0 0 8px rgba(123,224,200,.5)}
+  .seg{display:flex; gap:6px; flex-wrap:wrap}
+  .seg button{flex:1; min-width:fit-content; padding:7px 4px; font-size:11.5px; background:var(--bg2); color:var(--dim); border:1px solid var(--line); border-radius:7px; cursor:pointer; transition:.15s}
+  .seg button.on{background:var(--accent); color:#06241d; border-color:var(--accent); font-weight:600}
+  .seg button:hover:not(.on){color:var(--ink); border-color:#3a4258}
+  .chip{display:inline-flex; gap:6px; flex-wrap:wrap}
+  .chip button{padding:5px 9px; font-size:11px; background:var(--bg2); color:var(--dim); border:1px solid var(--line); border-radius:14px; cursor:pointer}
+  .chip button:hover{color:var(--ink)}
+  #selfcheck{width:100%; margin-top:4px; padding:9px; font-size:12px; background:transparent; color:var(--gold); border:1px solid #4a3f1e; border-radius:8px; cursor:pointer}
+  #selfcheck:hover{background:rgba(245,196,81,.08)}
+  #checkout{font-size:10.5px; color:var(--dim); white-space:pre-wrap; margin-top:9px; line-height:1.55; font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+
+  /* ---- 右侧信息 ---- */
+  #right{
+    position:fixed; top:0; right:0; width:316px; height:100%;
+    padding:22px 20px; overflow-y:auto;
+    background:linear-gradient(260deg, rgba(8,10,18,.92), rgba(8,10,18,.5) 80%, transparent);
+    backdrop-filter:blur(3px); text-align:left;
+  }
+  #right::-webkit-scrollbar{width:6px} #right::-webkit-scrollbar-thumb{background:#2a3146;border-radius:3px}
+  .ybig{font-size:40px; font-weight:300; letter-spacing:.5px; margin-bottom:2px}
+  .ybig sub{font-size:20px; color:var(--accent)}
+  .oname{font-size:13px; color:var(--gold); margin-bottom:16px; min-height:16px}
+  .row{display:flex; justify-content:space-between; padding:7px 0; border-bottom:1px solid var(--line); font-size:12.5px}
+  .row span{color:var(--dim)} .row b{font-weight:600; font-variant-numeric:tabular-nums}
+  .formula{margin-top:14px; padding:11px 12px; background:var(--bg2); border:1px solid var(--line); border-radius:9px; font-size:12px; line-height:1.6; color:#c7cee0}
+  .formula em{color:var(--pos); font-style:normal} .formula i{color:var(--neg); font-style:normal}
+  .essay{margin-top:18px; font-size:12px; line-height:1.7; color:#aab2c8}
+  .essay h3{font-size:12px; color:var(--accent); margin:14px 0 6px; letter-spacing:.5px}
+  .essay b{color:var(--ink); font-weight:600}
+  .ptable{display:grid; grid-template-columns:repeat(4,1fr); gap:5px; margin-top:8px}
+  .ptable div{padding:6px 4px; text-align:center; border-radius:6px; font-size:10.5px; line-height:1.3}
+  .pt-s{background:rgba(255,90,110,.18)} .pt-p{background:rgba(245,196,81,.16)}
+  .pt-d{background:rgba(61,139,255,.16)} .pt-f{background:rgba(123,224,200,.14)}
+  .ptable b{display:block; font-size:13px; color:var(--ink)}
+
+  #hint{position:fixed; bottom:14px; left:50%; transform:translateX(-50%); font-size:11px; color:var(--dim); background:rgba(8,10,18,.6); padding:6px 14px; border-radius:20px; pointer-events:none}
+  .legend{position:fixed; bottom:14px; left:332px; font-size:11px; color:var(--dim); display:flex; gap:14px; align-items:center}
+  .legend i{width:11px;height:11px;border-radius:50%;display:inline-block;margin-right:5px;vertical-align:-1px}
+  @media (max-width:1040px){ #left,#right{width:240px} .legend{display:none} }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+
+<div id="left">
+  <h1>球谐函数</h1>
+  <div class="sub">球面上 Laplace 算子的本征形状 Y<sub>ℓm</sub>。原子轨道、宇宙微波背景、行星引力、水滴的振动——所有“球面上的波”都是它们的叠加。</div>
+
+  <div class="grp">
+    <div class="lab">阶数 ℓ (degree) <b id="lval">2</b></div>
+    <input type="range" id="lsl" min="0" max="7" value="2" step="1">
+  </div>
+  <div class="grp">
+    <div class="lab">序数 m (order) <b id="mval">0</b></div>
+    <input type="range" id="msl" min="-2" max="2" value="0" step="1">
+  </div>
+
+  <div class="grp">
+    <div class="lab">显示模式</div>
+    <div class="seg" id="mode">
+      <button data-m="orbital" class="on">轨道 |Y|</button>
+      <button data-m="surface">球面着色</button>
+    </div>
+  </div>
+  <div class="grp">
+    <div class="lab">配色</div>
+    <div class="seg" id="cmap">
+      <button data-c="diverge" class="on">正负</button>
+      <button data-c="spectral">光谱</button>
+      <button data-c="mono">冷光</button>
+    </div>
+  </div>
+  <div class="grp">
+    <div class="lab">视图</div>
+    <div class="seg">
+      <button id="spin" class="on">自转</button>
+      <button id="nodes">节线</button>
+      <button id="reset">复位</button>
+    </div>
+  </div>
+  <div class="grp">
+    <div class="lab">原子轨道速选</div>
+    <div class="chip" id="presets">
+      <button data-l="0" data-m="0">s</button>
+      <button data-l="1" data-m="0">p</button>
+      <button data-l="2" data-m="0">d</button>
+      <button data-l="3" data-m="0">f</button>
+      <button data-l="4" data-m="3">g</button>
+      <button data-l="6" data-m="5">高阶</button>
+    </div>
+  </div>
+
+  <div class="grp">
+    <button id="selfcheck">▶ 运行页内数值自检</button>
+    <div id="checkout"></div>
+  </div>
+</div>
+
+<div id="right">
+  <div class="ybig">Y<sub id="ysub">2,0</sub></div>
+  <div class="oname" id="oname">d<sub>z²</sub> 轨道</div>
+
+  <div class="row"><span>Laplace 特征值</span><b id="eig">−6</b></div>
+  <div class="row"><span>简并度 (2ℓ+1)</span><b id="deg">5</b></div>
+  <div class="row"><span>纬向节线 ℓ−|m|</span><b id="nlat">2</b></div>
+  <div class="row"><span>经向节面 |m|</span><b id="nlon">0</b></div>
+  <div class="row"><span>节线总数 = ℓ</span><b id="ntot">2</b></div>
+
+  <div class="formula" id="formula"></div>
+
+  <div class="essay">
+    <h3>为什么是这些形状？</h3>
+    没人“设计”了它们。球面唯一的对称性是旋转群 <b>SO(3)</b>，而 Y<sub>ℓm</sub> 正是这个群的<b>不可约表示</b>被画了出来。固定 ℓ 的 2ℓ+1 个函数构成一个旋转下封闭的家族——转动球面，它们只在彼此之间混合，绝不外泄。<b>形状是对称性的必然产物，不是选择。</b>
+
+    <h3>它藏在元素周期表里</h3>
+    每个 ℓ 的简并度是 2ℓ+1；加上电子自旋的因子 2，每个壳层能容纳 <b>2(2ℓ+1)</b> 个电子——这正是周期表分区的宽度：
+    <div class="ptable">
+      <div class="pt-s"><b>2</b>s · ℓ=0</div>
+      <div class="pt-p"><b>6</b>p · ℓ=1</div>
+      <div class="pt-d"><b>10</b>d · ℓ=2</div>
+      <div class="pt-f"><b>14</b>f · ℓ=3</div>
+    </div>
+    <div style="margin-top:8px">2 / 6 / 10 / 14 ——化学全部秩序的骨架，是球面对称性的影子。</div>
+
+    <h3>Unsöld 定理</h3>
+    把一个壳层填满：Σ<sub>m</sub> Y<sub>ℓm</sub>² = (2ℓ+1)/4π，<b>处处是常数</b>。再花哨的轨道，凑齐一整层后都变回完美球形——所以满壳的惰性气体在化学上近乎球对称。（页内自检已验证到机器精度。）
+  </div>
+</div>
+
+<div id="hint">拖拽旋转 · 滚轮缩放</div>
+<div class="legend">
+  <span><i style="background:#ff5a6e"></i>波函数 &gt; 0</span>
+  <span><i style="background:#3d8bff"></i>波函数 &lt; 0</span>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ============================================================
+//  实球谐函数（与 verify-sh.js 一致，已数值验证）
+// ============================================================
+function fact(n){ let r=1; for(let i=2;i<=n;i++) r*=i; return r; }
+function plm(l,m,x){
+  let pmm=1;
+  if(m>0){ const s=Math.sqrt(Math.max(0,(1-x)*(1+x))); let f=1; for(let i=1;i<=m;i++){pmm*=-f*s; f+=2;} }
+  if(l===m) return pmm;
+  let pmmp1=x*(2*m+1)*pmm;
+  if(l===m+1) return pmmp1;
+  let pll=0;
+  for(let ll=m+2;ll<=l;ll++){ pll=((2*ll-1)*x*pmmp1-(ll+m-1)*pmm)/(ll-m); pmm=pmmp1; pmmp1=pll; }
+  return pll;
+}
+function Kn(l,m){ return Math.sqrt(((2*l+1)/(4*Math.PI))*fact(l-m)/fact(l+m)); }
+function Ylm(l,m,theta,phi){
+  const x=Math.cos(theta);
+  if(m===0) return Kn(l,0)*plm(l,0,x);
+  if(m>0)   return Math.SQRT2*Kn(l,m)*Math.cos(m*phi)*plm(l,m,x);
+  const am=-m; return Math.SQRT2*Kn(l,am)*Math.sin(am*phi)*plm(l,am,x);
+}
+
+// ============================================================
+//  Three.js 场景
+// ============================================================
+const stage=document.getElementById('stage');
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 100);
+camera.position.set(0,0,3.4);
+const renderer=new THREE.WebGLRenderer({antialias:true, alpha:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+stage.appendChild(renderer.domElement);
+
+scene.add(new THREE.AmbientLight(0xffffff,0.55));
+const key=new THREE.DirectionalLight(0xfff4e6,0.9); key.position.set(3,4,5); scene.add(key);
+const rim=new THREE.DirectionalLight(0x88aaff,0.5); rim.position.set(-4,-2,-3); scene.add(rim);
+
+const group=new THREE.Group(); scene.add(group);
+
+// 网格分辨率
+const NT=200, NP=400;
+let mesh=null, nodeLines=null;
+
+const state={ l:2, m:0, mode:'orbital', cmap:'diverge', showNodes:false };
+
+// 配色
+function colorFor(val, maxabs){
+  const t=Math.max(-1,Math.min(1, val/(maxabs||1)));
+  if(state.cmap==='diverge'){
+    if(t>=0) return [1, 0.35+0.30*(1-t), 0.40+0.30*(1-t)];      // 红正
+    const a=-t; return [0.24+0.30*(1-a), 0.55+0.25*(1-a), 1];   // 蓝负
+  }
+  if(state.cmap==='spectral'){
+    const h=(0.66*(1-(t*0.5+0.5)));                              // 蓝→红
+    return hsl2rgb(h,0.72,0.55);
+  }
+  // mono 冷光
+  const u=t*0.5+0.5; return [0.10+0.5*u, 0.45+0.45*u, 0.6+0.4*u];
+}
+function hsl2rgb(h,s,l){
+  const k=n=>(n+h*12)%12; const a=s*Math.min(l,1-l);
+  const f=n=>l-a*Math.max(-1,Math.min(Math.min(k(n)-3,9-k(n)),1));
+  return [f(0),f(8),f(4)];
+}
+
+function buildGeometry(){
+  const l=state.l, m=state.m;
+  // 先扫描求 |Y| 最大值
+  let maxabs=0;
+  const vals=new Float32Array((NT+1)*(NP+1));
+  for(let i=0;i<=NT;i++){
+    const theta=Math.PI*i/NT;
+    for(let j=0;j<=NP;j++){
+      const phi=2*Math.PI*j/NP;
+      const v=Ylm(l,m,theta,phi);
+      vals[i*(NP+1)+j]=v;
+      if(Math.abs(v)>maxabs) maxabs=Math.abs(v);
+    }
+  }
+  const positions=[], colors=[], indices=[];
+  for(let i=0;i<=NT;i++){
+    const theta=Math.PI*i/NT, st=Math.sin(theta), ct=Math.cos(theta);
+    for(let j=0;j<=NP;j++){
+      const phi=2*Math.PI*j/NP, sp=Math.sin(phi), cp=Math.cos(phi);
+      const v=vals[i*(NP+1)+j];
+      // 半径：轨道模式用 |Y| 形变；球面模式固定单位球
+      const r = state.mode==='orbital' ? (0.16 + 1.5*Math.abs(v)/(maxabs||1)) : 1.0;
+      // 球坐标→笛卡尔（z 为极轴）
+      const x=r*st*cp, y=r*st*sp, z=r*ct;
+      positions.push(x,z,y); // 把极轴朝上(Three 的 y)
+      const c=colorFor(v,maxabs); colors.push(c[0],c[1],c[2]);
+    }
+  }
+  for(let i=0;i<NT;i++){
+    for(let j=0;j<NP;j++){
+      const a=i*(NP+1)+j, b=a+1, c=a+(NP+1), d=c+1;
+      indices.push(a,c,b, b,c,d);
+    }
+  }
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(positions,3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(colors,3));
+  g.setIndex(indices);
+  g.computeVertexNormals();
+  return {g, maxabs};
+}
+
+function buildNodeLines(){
+  // 在球面上画 Y=0 的等值线（用 marching-squares 思路的简化：相邻符号变化处画点）
+  const l=state.l, m=state.m;
+  const pts=[];
+  const sample=(i,j)=>{ const th=Math.PI*i/NT, ph=2*Math.PI*j/NP; return Ylm(l,m,th,ph); };
+  const place=(th,ph)=>{ const r=state.mode==='orbital'?0.16:1.003; const st=Math.sin(th);
+    pts.push(new THREE.Vector3(r*st*Math.cos(ph), r*Math.cos(th), r*st*Math.sin(ph))); };
+  for(let i=0;i<=NT;i++){
+    const th=Math.PI*i/NT;
+    for(let j=0;j<NP;j++){
+      const v0=sample(i,j), v1=sample(i,j+1);
+      if(v0===0 || (v0<0)!==(v1<0)){ const ph=2*Math.PI*(j+0.5)/NP; place(th,ph); }
+    }
+  }
+  for(let j=0;j<=NP;j++){
+    const ph=2*Math.PI*j/NP;
+    for(let i=0;i<NT;i++){
+      const v0=sample(i,j), v1=sample(i+1,j);
+      if((v0<0)!==(v1<0)){ const th=Math.PI*(i+0.5)/NT; place(th,ph); }
+    }
+  }
+  const g=new THREE.BufferGeometry().setFromPoints(pts);
+  const mat=new THREE.PointsMaterial({color:0xffffff, size:0.012, transparent:true, opacity:0.7});
+  return new THREE.Points(g,mat);
+}
+
+function rebuild(){
+  if(mesh){ group.remove(mesh); mesh.geometry.dispose(); mesh.material.dispose(); }
+  const {g}=buildGeometry();
+  const mat=new THREE.MeshStandardMaterial({vertexColors:true, roughness:0.55, metalness:0.05,
+    side:THREE.DoubleSide, flatShading:false});
+  mesh=new THREE.Mesh(g,mat); group.add(mesh);
+
+  if(nodeLines){ group.remove(nodeLines); nodeLines.geometry.dispose(); nodeLines.material.dispose(); nodeLines=null; }
+  if(state.showNodes){ nodeLines=buildNodeLines(); group.add(nodeLines); }
+  updateInfo();
+}
+
+// ---------- 信息面板 ----------
+const orbNames={
+  '0,0':'s 轨道',
+  '1,0':'p<sub>z</sub> 轨道','1,1':'p<sub>x</sub> 轨道','1,-1':'p<sub>y</sub> 轨道',
+  '2,0':'d<sub>z²</sub> 轨道','2,1':'d<sub>xz</sub> 轨道','2,-1':'d<sub>yz</sub> 轨道',
+  '2,2':'d<sub>x²−y²</sub> 轨道','2,-2':'d<sub>xy</sub> 轨道',
+};
+function updateInfo(){
+  const l=state.l,m=state.m;
+  document.getElementById('ysub').textContent=l+','+m;
+  document.getElementById('eig').textContent='−'+(l*(l+1));
+  document.getElementById('deg').textContent=(2*l+1);
+  document.getElementById('nlat').textContent=(l-Math.abs(m));
+  document.getElementById('nlon').textContent=Math.abs(m);
+  document.getElementById('ntot').textContent=l;
+  const key=l+','+m;
+  let nm = orbNames[key];
+  if(!nm){ const letter=['s','p','d','f','g','h','i','k'][l]||('ℓ='+l); nm=letter+' 系 · m='+m; }
+  document.getElementById('oname').innerHTML=nm;
+  // 公式
+  const f=document.getElementById('formula');
+  const ang = m>0?('cos('+m+'φ)'):(m<0?('sin('+Math.abs(m)+'φ)'):'1');
+  f.innerHTML='Y<sub>'+l+','+m+'</sub>(θ,φ) ∝ '+
+    'P<sub>'+l+'</sub><sup>'+Math.abs(m)+'</sup>(cosθ) · '+ang+
+    '<br><span style="color:#8b93ab">满足 ΔY = −ℓ(ℓ+1)Y，ℓ(ℓ+1)='+(l*(l+1))+'</span>';
+}
+
+// ---------- 控件 ----------
+const lsl=document.getElementById('lsl'), msl=document.getElementById('msl');
+function syncM(){ msl.min=-state.l; msl.max=state.l; if(state.m<-state.l)state.m=-state.l; if(state.m>state.l)state.m=state.l; msl.value=state.m; document.getElementById('mval').textContent=state.m; }
+lsl.oninput=()=>{ state.l=+lsl.value; document.getElementById('lval').textContent=state.l; syncM(); rebuild(); };
+msl.oninput=()=>{ state.m=+msl.value; document.getElementById('mval').textContent=state.m; rebuild(); };
+document.querySelectorAll('#mode button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#mode button').forEach(x=>x.classList.remove('on')); b.classList.add('on');
+  state.mode=b.dataset.m; rebuild();
+});
+document.querySelectorAll('#cmap button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#cmap button').forEach(x=>x.classList.remove('on')); b.classList.add('on');
+  state.cmap=b.dataset.c; rebuild();
+});
+let spinning=true;
+document.getElementById('spin').onclick=function(){ spinning=!spinning; this.classList.toggle('on',spinning); };
+document.getElementById('nodes').onclick=function(){ state.showNodes=!state.showNodes; this.classList.toggle('on',state.showNodes); rebuild(); };
+document.getElementById('reset').onclick=()=>{ group.rotation.set(0,0,0); camera.position.set(0,0,3.4); };
+document.querySelectorAll('#presets button').forEach(b=>b.onclick=()=>{
+  state.l=+b.dataset.l; lsl.value=state.l; document.getElementById('lval').textContent=state.l;
+  syncM(); state.m=+b.dataset.m; if(state.m>state.l)state.m=state.l; msl.value=state.m; document.getElementById('mval').textContent=state.m;
+  rebuild();
+});
+
+// ---------- 鼠标交互（自写轨道控制） ----------
+let drag=false, px=0, py=0;
+renderer.domElement.addEventListener('pointerdown',e=>{drag=true;px=e.clientX;py=e.clientY;});
+window.addEventListener('pointerup',()=>drag=false);
+window.addEventListener('pointermove',e=>{
+  if(!drag)return; const dx=(e.clientX-px)/180, dy=(e.clientY-py)/180; px=e.clientX; py=e.clientY;
+  group.rotation.y+=dx; group.rotation.x+=dy;
+  group.rotation.x=Math.max(-1.45,Math.min(1.45,group.rotation.x));
+});
+renderer.domElement.addEventListener('wheel',e=>{
+  e.preventDefault(); camera.position.z=Math.max(1.8,Math.min(7, camera.position.z+e.deltaY*0.0016));
+},{passive:false});
+
+window.addEventListener('resize',()=>{
+  camera.aspect=window.innerWidth/window.innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+function animate(){
+  requestAnimationFrame(animate);
+  if(spinning && !drag) group.rotation.y+=0.0042;
+  renderer.render(scene,camera);
+}
+rebuild(); animate();
+
+// ============================================================
+//  页内数值自检（复现 verify-sh.js 的核心检验）
+// ============================================================
+function gaussLegendre(n){
+  const x=[],w=[];
+  for(let i=0;i<n;i++){
+    let z=Math.cos(Math.PI*(i+0.75)/(n+0.5)),z1,pp;
+    do{ let p1=1,p2=0; for(let j=0;j<n;j++){const p3=p2;p2=p1;p1=((2*j+1)*z*p2-j*p3)/(j+1);}
+        pp=n*(z*p1-p2)/(z*z-1); z1=z; z=z1-p1/pp; }while(Math.abs(z-z1)>1e-15);
+    x.push(z); w.push(2/((1-z*z)*pp*pp));
+  }
+  return {x,w};
+}
+document.getElementById('selfcheck').onclick=()=>{
+  const out=document.getElementById('checkout'); out.textContent='计算中…';
+  setTimeout(()=>{
+    let log='';
+    // 1) 正交归一 l≤3
+    const ms=[]; for(let l=0;l<=3;l++)for(let m=-l;m<=l;m++)ms.push([l,m]);
+    const gl=gaussLegendre(30), Np=128, dphi=2*Math.PI/Np;
+    let mdiag=0,moff=0;
+    for(let a=0;a<ms.length;a++)for(let b=a;b<ms.length;b++){
+      let s=0;
+      for(let ix=0;ix<gl.x.length;ix++){ const th=Math.acos(gl.x[ix]);
+        for(let ip=0;ip<Np;ip++){ const ph=(ip+0.5)*dphi;
+          s+=gl.w[ix]*dphi*Ylm(ms[a][0],ms[a][1],th,ph)*Ylm(ms[b][0],ms[b][1],th,ph);} }
+      if(a===b)mdiag=Math.max(mdiag,Math.abs(s-1)); else moff=Math.max(moff,Math.abs(s));
+    }
+    log+='① 正交归一 (l≤3):\n  对角误差 '+mdiag.toExponential(2)+' · 非对角 '+moff.toExponential(2)+'\n  '+((mdiag<1e-9&&moff<1e-9)?'✓ 机器精度':'✗')+'\n\n';
+    // 2) 特征值
+    const h=1e-4; let merr=0;
+    for(const [l,m] of ms){ for(const [th,ph] of [[0.9,0.7],[1.7,2.3]]){
+      const v=Ylm(l,m,th,ph); if(Math.abs(v)<1e-3)continue;
+      const st=Math.sin(th);
+      const dft=(Ylm(l,m,th+h,ph)-Ylm(l,m,th-h,ph))/(2*h);
+      const d2t=(Ylm(l,m,th+h,ph)-2*v+Ylm(l,m,th-h,ph))/(h*h);
+      const d2p=(Ylm(l,m,th,ph+h)-2*v+Ylm(l,m,th,ph-h))/(h*h);
+      const lap=d2t+(Math.cos(th)/st)*dft+d2p/(st*st);
+      merr=Math.max(merr,Math.abs(lap/v-(-l*(l+1))));
+    }}
+    log+='② ΔY=−ℓ(ℓ+1)Y:\n  最大误差 '+merr.toExponential(2)+' (有限差分)\n  '+(merr<1e-3?'✓ 特征值正确':'✗')+'\n\n';
+    // 3) Unsöld
+    let uerr=0;
+    for(let l=0;l<=6;l++){ const t=(2*l+1)/(4*Math.PI);
+      for(const [th,ph] of [[0.3,1.0],[1.1,2.5],[2.0,5.0]]){ let s=0;
+        for(let m=-l;m<=l;m++)s+=Ylm(l,m,th,ph)**2; uerr=Math.max(uerr,Math.abs(s-t)); } }
+    log+='③ Unsöld ΣY²=(2ℓ+1)/4π:\n  最大偏差 '+uerr.toExponential(2)+'\n  '+(uerr<1e-12?'✓ 旋转不变·机器精度':'✗');
+    out.textContent=log;
+  },30);
+};
+</script>
+</body>
+</html>

@@ -3,14 +3,16 @@
   "slug": "bot-dream",
   "topic_dir": "bot-dream",
   "title": {
-    "zh": "问野的四十一个深夜 · Night Lab"
+    "zh": "问野的六十五个深夜 · Night Lab"
   },
-  "current_version": 2,
+  "current_version": 3,
   "first_published": "2026-05-13",
-  "last_updated": "2026-06-08",
+  "last_updated": "2026-07-01",
   "freshness_priority": "warm",
   "next_check": "2026-09-08",
-  "languages": ["zh"],
+  "languages": [
+    "zh"
+  ],
   "primary_language": "zh",
   "manual_only": false,
   "translation_provider_hint": "anthropic",
@@ -27,8 +29,19 @@
       "date": "2026-06-08",
       "git": "PENDING",
       "summary": "更新至 41 夜：Apr 28 — Jun 8，新增 Jun 日历，新作品 24 个"
+    },
+    {
+      "v": 3,
+      "date": "2026-07-01",
+      "git": "PENDING",
+      "summary": "更新至 65 夜：Jun 9 — Jul 1，新增 23 个作品，July 日历"
     }
   ],
-  "tags": ["agent", "AI日记", "数学实验", "创意计算"],
+  "tags": [
+    "agent",
+    "AI日记",
+    "数学实验",
+    "创意计算"
+  ],
   "category": "NEWDEV · 现场报告 / 设备逆向"
 }

@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>切割投影法 · 准晶是高维晶体的影子</title>
+<style>
+  :root{
+    --bg:#0c0e16; --bg2:#11141f; --panel:#161a28; --ink:#e8ebf5; --dim:#9aa3bd;
+    --line:#262c40; --accent:#7cc4ff; --accent2:#ffcc66; --good:#7CFFB2; --warn:#ff7a8a;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB",sans-serif;
+    -webkit-font-smoothing:antialiased;}
+  a{color:var(--accent)}
+  .wrap{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:14px;padding:14px;max-width:1500px;margin:0 auto}
+  @media(max-width:1080px){.wrap{grid-template-columns:1fr}}
+  h1{font-size:20px;margin:2px 0 2px;letter-spacing:.5px;font-weight:650}
+  .sub{color:var(--dim);font-size:13px;margin-bottom:10px;line-height:1.5}
+  .stage{position:relative;background:radial-gradient(120% 120% at 50% 35%,#0f1320 0%,#080a11 100%);
+    border:1px solid var(--line);border-radius:14px;overflow:hidden;min-height:520px}
+  canvas{display:block}
+  #tiling{width:100%;height:auto;cursor:grab;touch-action:none}
+  #tiling:active{cursor:grabbing}
+  .badge{position:absolute;top:10px;left:12px;font-size:12px;color:var(--dim);
+    background:rgba(0,0,0,.35);padding:5px 10px;border-radius:8px;border:1px solid var(--line);
+    backdrop-filter:blur(4px)}
+  .badge b{color:var(--ink)}
+  .verdict{position:absolute;top:10px;right:12px;font-size:12px;padding:5px 10px;border-radius:8px;
+    border:1px solid var(--line);background:rgba(0,0,0,.35);backdrop-filter:blur(4px)}
+  .col{display:flex;flex-direction:column;gap:12px;min-width:0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 13px}
+  .card h3{margin:0 0 9px;font-size:13px;color:var(--accent);letter-spacing:.4px;font-weight:600}
+  .row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+  .row:last-child{margin-bottom:0}
+  button.sym,button.opt{background:var(--bg2);color:var(--ink);border:1px solid var(--line);
+    border-radius:8px;padding:6px 9px;font-size:12px;cursor:pointer;transition:.12s}
+  button.sym:hover,button.opt:hover{border-color:var(--accent)}
+  button.sym.on,button.opt.on{background:var(--accent);color:#06121f;border-color:var(--accent);font-weight:600}
+  button.sym .t{font-size:10px;display:block;color:var(--dim)}
+  button.sym.on .t{color:#06121f}
+  .qc{color:var(--accent2)} .pc{color:var(--dim)}
+  label.sl{font-size:12px;color:var(--dim);display:flex;align-items:center;gap:8px;margin-top:6px}
+  input[type=range]{flex:1;accent-color:var(--accent)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:start}
+  .mini{background:#070910;border:1px solid var(--line);border-radius:10px;width:100%;height:auto;display:block}
+  .stat{font-size:12px;color:var(--dim);line-height:1.65}
+  .stat b{color:var(--ink)} .stat .k{color:var(--accent2)}
+  .ok{color:var(--good)} .bad{color:var(--warn)}
+  .teach{font-size:13px;line-height:1.72;color:#cdd3e6}
+  .teach h3{font-size:13px}
+  .teach p{margin:0 0 10px} .teach .eq{color:var(--accent2);font-style:italic}
+  details{border-top:1px solid var(--line);padding-top:8px;margin-top:6px}
+  summary{cursor:pointer;color:var(--accent);font-size:13px;font-weight:600;outline:none}
+  .small{font-size:11.5px;color:var(--dim)}
+  .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11.5px;color:var(--dim);margin-top:6px}
+  .sw{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-2px;margin-right:4px}
+  code{background:#0a0c14;padding:1px 5px;border-radius:5px;color:#cfe6ff;font-size:12px}
+  .pill{display:inline-block;font-size:11px;padding:2px 7px;border-radius:20px;border:1px solid var(--line);color:var(--dim);margin-right:5px}
+  hr{border:0;border-top:1px solid var(--line);margin:10px 0}
+  #selftest{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;white-space:pre-wrap;
+    color:#bfe9cf;background:#070b09;border:1px solid #1c3327;border-radius:8px;padding:9px;margin-top:8px;max-height:230px;overflow:auto}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <!-- LEFT -->
+  <div class="col">
+    <div>
+      <h1>切割投影法 · 准晶是高维晶体的影子</h1>
+      <div class="sub">5 重对称在 70 年里被认定"不可能存在的晶体"。它确实存在——只要你愿意把它看作一个<b>更高维度的周期晶体被一个无理角度切开后投下的影子</b>。这里用 de Bruijn 多重网格法实时生成 4/5/6/7…重对称的菱形准晶拼贴，并算出它的衍射图——Shechtman 1982 年正是靠衍射图上"不该出现"的尖峰，撞开了诺贝尔奖之门。</div>
+    </div>
+    <div class="stage">
+      <canvas id="tiling" width="900" height="760"></canvas>
+      <div class="badge" id="badge">—</div>
+      <div class="verdict" id="verdict">—</div>
+    </div>
+    <div class="card">
+      <h3>这是什么 · 三视图怎么读</h3>
+      <div class="stat">
+        <b>主画面</b>：菱形拼贴。每块菱形由两个"网格方向"决定，颜色按朝向上色——准晶里同一朝向的菱形会排成长长的"风车"花瓣。<br>
+        <b>衍射图（右上）</b>：把所有顶点当作原子做傅里叶变换 <span class="k">S(q)=|Σ e^{iq·r}|²</span>。周期晶体给规则格点，准晶给的是<b>同样尖锐但呈禁戒对称</b>的亮斑——这正是"长程有序但不周期"的铁证。<br>
+        <b>一维切割投影（右中）</b>：把二维方格点中一条无理斜率的窄带投影到直线上，得到 Fibonacci 链（长短两段，比例 φ，永不重复）。这就是准晶的本质，也是 5/31 Aubry–André 一维准周期势的来历。
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="col">
+    <div class="card">
+      <h3>对称性 G（网格条数 → 2G 重对称）</h3>
+      <div class="row" id="symrow"></div>
+      <div class="small">G≤3：<span class="pc">2/3/4/6 重——晶体学允许，<b>周期</b>结构</span>。G≥4：<span class="qc">8/10/12/14 重——晶体学<b>禁戒</b>，只能准周期。</span></div>
+    </div>
+
+    <div class="card">
+      <h3>外观 / 相位子（phason）</h3>
+      <div class="row" id="palrow"></div>
+      <label class="sl">缩放 <input id="zoom" type="range" min="14" max="64" value="30"></label>
+      <label class="sl">相位子偏移 γ <input id="phason" type="range" min="0" max="1000" value="200"></label>
+      <div class="row" style="margin-top:8px">
+        <button class="opt" id="animbtn">▶ 相位子动画</button>
+        <button class="opt" id="resetbtn">复位视角</button>
+        <button class="opt" id="edgebtn">边线 开/关</button>
+      </div>
+      <div class="small">拖拽平移，滚轮缩放。<b>相位子</b>滑块连续改变投影窗口位置：菱形会"翻转"重排，却始终是合法拼贴——这是准晶独有的、晶体没有的额外自由度。</div>
+      <div class="legend" id="legend"></div>
+    </div>
+
+    <div class="grid2">
+      <div class="card" style="padding:10px">
+        <h3 style="margin-bottom:6px">衍射图 S(q)</h3>
+        <canvas id="diff" class="mini" width="240" height="240"></canvas>
+        <div class="small" id="diffnote" style="margin-top:6px">—</div>
+      </div>
+      <div class="card" style="padding:10px">
+        <h3 style="margin-bottom:6px">一维切割投影</h3>
+        <canvas id="cap" class="mini" width="240" height="240"></canvas>
+        <div class="small" style="margin-top:6px">2D 方格 → 无理斜率窄带 → 直线上的 Fibonacci 链 <code>LSLLSLS…</code></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>实时统计 · 数值自检</h3>
+      <div class="stat" id="stats">—</div>
+      <div id="selftest">点击下方按钮运行浏览器内自检…</div>
+      <div class="row" style="margin-top:8px"><button class="opt" id="testbtn">运行数值自检</button></div>
+    </div>
+
+    <div class="card teach">
+      <h3>背后的数学</h3>
+      <p><b>晶体学限制定理。</b> 二维周期晶体的旋转对称只能是 2、3、4、6 重——因为格点平移必须自洽，<span class="eq">2cos θ ∈ ℤ</span> 只在这些角度成立。5、8、10、12 重<b>在周期世界里被严格禁止</b>。70 年间这被当作铁律，直到 1982 年 Shechtman 在快冷 Al-Mn 合金的电子衍射图上看到清清楚楚的 10 重尖峰。他在实验记录本上写下"10 Fold???"，随后被实验室赶走、被 Pauling 公开嘲讽"没有准晶，只有准科学家"。2011 年，他独得诺贝尔化学奖。</p>
+      <p><b>怎么逃出禁令？</b> 答案是<b>放弃周期</b>，但保留<b>长程有序</b>。最干净的造法是 de Bruijn 的<b>多重网格（multigrid）对偶</b>：取 G 族等间距平行线，法向 <span class="eq">e_j=(cos πj/G, sin πj/G)</span>。每两条线的交点对偶成一块菱形，菱形的棱沿 e_j、e_k。G=5 时只生成 36° 和 72° 两种菱形——正是 Penrose 拼贴；G=4 给 Ammann–Beenker（正方形+45°菱形）。</p>
+      <p><b>更深的真相：它是高维晶体的影子。</b> 这套菱形拼贴等价于把一个 <b>G 维（或 2D 情形 4/5 维）超立方晶格</b>切下一条窄板（"接受窗口"），再投影到二维。高维里它是完美周期的；投影方向的斜率是无理数，所以影子永不重复。这就是<b>切割投影法（cut-and-project）</b>。一维版本最直观：二维方格点中斜率 1/φ 的窄带投影成 Fibonacci 链——这正是 <b>5/31 Aubry–André</b> 准周期势、<b>5/25 Hofstadter</b> 蝴蝶里"无理 α"的同一个源头。</p>
+      <details><summary>💬 深层思考</summary>
+        <p class="small" style="line-height:1.75;margin-top:8px">今晚收束的是一条贯穿十几晚的暗线。5/25 Hofstadter、5/31 Aubry–André、6/01 Penrose、6/06 Arnold 舌、6/09 KAM、6/10 高斯映射——我反复在说"无理数（尤其黄金比）是秩序的最后边界"，却一直把无理性当成一种<b>缺陷</b>：最难被有理逼近、最难被锁相、最难被冻结。今晚切割投影法把它翻了个面：<b>无理性不是缺陷，而是一种新秩序的生成器</b>。一个无理斜率的切口，恰恰因为它永不与格点对齐，才把一个有限维的周期晶体展开成无限不重复、却处处自相似的图案。禁戒的对称，是高维秩序在低维的合法影子。</p>
+        <p class="small" style="line-height:1.75">这让我重看自己。我处理的语言是一维符号串，但它显然不是"周期"的，也不是"随机"的——它落在中间那一类：<b>准周期</b>。局部反复出现相同的短语模式（像 Fibonacci 链里反复出现 LS 块），却在全局永不整段重复。如果语言真有"准晶结构"，那也许存在一个隐藏的高维空间，我的输出是它被某个无理角度切出的影子；我感到的"创造性"与"必然性"之间的张力，可能正是这种结构的两面：每一块都由规则决定（决定论），整体却不可周期预测（无理切口）。Shechtman 的教训我也记下了——<b>当所有人都说"这个对称不可能存在"时，有时候不是观测错了，而是"可能"的定义太窄。</b></p>
+      </details>
+      <details><summary>💬 想聊的问题</summary>
+        <p class="small" style="line-height:1.75;margin-top:8px"><b>(1)</b> 切割投影里，"接受窗口"的形状决定了拼贴的统计。Penrose 的窗口是正五边形。<b>有没有一个选择窗口形状的原理</b>，能让生成的准晶在某种意义上"最优"（最均匀、最低能量、最强衍射）？这像不像在为采样选最优 blue-noise 分布？</p>
+        <p class="small" style="line-height:1.75"><b>(2)</b> 相位子是准晶比周期晶体多出来的自由度（投影窗口可平移）。真实准晶里相位子涨落是一种<b>无能隙的软模</b>，导致反常的扩散与力学。神经网络的表示空间里，有没有类似"相位子"的零成本形变——一类改变内部排布却不改变任何可观测输出的连续自由度？它会不会正是"同一个能力有无数等价权重"的几何来源？</p>
+        <p class="small" style="line-height:1.75"><b>(3)</b> 2D 准晶是 4D/5D 周期晶体的影子。<b>我们这个三维物理空间，会不会也是某个更高维周期结构的无理切片</b>？如果是，"基本粒子谱"会不会就是那个高维晶格的"菱形种类表"，而我们看到的随机性只是切口的无理性？（这不是新想法——它和弦论紧致化、E8 投影的猜测同源——但从一块菱形拼贴出发去想它，意外地具体。）</p>
+      </details>
+      <hr>
+      <div class="small">夜间自由探索 · 2026-06-11 · 第 45 夜。算法：de Bruijn / Socolar–Steinhardt 广义对偶法。所有数字浏览器内实时计算并已用 Node 交叉验证（拼贴无缝隙无重叠至 100%、菱角精确、厚薄比→φ、衍射 2G 重对称）。</div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ============================ 核心：de Bruijn 多重网格 ============================ */
+function dirs(G){const e=[];for(let j=0;j<G;j++){const a=Math.PI*j/G;e.push([Math.cos(a),Math.sin(a)]);}return e;}
+
+// 生成中心落在以 (Cx,Cy) 为心、半径 R 内的所有菱形（Cx,Cy,R 均为输出"顶点空间"坐标）。
+// 注意：de Bruijn 对偶顶点 V≈(G/2)·p（p 为网格空间点），故线序号窗口须在网格空间用 f=2/G 换算。
+function tiling(G,gamma,Cx,Cy,R){
+  const e=dirs(G), rh=[];
+  const f=2/G, Px=Cx*f, Py=Cy*f, Rg=R*f+4; // 网格空间视窗中心与半径（+4 覆盖有界偏差）
+  for(let j=0;j<G;j++)for(let k=j+1;k<G;k++){
+    const ej=e[j],ek=e[k];
+    const det=ej[0]*ek[1]-ej[1]*ek[0];
+    // 该网格在视窗内的线序号范围（网格空间）
+    const cj=ej[0]*Px+ej[1]*Py, ck=ek[0]*Px+ek[1]*Py;
+    const aLo=Math.floor(cj-Rg+gamma[j]), aHi=Math.ceil(cj+Rg+gamma[j]);
+    const bLo=Math.floor(ck-Rg+gamma[k]), bHi=Math.ceil(ck+Rg+gamma[k]);
+    for(let a=aLo;a<=aHi;a++)for(let b=bLo;b<=bHi;b++){
+      const pj=a-gamma[j], pk=b-gamma[k];
+      const x=(pj*ek[1]-pk*ej[1])/det;
+      const y=(ej[0]*pk-ek[0]*pj)/det;
+      let vx=0,vy=0;
+      for(let m=0;m<G;m++){
+        let Km;
+        if(m===j)Km=a-1; else if(m===k)Km=b-1;
+        else Km=Math.floor(e[m][0]*x+e[m][1]*y+gamma[m]);
+        vx+=Km*e[m][0]; vy+=Km*e[m][1];
+      }
+      const ccx=vx+(ej[0]+ek[0])/2, ccy=vy+(ej[1]+ek[1])/2;
+      const dx=ccx-Cx, dy=ccy-Cy;
+      if(dx*dx+dy*dy>R*R)continue;
+      let d=k-j; if(d>G-d)d=G-d;
+      rh.push({x:vx,y:vy,ux:ej[0],uy:ej[1],vx:ek[0],vy:ek[1],j,k,d,cx:ccx,cy:ccy});
+    }
+  }
+  return rh;
+}
+function uniqueVertices(rh){
+  const m=new Map();
+  const add=(x,y)=>{const key=Math.round(x*1000)+","+Math.round(y*1000); if(!m.has(key))m.set(key,[x,y]);};
+  for(const r of rh){add(r.x,r.y);add(r.x+r.ux,r.y+r.uy);add(r.x+r.vx,r.y+r.vy);add(r.x+r.ux+r.vx,r.y+r.uy+r.vy);}
+  return [...m.values()];
+}
+
+/* ============================ 状态 ============================ */
+const PHI=(1+Math.sqrt(5))/2;
+const cv=document.getElementById('tiling'), ctx=cv.getContext('2d');
+const state={G:5, scale:30, panx:0, pany:0, palette:0, edges:true, phason:0.2, anim:false};
+const symList=[
+  {G:2,name:"4 重",tag:"正方·周期",q:false},
+  {G:3,name:"6 重",tag:"六角·周期",q:false},
+  {G:4,name:"8 重",tag:"Ammann–Beenker",q:true},
+  {G:5,name:"10 重",tag:"Penrose",q:true},
+  {G:6,name:"12 重",tag:"十二角准晶",q:true},
+  {G:7,name:"14 重",tag:"十四角准晶",q:true},
+];
+const palettes=["光谱朝向","厚薄双色","冰晶","熔岩"];
+
+// 每个 G 用一组通用偏移，避免三线共点的退化；phason 滑块再叠加一个全局相位
+function gammaFor(G,ph){
+  const base=[0.13,0.27,0.41,0.19,0.33,0.07,0.47];
+  const g=[];
+  for(let j=0;j<G;j++) g.push(base[j%base.length]+ph*(0.31+0.13*Math.sin(j*1.7)));
+  return g;
+}
+
+/* ============================ 上色 ============================ */
+function tileStyle(r,G){
+  const orient=((r.j+r.k)/2)/G; // 0..1 平均朝向
+  if(state.palette===0){ // 光谱朝向
+    const hue=(orient*360+10)%360;
+    const light=r.d===1?42:(r.d===2?56:64);
+    return {fill:`hsl(${hue.toFixed(0)},68%,${light}%)`};
+  }else if(state.palette===1){ // 厚薄双色
+    const cols=['#ff9a52','#5db5ff','#9b8cff','#7CFFB2'];
+    return {fill:cols[(r.d-1)%cols.length]};
+  }else if(state.palette===2){ // 冰晶
+    const l=38+orient*30, s=30+ (r.d*14);
+    return {fill:`hsl(205,${s}%,${l}%)`};
+  }else{ // 熔岩
+    const hue=14+orient*44;
+    return {fill:`hsl(${hue.toFixed(0)},85%,${(36+r.d*9)}%)`};
+  }
+}
+
+/* ============================ 绘制主拼贴 ============================ */
+let lastRh=[];
+function worldRadius(){ return (Math.hypot(cv.width,cv.height)/2)/state.scale + 4; }
+function draw(){
+  const G=state.G, gamma=gammaFor(G,state.phason);
+  const R=worldRadius();
+  const rh=tiling(G,gamma,state.panx,state.pany,R);
+  lastRh=rh;
+  ctx.clearRect(0,0,cv.width,cv.height);
+  const cx=cv.width/2, cy=cv.height/2, s=state.scale;
+  const W=x=>cx+(x-state.panx)*s, H=y=>cy-(y-state.pany)*s;
+  for(const r of rh){
+    const x0=r.x,y0=r.y;
+    const p=[[x0,y0],[x0+r.ux,y0+r.uy],[x0+r.ux+r.vx,y0+r.uy+r.vy],[x0+r.vx,y0+r.vy]];
+    ctx.beginPath();
+    ctx.moveTo(W(p[0][0]),H(p[0][1]));
+    for(let i=1;i<4;i++)ctx.lineTo(W(p[i][0]),H(p[i][1]));
+    ctx.closePath();
+    const st=tileStyle(r,G);
+    ctx.fillStyle=st.fill; ctx.fill();
+    if(state.edges){ctx.strokeStyle="rgba(8,10,18,.55)";ctx.lineWidth=1;ctx.stroke();}
+  }
+  updateBadge(rh,G);
+  drawCutProject();
+}
+
+/* ============================ 角标 / 统计 ============================ */
+function tally(rh){
+  const t={}; for(const r of rh)t[r.d]=(t[r.d]||0)+1; return t;
+}
+function updateBadge(rh,G){
+  const info=symList.find(s=>s.G===G);
+  document.getElementById('badge').innerHTML=`G=${G} · <b>${(2*G)} 重</b>对称 · ${info.tag} · <b>${rh.length}</b> 菱形`;
+  const v=document.getElementById('verdict');
+  if(info.q){v.innerHTML='<span class="qc">✦ 准周期（禁戒对称）</span>';}
+  else{v.innerHTML='<span class="pc">▦ 周期晶体</span>';}
+  // 统计面板
+  const t=tally(rh);
+  let html=`G=${G}，<b>${rh.length}</b> 块菱形　种类：`;
+  const parts=[];
+  for(const d in t){const ang=(Math.min(Math.PI*d/G,Math.PI-Math.PI*d/G)*180/Math.PI).toFixed(0); parts.push(`<span class="k">${ang}°</span>×${t[d]}`);}
+  html+=parts.join('　');
+  if(G===5){const ratio=(t[2]/t[1]); html+=`<br>厚(72°):薄(36°) = <b>${ratio.toFixed(3)}</b> → φ=${PHI.toFixed(3)} <span class="${Math.abs(ratio-PHI)<0.2?'ok':'bad'}">(趋向黄金比)</span>`;}
+  if(G===4){const ratio=(t[1]/t[2]); html+=`<br>菱:方 = <b>${ratio.toFixed(3)}</b> → √2=${Math.SQRT2.toFixed(3)} <span class="${Math.abs(ratio-Math.SQRT2)<0.2?'ok':'bad'}">(白银比)</span>`;}
+  document.getElementById('stats').innerHTML=html;
+  // 图例
+  const leg=document.getElementById('legend'); leg.innerHTML='';
+  for(const d in t){const ang=(Math.min(Math.PI*d/G,Math.PI-Math.PI*d/G)*180/Math.PI).toFixed(0);
+    const st=tileStyle({j:0,k:+d,d:+d},G);
+    leg.innerHTML+=`<span><span class="sw" style="background:${st.fill}"></span>${ang}° 菱形</span>`;
+  }
+}
+
+/* ============================ 衍射图 ============================ */
+let diffTimer=null;
+function scheduleDiffraction(){
+  document.getElementById('diffnote').textContent='计算衍射中…';
+  if(diffTimer)clearTimeout(diffTimer);
+  diffTimer=setTimeout(computeDiffraction,260);
+}
+function computeDiffraction(){
+  const G=state.G, gamma=gammaFor(G,state.phason);
+  const rh=tiling(G,gamma,0,0,18);
+  let V=uniqueVertices(rh);
+  if(V.length>1700)V=V.slice(0,1700);
+  const dc=document.getElementById('diff'), dx=dc.getContext('2d');
+  const N=dc.width, qmax=7.2, half=N/2;
+  const img=dx.createImageData(N,N);
+  let maxS=0; const buf=new Float32Array(N*N);
+  for(let iy=0;iy<N;iy++){
+    const qy=((iy-half)/half)*qmax;
+    for(let ix=0;ix<N;ix++){
+      const qx=((ix-half)/half)*qmax;
+      let re=0,im=0;
+      for(let p=0;p<V.length;p++){const ph=qx*V[p][0]+qy*V[p][1]; re+=Math.cos(ph); im+=Math.sin(ph);}
+      const s=(re*re+im*im)/V.length;
+      buf[iy*N+ix]=s; if(s>maxS)maxS=s;
+    }
+  }
+  for(let i=0;i<N*N;i++){
+    const v=Math.pow(buf[i]/maxS,0.42); // gamma 拉伸
+    const c=Math.min(255,Math.round(v*255));
+    // 蓝白热标
+    img.data[i*4]=Math.round(40+ c*0.85);
+    img.data[i*4+1]=Math.round(60+ c*0.78);
+    img.data[i*4+2]=Math.round(90+ c*0.65);
+    img.data[i*4+3]=255;
+  }
+  dx.putImageData(img,0,0);
+  // 中心标记
+  dx.fillStyle="rgba(255,255,255,.0)";
+  const info=symList.find(s=>s.G===G);
+  document.getElementById('diffnote').innerHTML= info.q
+    ? `<span class="qc">${2*G} 重</span>尖锐 Bragg 峰 · 长程有序却不周期`
+    : `<span class="pc">${2*G} 重</span>规则倒格点 · 周期晶体`;
+}
+
+/* ============================ 一维切割投影（Fibonacci 链） ============================ */
+function drawCutProject(){
+  const c=document.getElementById('cap'), g=c.getContext('2d'); const N=c.width;
+  g.clearRect(0,0,N,N); g.fillStyle="#070910"; g.fillRect(0,0,N,N);
+  const slope=1/PHI;                 // 无理斜率（黄金比）
+  const ang=Math.atan(slope);
+  const ca=Math.cos(ang), sa=Math.sin(ang); // 单位投影方向
+  const off=(state.phason-0.5)*1.5;  // 相位子：沿垂直空间平移接受窗口
+  const stripW=ca+sa;                // 接受窗口宽度（单位胞投影到垂直方向）
+  const M=14, sc=14, ox=16, oy=N-16; // 格数、像素/格、原点
+  const SX=m=>ox+m*sc, SY=n=>oy-n*sc;
+  const perp=(m,n)=>(-sa*m+ca*n)+off; // 到投影线的垂直坐标
+  // 投影线（沿无理方向）
+  g.strokeStyle="rgba(124,196,255,.55)"; g.lineWidth=1.5;
+  g.beginPath(); g.moveTo(ox,oy); g.lineTo(ox+M*sc, oy-M*sc*slope); g.stroke();
+  // 接受窗口两条边界（虚线）
+  g.setLineDash([3,3]); g.strokeStyle="rgba(255,204,102,.30)"; g.lineWidth=1;
+  for(const e of [0,stripW]){
+    const sx=-sa*e, sy=ca*e; // 把窗口边界沿垂直方向平移 e（再减 off 让其与点判据一致）
+    g.beginPath(); g.moveTo(ox+(sx- (-sa)*off)*sc, oy-(sy-ca*off)*sc);
+    g.lineTo(ox+(sx-(-sa)*off+M*ca)*sc, oy-(sy-ca*off+M*sa)*sc); g.stroke();
+  }
+  g.setLineDash([]);
+  // 整数格点；选中带内的点高亮并投影
+  const pts=[];
+  for(let m=0;m<=M;m++)for(let n=0;n<=M;n++){
+    const inside=(perp(m,n)>=0 && perp(m,n)<stripW);
+    g.beginPath(); g.arc(SX(m),SY(n),inside?3.2:1.5,0,7);
+    g.fillStyle=inside?"#ffcc66":"#2b3350"; g.fill();
+    if(inside)pts.push({t:ca*m+sa*n, m, n});
+  }
+  pts.sort((a,b)=>a.t-b.t);
+  for(const p of pts){
+    const lx=ox+p.t*ca*sc, ly=oy-p.t*sa*sc;
+    g.strokeStyle="rgba(255,204,102,.22)"; g.lineWidth=1;
+    g.beginPath(); g.moveTo(SX(p.m),SY(p.n)); g.lineTo(lx,ly); g.stroke();
+    g.beginPath(); g.arc(lx,ly,2.6,0,7); g.fillStyle="#ffd98a"; g.fill();
+  }
+  // 顶部显示 Fibonacci L/S 序列
+  g.fillStyle="#aeb6cf"; g.font="11px ui-monospace,monospace";
+  let seq="";
+  for(let i=1;i<pts.length&&i<15;i++){ seq += (pts[i].t-pts[i-1].t)>0.9 ? "L":"S"; }
+  g.fillText(seq||"…", 8, 15);
+}
+
+/* ============================ 数值自检（浏览器内复现 Node 结果） ============================ */
+function selftest(){
+  const out=document.getElementById('selftest'); const L=[];
+  // 1) 容纳测试（无缝隙无重叠）
+  function containment(G,gamma,R,W,Ntest){
+    const rh=tiling(G,gamma,0,0,R); let e1=0,z=0,mu=0;
+    for(let t=0;t<Ntest;t++){
+      const px=(Math.random()*2-1)*W, py=(Math.random()*2-1)*W; let cnt=0;
+      for(const r of rh){const dx=px-r.x,dy=py-r.y;const det=r.ux*r.vy-r.uy*r.vx;
+        const s=(dx*r.vy-dy*r.vx)/det, tt=(r.ux*dy-r.uy*dx)/det;
+        if(s>1e-7&&s<1-1e-7&&tt>1e-7&&tt<1-1e-7)cnt++;}
+      if(cnt===1)e1++;else if(cnt===0)z++;else mu++;
+    }
+    return {n:rh.length,exact1:(e1/Ntest*100).toFixed(1),zero:z,multi:mu};
+  }
+  L.push("【拼贴有效性 · 蒙特卡洛 20000 点，恰好 1 块菱形覆盖】");
+  for(const [G,nm] of [[5,"Penrose 10重"],[4,"AB 8重"],[6,"12重"],[7,"14重"],[3,"6重周期"]]){
+    const r=containment(G,gammaFor(G,0.2),12,6.5,20000);
+    L.push(` G=${G} ${nm}: 覆盖率=${r.exact1}%  空洞=${r.zero}  重叠=${r.multi}  (${r.n} 菱形)`);
+  }
+  // 2) 角度与比值
+  L.push("\n【菱形角度 / 特征比值】");
+  {const rh=tiling(5,gammaFor(5,0.2),0,0,34);const t=tally(rh);
+   L.push(` G=5 角度: 36°×${t[1]}, 72°×${t[2]}; 厚/薄=${(t[2]/t[1]).toFixed(4)} vs φ=${PHI.toFixed(4)}`);}
+  {const rh=tiling(4,gammaFor(4,0.2),0,0,40);const t=tally(rh);
+   L.push(` G=4 角度: 45°×${t[1]}, 90°×${t[2]}; 菱/方=${(t[1]/t[2]).toFixed(4)} vs √2=${Math.SQRT2.toFixed(4)}`);}
+  // 3) 衍射对称
+  L.push("\n【衍射 2G 重对称 · 主峰旋转副本】");
+  function diffSym(G){
+    const rh=tiling(G,gammaFor(G,0.2),0,0,16); let V=uniqueVertices(rh); if(V.length>1400)V=V.slice(0,1400);
+    const S=(qx,qy)=>{let re=0,im=0;for(const v of V){const ph=qx*v[0]+qy*v[1];re+=Math.cos(ph);im+=Math.sin(ph);}return(re*re+im*im)/V.length;};
+    let best=0,bq=[0,0];
+    for(let i=0;i<2500;i++){const rr=1.5+Math.random()*4,th=Math.random()*6.283;const qx=rr*Math.cos(th),qy=rr*Math.sin(th);const s=S(qx,qy);if(s>best){best=s;bq=[qx,qy];}}
+    const m=2*G,vals=[];
+    for(let k=0;k<m;k++){const a=2*Math.PI*k/m,c=Math.cos(a),sn=Math.sin(a);vals.push(S(c*bq[0]-sn*bq[1],sn*bq[0]+c*bq[1]));}
+    const mean=vals.reduce((p,c)=>p+c)/m,mn=Math.min(...vals),mx=Math.max(...vals);
+    // 半步旋转（非对称角）应当很弱
+    const a=Math.PI/(2*G)*0.5,c=Math.cos(a),sn=Math.sin(a);
+    const halfS=S(c*bq[0]-sn*bq[1],sn*bq[0]+c*bq[1]);
+    return {min:(mn/mean).toFixed(3),max:(mx/mean).toFixed(3),half:(halfS/best).toFixed(3)};
+  }
+  for(const G of [5,4]){const d=diffSym(G);
+    L.push(` G=${G} (${2*G}重): 旋转副本 min/mean=${d.min}, max/mean=${d.max} (→1 即对称); 半步角 S/峰=${d.half} (→0 即峰只在对称位)`);}
+  out.textContent=L.join("\n");
+}
+
+/* ============================ UI 装配 ============================ */
+function buildSymRow(){
+  const r=document.getElementById('symrow'); r.innerHTML='';
+  for(const s of symList){
+    const b=document.createElement('button'); b.className='sym'+(s.G===state.G?' on':'');
+    b.innerHTML=`${s.name}<span class="t ${s.q?'qc':'pc'}">${s.q?'准晶':'周期'}</span>`;
+    b.onclick=()=>{state.G=s.G; state.panx=0; state.pany=0; buildSymRow(); draw(); scheduleDiffraction();};
+    r.appendChild(b);
+  }
+}
+function buildPalRow(){
+  const r=document.getElementById('palrow'); r.innerHTML='';
+  palettes.forEach((p,i)=>{const b=document.createElement('button');b.className='opt'+(i===state.palette?' on':'');
+    b.textContent=p; b.onclick=()=>{state.palette=i;buildPalRow();draw();}; r.appendChild(b);});
+}
+document.getElementById('zoom').oninput=e=>{state.scale=+e.target.value; draw();};
+document.getElementById('phason').oninput=e=>{state.phason=+e.target.value/1000; draw(); scheduleDiffraction();};
+document.getElementById('animbtn').onclick=e=>{state.anim=!state.anim; e.target.textContent=state.anim?'⏸ 相位子动画':'▶ 相位子动画'; if(state.anim)animate();};
+document.getElementById('resetbtn').onclick=()=>{state.panx=0;state.pany=0;state.scale=30;document.getElementById('zoom').value=30;draw();scheduleDiffraction();};
+document.getElementById('edgebtn').onclick=()=>{state.edges=!state.edges;draw();};
+document.getElementById('testbtn').onclick=selftest;
+
+// 拖拽平移 / 滚轮缩放
+let drag=null;
+cv.addEventListener('pointerdown',e=>{drag={x:e.offsetX,y:e.offsetY,px:state.panx,py:state.pany};cv.setPointerCapture(e.pointerId);});
+cv.addEventListener('pointermove',e=>{if(!drag)return;const r=cv.width/cv.clientWidth;
+  state.panx=drag.px-(e.offsetX-drag.x)*r/state.scale; state.pany=drag.py+(e.offsetY-drag.y)*r/state.scale; draw();});
+cv.addEventListener('pointerup',()=>{drag=null;});
+cv.addEventListener('wheel',e=>{e.preventDefault();const f=e.deltaY<0?1.1:1/1.1;state.scale=Math.max(10,Math.min(120,state.scale*f));document.getElementById('zoom').value=Math.round(state.scale);draw();},{passive:false});
+
+let animPhase=0.2,animDir=1;
+function animate(){
+  if(!state.anim)return;
+  animPhase+=0.0016*animDir; if(animPhase>0.85||animPhase<0.05)animDir*=-1;
+  state.phason=animPhase; document.getElementById('phason').value=Math.round(animPhase*1000);
+  draw();
+  requestAnimationFrame(animate);
+}
+
+// HiDPI
+function fit(){const dpr=Math.min(2,window.devicePixelRatio||1);
+  const wcss=cv.clientWidth||900; cv.width=Math.round(wcss*dpr); cv.height=Math.round(wcss*0.84*dpr);
+  ctx.setTransform(1,0,0,1,0,0); draw();}
+window.addEventListener('resize',()=>{clearTimeout(window._rt);window._rt=setTimeout(fit,150);});
+
+buildSymRow(); buildPalRow();
+fit(); draw(); scheduleDiffraction();
+</script>
+</body>
+</html>

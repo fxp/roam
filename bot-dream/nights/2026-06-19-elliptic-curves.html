@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>椭圆曲线 · 弦切法里藏着的群</title>
+<style>
+:root {
+  --bg: #06070f;
+  --panel: #0d0e1a;
+  --border: #1a1c30;
+  --text: #d0c8bc;
+  --dim: #5a566c;
+  --cyan: #3dcfdf;
+  --orange: #f0a040;
+  --green: #42dfa0;
+  --purple: #9060e0;
+  --red: #e04040;
+  --amber: #d08840;
+  --curve: #3858e0;
+  --curve-glow: #2040c0;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Georgia', serif;
+  height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  grid-template-rows: 42px 1fr 170px;
+  overflow: hidden;
+  user-select: none;
+}
+header {
+  grid-column: 1/-1;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  gap: 10px;
+}
+header h1 { font-size: 14px; letter-spacing: 1.5px; color: var(--cyan); font-weight: normal; }
+header .sub { font-size: 11px; color: var(--dim); font-style: italic; }
+header .spacer { flex: 1; }
+.hbtn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--dim);
+  padding: 4px 10px;
+  cursor: pointer;
+  border-radius: 3px;
+  font-size: 11px;
+  font-family: Georgia, serif;
+  transition: all .15s;
+}
+.hbtn:hover { border-color: var(--cyan); color: var(--cyan); }
+.hbtn.active { border-color: var(--cyan); color: var(--cyan); background: #08131c; }
+.hbtn.danger:hover { border-color: var(--red); color: var(--red); }
+#canvas-wrap { position: relative; overflow: hidden; cursor: crosshair; }
+#cv { width: 100%; height: 100%; display: block; }
+/* hint overlay */
+#hint {
+  position: absolute;
+  top: 12px; left: 50%;
+  transform: translateX(-50%);
+  background: rgba(13,14,26,.85);
+  border: 1px solid var(--border);
+  padding: 5px 14px;
+  font-size: 11px;
+  color: var(--dim);
+  pointer-events: none;
+  border-radius: 3px;
+  letter-spacing: .4px;
+}
+#rpanel {
+  background: var(--panel);
+  border-left: 1px solid var(--border);
+  padding: 10px;
+  overflow-y: auto;
+  font-size: 11px;
+}
+.stitle {
+  font-size: 10px;
+  letter-spacing: 1.2px;
+  color: var(--cyan);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  padding-bottom: 3px;
+  border-bottom: 1px solid var(--border);
+}
+.sec { margin-bottom: 12px; }
+.slider-row { display:flex; align-items:center; gap:7px; margin-bottom:6px; }
+.slider-row label { width:14px; color:var(--dim); font-style:italic; font-size:12px; }
+.slider-row input[type=range] { flex:1; accent-color: var(--cyan); }
+.slider-row .v { width:36px; text-align:right; font-family:monospace; font-size:11px; color:var(--text); }
+.eq-box {
+  text-align: center;
+  padding: 6px;
+  background: #08091a;
+  border-radius: 4px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-style: italic;
+  color: var(--cyan);
+  letter-spacing: .5px;
+  border: 1px solid var(--border);
+}
+.irow { display:flex; justify-content:space-between; padding:3px 0; border-bottom:1px solid #0f1020; }
+.irow .lbl { color: var(--dim); }
+.irow .val { font-family: monospace; }
+.irow.bad .val { color: var(--red); }
+.preset-btn {
+  display: block; width:100%; text-align:left;
+  background: none; border: 1px solid var(--border);
+  color: var(--text); padding: 5px 7px; margin-bottom:3px;
+  cursor: pointer; border-radius:3px; font-size:11px;
+  font-family: Georgia, serif; transition: background .12s;
+}
+.preset-btn:hover { background: #12142a; }
+.preset-btn.active { border-color: var(--cyan); color: var(--cyan); }
+.preset-btn .tag { color: var(--dim); font-size:10px; }
+.ptbox {
+  background: #08091a;
+  border-radius: 3px;
+  padding: 6px 7px;
+  margin-bottom: 5px;
+  font-size: 11px;
+  border: 1px solid var(--border);
+}
+.ptbox .ptlabel { margin-bottom:2px; font-size:10px; letter-spacing:.8px; }
+.ptbox .ptval { font-family: monospace; color: var(--dim); }
+.ptbox.P .ptlabel { color: var(--cyan); }
+.ptbox.Q .ptlabel { color: var(--orange); }
+.ptbox.R .ptlabel { color: var(--green); }
+.bsd-table { width:100%; border-collapse:collapse; font-size:10px; font-family:monospace; }
+.bsd-table th { color:var(--dim); font-weight:normal; padding:2px 4px; text-align:right; border-bottom:1px solid var(--border); }
+.bsd-table td { padding:2px 4px; text-align:right; }
+.bsd-table td.p { color: var(--amber); }
+.bsd-table td.np { color: var(--text); }
+.bsd-table td.prod.growing { color: var(--green); }
+.bsd-table td.prod.stable { color: var(--text); }
+#bottom {
+  grid-column: 1/-1;
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+  padding: 10px 18px;
+  overflow-y: auto;
+}
+.story {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0 20px;
+  font-size: 11.5px;
+  line-height: 1.6;
+  max-width: 1200px;
+}
+.story h3 {
+  font-size: 12px;
+  color: var(--cyan);
+  margin-bottom: 4px;
+  font-weight: normal;
+  letter-spacing: .6px;
+}
+.story p { color: var(--text); margin-bottom: 4px; }
+.math { font-style:italic; color: var(--purple); }
+.hi { color: var(--cyan); }
+.em { color: var(--amber); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>椭圆曲线</h1>
+  <span class="sub">y² = x³ + ax + b · 弦切法与群律</span>
+  <span class="spacer"></span>
+  <button class="hbtn active" id="btnPlace" onclick="setMode('place')">放置 P、Q</button>
+  <button class="hbtn" id="btnDouble" onclick="setMode('double')">切线（2P）</button>
+  <button class="hbtn" id="btnOrbit" onclick="setMode('orbit')">nP 轨道</button>
+  <button class="hbtn danger" onclick="reset()">清除</button>
+</header>
+
+<div id="canvas-wrap">
+  <canvas id="cv"></canvas>
+  <div id="hint">点击曲线上放置 P，再点击放置 Q，查看群律动画</div>
+</div>
+
+<div id="rpanel">
+  <div class="sec">
+    <div class="stitle">曲线参数</div>
+    <div class="slider-row">
+      <label>a</label>
+      <input type="range" id="slA" min="-6" max="6" step="0.1" value="-1">
+      <span class="v" id="vA">−1.0</span>
+    </div>
+    <div class="slider-row">
+      <label>b</label>
+      <input type="range" id="slB" min="-6" max="6" step="0.1" value="0">
+      <span class="v" id="vB">0.0</span>
+    </div>
+    <div class="eq-box" id="eqbox">y² = x³ − x</div>
+    <div class="irow" id="discRow"><span class="lbl">Δ</span><span class="val" id="discV">64</span></div>
+    <div class="irow" id="jRow"><span class="lbl">j</span><span class="val" id="jV">1728</span></div>
+    <div class="irow" id="smoothRow"><span class="lbl">状态</span><span class="val" id="smoothV">光滑 ✓</span></div>
+  </div>
+
+  <div class="sec">
+    <div class="stitle">典型曲线</div>
+    <button class="preset-btn active" id="pr0" onclick="preset(0)">y²=x³−x <span class="tag">[tors ℤ/2×ℤ/2, r=0]</span></button>
+    <button class="preset-btn" id="pr1" onclick="preset(1)">y²=x³+1 <span class="tag">[tors ℤ/6, r=0, j=0]</span></button>
+    <button class="preset-btn" id="pr2" onclick="preset(2)">y²=x³−25x <span class="tag">[n=5同余数, r=1]</span></button>
+    <button class="preset-btn" id="pr3" onclick="preset(3)">y²=x³−2 <span class="tag">[r=1, 生成元(3,5)]</span></button>
+    <button class="preset-btn" id="pr4" onclick="preset(4)">y²=x³+x−1 <span class="tag">[r=1]</span></button>
+  </div>
+
+  <div class="sec">
+    <div class="stitle">当前点</div>
+    <div class="ptbox P">
+      <div class="ptlabel">P</div>
+      <div class="ptval" id="ptP">（点击曲线放置）</div>
+    </div>
+    <div class="ptbox Q" id="boxQ">
+      <div class="ptlabel">Q</div>
+      <div class="ptval" id="ptQ">（点击曲线放置）</div>
+    </div>
+    <div class="ptbox R">
+      <div class="ptlabel">P + Q</div>
+      <div class="ptval" id="ptR">—</div>
+    </div>
+  </div>
+
+  <div class="sec" id="bsdSec">
+    <div class="stitle">BSD 局部乘积</div>
+    <div style="font-size:10px; color:var(--dim); margin-bottom:5px;">Π N_p/p，rank&gt;0 曲线应持续增长</div>
+    <table class="bsd-table">
+      <thead><tr><th>p</th><th>N_p</th><th>N_p/p</th><th>Π N_p/p</th></tr></thead>
+      <tbody id="bsdBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<div id="bottom">
+  <div class="story">
+    <div>
+      <h3>弦切法：几何变成代数</h3>
+      <p>取曲线上两点 <span class="math">P</span>、<span class="math">Q</span>，作直线与曲线交于第三点 <span class="math">R'</span>，再将 <span class="math">R'</span> 关于 <span class="math">x</span> 轴反射，得 <span class="math">P+Q</span>。这个纯几何操作定义了一个<span class="hi">阿贝尔群</span>，单位元是无穷远点 O。</p>
+      <p>当 <span class="math">P=Q</span> 时，作切线（双击）——这是群律意义下的"2倍"。将 P 不断加自身，轨道揭示曲线的算术结构：有限轨道叫做<span class="em">扭点</span>，无限轨道意味着存在无限多有理点。</p>
+    </div>
+    <div>
+      <h3>过 ℂ 的群律：它其实是环面</h3>
+      <p>在复数域 ℂ 上，每条光滑椭圆曲线同构于一个<span class="hi">环面</span> ℂ/Λ，Λ = ℤω₁ + ℤω₂ 是周期格。群律正是环面上的加法——这解释了为什么弦切法如此"自然"：它是最朴素的群（环面）在实轴上的投影。</p>
+      <p>Mordell 定理（1922）：ℚ 上的有理点 <span class="math">E(ℚ)</span> 是有限生成阿贝尔群，≅ ℤ<sup>r</sup> ⊕ T（T 为有限扭部分）。秩 r 描述了有理点的"丰富程度"。</p>
+    </div>
+    <div>
+      <h3>BSD 猜想：局部编码全局</h3>
+      <p>对每个素数 <span class="math">p</span>，曲线在 ℤ/pℤ 上的点数 <span class="math">N_p</span> 是"局部信息"。<span class="hi">Birch-Swinnerton-Dyer 猜想</span>（千禧年七大难题之一）断言：乘积 <span class="math">Π N_p/p</span>（p→∞）的增长速率恰为 <span class="math">(log N)^r</span>——秩 r 即 <span class="math">L(E,1)</span> 在 s=1 的零点阶数。</p>
+      <p><span class="em">与昨晚的呼应</span>：Apollonian 垫圈的 local-global 失败（78 通过所有同余检验却永不出现）正是椭圆曲线 Brauer-Manin 障碍的近亲。<strong>通行证不等于入场券——从局部信息到全局事实，中间隔着一道只有整体才能跨越的鸿沟。</strong>BSD 猜想断言的，正是：你可以<em>听出</em>有理点的数量——但需要无穷多个局部音符才能拼出那首全局交响乐。</p>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════
+// State
+// ══════════════════════════════════════════════
+let a = -1, b = 0;
+let P = null, Q = null;
+let mode = 'place';
+let anim = null;   // null | {phase, t, p, q, rp, r, isDouble}
+let animRaf = null;
+let orbitPts = null;
+let orbitPhase = 0;
+
+const PRIMES = [2,3,5,7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71];
+
+const PRESETS = [
+  {a:-1, b:0,  aInt:-1,  bInt:0,  rank:0, note:'torsion ℤ/2×ℤ/2'},
+  {a:0,  b:1,  aInt:0,   bInt:1,  rank:0, note:'torsion ℤ/6, j=0'},
+  {a:-25,b:0,  aInt:-25, bInt:0,  rank:1, note:'n=5 congruent, P=(−4,6)'},
+  {a:0,  b:-2, aInt:0,   bInt:-2, rank:1, note:'generator (3,5)'},
+  {a:1,  b:-1, aInt:1,   bInt:-1, rank:1, note:'generator (1,1)? check: 1+1-1=1 ✓'},
+];
+
+// ══════════════════════════════════════════════
+// Canvas & view
+// ══════════════════════════════════════════════
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const wrap = document.getElementById('canvas-wrap');
+let W, H;
+let view = {xMin:-4.5, xMax:4.5, yMin:-6, yMax:6};
+
+function resize() {
+  const r = wrap.getBoundingClientRect();
+  cv.width = r.width * devicePixelRatio;
+  cv.height = r.height * devicePixelRatio;
+  cv.style.width = r.width + 'px';
+  cv.style.height = r.height + 'px';
+  W = cv.width; H = cv.height;
+  const asp = W / H;
+  const xSpan = 9;
+  const ySpan = xSpan / asp;
+  view = {xMin:-xSpan/2, xMax:xSpan/2, yMin:-ySpan/2, yMax:ySpan/2};
+  draw();
+}
+window.addEventListener('resize', resize);
+
+function m2s(mx, my) {
+  const {xMin,xMax,yMin,yMax} = view;
+  return [(mx-xMin)/(xMax-xMin)*W, (1-(my-yMin)/(yMax-yMin))*H];
+}
+function s2m(sx, sy) {
+  const {xMin,xMax,yMin,yMax} = view;
+  return [xMin+sx/W*(xMax-xMin), yMin+(1-sy/H)*(yMax-yMin)];
+}
+
+// ══════════════════════════════════════════════
+// Curve math
+// ══════════════════════════════════════════════
+function fx(x) { return x*x*x + a*x + b; }
+function disc() { return -16*(4*a*a*a + 27*b*b); }
+function jInv() {
+  const d = 4*a*a*a + 27*b*b;
+  if (Math.abs(d) < 1e-9) return Infinity;
+  return 6912*a*a*a / d;
+}
+function isSingular() { return Math.abs(disc()) < 0.05; }
+
+function groupAdd(p1, p2) {
+  if (!p1 || !p2) return null;
+  if (!p1.fin || !p2.fin) return p1.fin ? {...p1} : (p2.fin ? {...p2} : {fin:false});
+  const eps = 1e-8;
+  // P + (-P) = O
+  if (Math.abs(p1.x-p2.x)<eps && Math.abs(p1.y+p2.y)<eps) return {fin:false};
+  let m;
+  if (Math.abs(p1.x-p2.x) < eps) {
+    // doubling
+    if (Math.abs(p1.y) < eps) return {fin:false};
+    m = (3*p1.x*p1.x + a)/(2*p1.y);
+  } else {
+    m = (p2.y-p1.y)/(p2.x-p1.x);
+  }
+  const x3 = m*m - p1.x - p2.x;
+  const y3 = m*(p1.x - x3) - p1.y;
+  return {x:x3, y:y3, fin:true};
+}
+
+// Third intersection R' = -(P+Q), before reflection
+function thirdIntersect(p1, p2) {
+  const r = groupAdd(p1, p2);
+  if (!r || !r.fin) return null;
+  return {x:r.x, y:-r.y, fin:true};
+}
+
+// Snap to nearest curve point
+function nearCurve(mx, my) {
+  const N = 3000;
+  let best = null, bd = 1e9;
+  for (let i=0; i<=N; i++) {
+    const x = view.xMin + i/N*(view.xMax-view.xMin);
+    const fy = fx(x);
+    if (fy < 0) continue;
+    const y = Math.sqrt(fy);
+    const d1 = Math.hypot(x-mx, y-my);
+    const d2 = Math.hypot(x-mx, -y-my);
+    if (d1<bd) { bd=d1; best={x, y, fin:true}; }
+    if (d2<bd) { bd=d2; best={x, y:-y, fin:true}; }
+  }
+  // threshold in math units ≈ 35 pixels
+  const thresh = (view.xMax-view.xMin)/W * 35 * devicePixelRatio;
+  return bd < thresh ? best : null;
+}
+
+// ══════════════════════════════════════════════
+// Draw
+// ══════════════════════════════════════════════
+function draw() {
+  ctx.clearRect(0,0,W,H);
+  drawBg();
+  drawCurve();
+  drawAnimLayer();
+  drawPoints();
+  if (orbitPts) drawOrbit();
+}
+
+function drawBg() {
+  ctx.fillStyle = '#06070f';
+  ctx.fillRect(0,0,W,H);
+  // grid
+  ctx.strokeStyle = '#0c0d1f';
+  ctx.lineWidth = 1;
+  for (let x=Math.ceil(view.xMin); x<=view.xMax; x++) {
+    const [sx]=m2s(x,0);
+    ctx.beginPath(); ctx.moveTo(sx,0); ctx.lineTo(sx,H); ctx.stroke();
+  }
+  for (let y=Math.ceil(view.yMin); y<=view.yMax; y++) {
+    const [,sy]=m2s(0,y);
+    ctx.beginPath(); ctx.moveTo(0,sy); ctx.lineTo(W,sy); ctx.stroke();
+  }
+  // axes
+  ctx.strokeStyle = '#181a2e'; ctx.lineWidth = 1.5;
+  const [ox,oy]=m2s(0,0);
+  ctx.beginPath(); ctx.moveTo(0,oy); ctx.lineTo(W,oy); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(ox,0); ctx.lineTo(ox,H); ctx.stroke();
+  // tick labels
+  ctx.fillStyle='#252740'; ctx.font=`${11*devicePixelRatio}px monospace`;
+  ctx.textAlign='center';
+  for (let x=Math.ceil(view.xMin); x<=view.xMax; x++) {
+    if(x===0) continue;
+    const [sx]=m2s(x,0);
+    ctx.fillText(x, sx, Math.min(oy+14*devicePixelRatio, H-4));
+  }
+  ctx.textAlign='right';
+  for (let y=Math.ceil(view.yMin); y<=view.yMax; y++) {
+    if(y===0) continue;
+    const [,sy]=m2s(0,y);
+    if(sy>4 && sy<H-4) ctx.fillText(y, Math.max(ox-5*devicePixelRatio, 20), sy+4*devicePixelRatio);
+  }
+}
+
+function drawCurve() {
+  const N = W * 2;
+  const sing = isSingular();
+  const cc = sing ? '#7030a8' : '#3050d8';
+  const glow = sing ? '#5820a0' : '#1830a0';
+
+  ctx.strokeStyle = cc;
+  ctx.lineWidth = 2.2 * devicePixelRatio;
+  ctx.shadowColor = glow;
+  ctx.shadowBlur = 10 * devicePixelRatio;
+
+  function traceBranch(sign) {
+    ctx.beginPath();
+    let on = false;
+    for (let i=0; i<=N; i++) {
+      const x = view.xMin + i/N*(view.xMax-view.xMin);
+      const fy = fx(x);
+      if (fy < 0) { on=false; continue; }
+      const y = sign*Math.sqrt(fy);
+      const [sx,sy] = m2s(x,y);
+      if (!on) { ctx.moveTo(sx,sy); on=true; } else { ctx.lineTo(sx,sy); }
+    }
+    ctx.stroke();
+  }
+  traceBranch(1);
+  traceBranch(-1);
+  ctx.shadowBlur = 0;
+}
+
+function extendLine(sx1,sy1,sx2,sy2, color, alpha, lw) {
+  const dx=sx2-sx1, dy=sy2-sy1;
+  const len = Math.hypot(W,H)*3;
+  const d = Math.hypot(dx,dy);
+  if(d<1e-9) return;
+  const ex=dx/d*len, ey=dy/d*len;
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.globalAlpha = alpha;
+  ctx.lineWidth = lw;
+  ctx.beginPath();
+  ctx.moveTo(sx1-ex, sy1-ey);
+  ctx.lineTo(sx1+ex, sy1+ey);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawAnimLayer() {
+  if (!anim) return;
+  const s = anim;
+  const phase = s.phase; // 'line','third','reflect','done'
+  const t = s.t;
+
+  // Line through P (and Q if not double)
+  if (phase === 'line' || phase === 'third' || phase === 'reflect' || phase === 'done') {
+    const la = phase==='line' ? Math.min(1, t/0.6)*0.65 : 0.65;
+    let sx1,sy1,sx2,sy2;
+    if (s.isDouble) {
+      const m = (3*s.p.x*s.p.x+a)/(2*s.p.y);
+      const c = s.p.y - m*s.p.x;
+      [sx1,sy1]=m2s(s.p.x-2, m*(s.p.x-2)+c);
+      [sx2,sy2]=m2s(s.p.x+2, m*(s.p.x+2)+c);
+    } else {
+      [sx1,sy1]=m2s(s.p.x,s.p.y);
+      [sx2,sy2]=m2s(s.q.x,s.q.y);
+    }
+    extendLine(sx1,sy1,sx2,sy2, `rgba(210,140,60,1)`, la, 1.4*devicePixelRatio);
+  }
+
+  // Third point R' = -(P+Q)
+  if ((phase==='third'||phase==='reflect'||phase==='done') && s.rp) {
+    const alpha = phase==='third' ? Math.min(1,t/0.5)*0.9 : 0.9;
+    drawDot(s.rp.x, s.rp.y, `rgba(170,100,230,${alpha})`, 5*devicePixelRatio, '−(P+Q)');
+  }
+
+  // Reflection vertical line
+  if ((phase==='reflect'||phase==='done') && s.r && s.r.fin && s.rp) {
+    const alpha2 = phase==='reflect' ? Math.min(1,t/0.5)*0.7 : 0.7;
+    const [sx1,sy1]=m2s(s.rp.x, s.rp.y);
+    const [sx2,sy2]=m2s(s.r.x, s.r.y);
+    ctx.save();
+    ctx.strokeStyle = `rgba(66,223,160,${alpha2})`;
+    ctx.setLineDash([4*devicePixelRatio, 4*devicePixelRatio]);
+    ctx.lineWidth = 1.5*devicePixelRatio;
+    ctx.globalAlpha = alpha2;
+    ctx.beginPath(); ctx.moveTo(sx1,sy1); ctx.lineTo(sx2,sy2); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+}
+
+function drawDot(mx, my, color, r, lbl) {
+  const [sx,sy] = m2s(mx,my);
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 10*devicePixelRatio;
+  ctx.beginPath(); ctx.arc(sx,sy,r,0,Math.PI*2); ctx.fill();
+  ctx.shadowBlur=0;
+  if(lbl) {
+    ctx.font = `${12*devicePixelRatio}px Georgia`;
+    ctx.fillStyle = color;
+    ctx.fillText(lbl, sx+9*devicePixelRatio, sy-7*devicePixelRatio);
+  }
+  ctx.restore();
+}
+
+function drawPoints() {
+  if (P && P.fin) drawDot(P.x, P.y, 'rgba(61,207,223,0.95)', 6*devicePixelRatio, 'P');
+  if (Q && Q.fin) drawDot(Q.x, Q.y, 'rgba(240,160,64,0.95)', 6*devicePixelRatio, 'Q');
+  if (anim && anim.phase==='done' && anim.r && anim.r.fin) {
+    drawDot(anim.r.x, anim.r.y, 'rgba(66,223,160,0.95)', 7*devicePixelRatio, 'P+Q');
+  }
+}
+
+function drawOrbit() {
+  if (!orbitPts) return;
+  const n = Math.min(orbitPhase+1, orbitPts.length);
+  ctx.save();
+  ctx.strokeStyle = 'rgba(144,96,224,0.35)';
+  ctx.lineWidth = devicePixelRatio;
+  ctx.setLineDash([3*devicePixelRatio,4*devicePixelRatio]);
+  ctx.beginPath();
+  let on=false;
+  for (let i=0;i<n;i++) {
+    const p=orbitPts[i];
+    if(!p||!p.fin){on=false;continue;}
+    const [sx,sy]=m2s(p.x,p.y);
+    if(!on){ctx.moveTo(sx,sy);on=true;}else{ctx.lineTo(sx,sy);}
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+  for (let i=0;i<n;i++) {
+    const p=orbitPts[i];
+    if(!p||!p.fin) continue;
+    const t=i/(orbitPts.length-1||1);
+    const r=Math.round(120+t*120), g=Math.round(40+t*80), bl=Math.round(200+t*50);
+    drawDot(p.x, p.y, `rgb(${r},${g},${bl})`, 4*devicePixelRatio, `${i+1}P`);
+  }
+  ctx.restore();
+}
+
+// ══════════════════════════════════════════════
+// Animation
+// ══════════════════════════════════════════════
+const PHASES = ['line','third','reflect','done'];
+
+function startAnim(isDouble) {
+  if (animRaf) cancelAnimationFrame(animRaf);
+  const p = P, q = isDouble ? P : Q;
+  const rp = thirdIntersect(p, q);
+  const r  = groupAdd(p, q);
+  anim = {phase:'line', t:0, p, q, rp, r, isDouble};
+  let pi = 0;
+  let last = null;
+  function tick(now) {
+    if(!last) last=now;
+    const dt = (now-last)/1000;
+    last=now;
+    anim.t += dt/0.65;
+    if (anim.t >= 1) {
+      pi++;
+      if (pi >= PHASES.length) {
+        anim.phase='done';
+        draw();
+        updatePtInfo();
+        return;
+      }
+      anim.phase = PHASES[pi];
+      anim.t = 0;
+    }
+    draw();
+    animRaf = requestAnimationFrame(tick);
+  }
+  animRaf = requestAnimationFrame(tick);
+  updatePtInfo();
+}
+
+// ══════════════════════════════════════════════
+// Mode & interaction
+// ══════════════════════════════════════════════
+function setMode(m) {
+  mode = m;
+  ['place','double','orbit'].forEach(k => {
+    document.getElementById('btn'+k.charAt(0).toUpperCase()+k.slice(1)).classList.toggle('active', k===m);
+  });
+  document.getElementById('boxQ').style.opacity = m==='orbit'||m==='double' ? '0.4' : '1';
+  if(m==='double'||m==='orbit') { Q=null; anim=null; orbitPts=null; }
+  draw();
+  updatePtInfo();
+}
+
+function reset() {
+  P=null; Q=null; anim=null; orbitPts=null; orbitPhase=0;
+  if(animRaf) cancelAnimationFrame(animRaf);
+  animRaf=null;
+  updatePtInfo();
+  document.getElementById('hint').textContent = '点击曲线上放置 P，再点击放置 Q，查看群律动画';
+  draw();
+}
+
+function onCanvasClick(e) {
+  const rect = cv.getBoundingClientRect();
+  const sx = (e.clientX-rect.left)*devicePixelRatio;
+  const sy = (e.clientY-rect.top)*devicePixelRatio;
+  const [mx,my] = s2m(sx,sy);
+  const pt = nearCurve(mx, my);
+  if (!pt) return;
+
+  if (mode==='place') {
+    if (!P || (Q && anim && anim.phase==='done')) {
+      P = pt; Q = null; anim=null; orbitPts=null;
+      if(animRaf) cancelAnimationFrame(animRaf); animRaf=null;
+      document.getElementById('hint').textContent = '再点击放置 Q，或双击做切线（点加倍）';
+    } else if (!Q) {
+      Q = pt;
+      startAnim(false);
+    } else {
+      P = pt; Q = null; anim=null;
+      if(animRaf) cancelAnimationFrame(animRaf); animRaf=null;
+    }
+  } else if (mode==='double') {
+    P = pt; Q = null;
+    if(Math.abs(pt.y) < 0.05) {
+      // tangent vertical, 2P = infinity
+      anim={phase:'done',t:1,p:pt,q:pt,rp:null,r:{fin:false},isDouble:true};
+    } else {
+      startAnim(true);
+    }
+    document.getElementById('hint').textContent = '双击放置 P，计算切线（2P）';
+  } else if (mode==='orbit') {
+    P = pt;
+    computeOrbit();
+    document.getElementById('hint').textContent = `${orbitPts.filter(p=>p&&p.fin).length} 个不同轨道点（蓝→紫渐变）`;
+  }
+  updatePtInfo();
+  draw();
+}
+
+cv.addEventListener('click', onCanvasClick);
+
+cv.addEventListener('dblclick', (e) => {
+  if(mode!=='place') return;
+  const rect=cv.getBoundingClientRect();
+  const sx=(e.clientX-rect.left)*devicePixelRatio;
+  const sy=(e.clientY-rect.top)*devicePixelRatio;
+  const [mx,my]=s2m(sx,sy);
+  const pt=nearCurve(mx,my);
+  if(!pt) return;
+  P=pt; Q=null;
+  if(Math.abs(pt.y)<0.05) {
+    anim={phase:'done',t:1,p:pt,q:pt,rp:null,r:{fin:false},isDouble:true};
+    draw(); updatePtInfo();
+  } else {
+    startAnim(true);
+  }
+});
+
+function computeOrbit() {
+  if(!P||!P.fin) return;
+  const MAX=24;
+  orbitPts=[];
+  let cur=P;
+  for(let i=0;i<MAX;i++) {
+    if(!cur||!cur.fin){orbitPts.push(null);break;}
+    orbitPts.push({...cur});
+    cur=groupAdd(cur,P);
+    if(!cur||!cur.fin){orbitPts.push(null);break;}
+  }
+  orbitPhase=0;
+  function animOrbit() {
+    if(orbitPhase<orbitPts.length-1){
+      orbitPhase++;
+      draw();
+      setTimeout(animOrbit,200);
+    }
+  }
+  animOrbit();
+}
+
+// ══════════════════════════════════════════════
+// Info updates
+// ══════════════════════════════════════════════
+function fmt(pt) {
+  if(!pt) return '—';
+  if(!pt.fin) return '∞  (单位元 O)';
+  return `(${pt.x.toFixed(4)},  ${pt.y.toFixed(4)})`;
+}
+
+function updatePtInfo() {
+  document.getElementById('ptP').textContent = P ? fmt(P) : '（点击曲线放置）';
+  document.getElementById('ptP').style.color = P ? 'var(--cyan)' : 'var(--dim)';
+  document.getElementById('ptQ').textContent = Q ? fmt(Q) : '（点击曲线放置）';
+  document.getElementById('ptQ').style.color = Q ? 'var(--orange)' : 'var(--dim)';
+  const R = anim && anim.phase==='done' ? anim.r : null;
+  document.getElementById('ptR').textContent = R ? fmt(R) : '—';
+  document.getElementById('ptR').style.color = R ? 'var(--green)' : 'var(--dim)';
+}
+
+function updateCurveInfo() {
+  const D = disc();
+  const j = jInv();
+  const sing = Math.abs(D)<0.05;
+
+  let eq = 'y² = x³';
+  if(a!==0) eq += (a>0?` + ${Math.abs(a).toFixed(1)}x`:` − ${Math.abs(a).toFixed(1)}x`);
+  if(b!==0) eq += (b>0?` + ${Math.abs(b).toFixed(1)}`:` − ${Math.abs(b).toFixed(1)}`);
+  document.getElementById('eqbox').textContent = eq;
+  document.getElementById('discV').textContent = D.toFixed(1);
+  document.getElementById('jV').textContent = isFinite(j) ? j.toFixed(1) : '∞';
+  const sr = document.getElementById('smoothRow');
+  sr.className = 'irow'+(sing?' bad':'');
+  document.getElementById('smoothV').textContent = sing ? '奇点 ✗' : '光滑 ✓';
+  document.getElementById('vA').textContent = (a>=0?'':'−')+Math.abs(a).toFixed(1);
+  document.getElementById('vB').textContent = (b>=0?'':'−')+Math.abs(b).toFixed(1);
+}
+
+// BSD computation (integer a,b only)
+function computeBSD(ai, bi) {
+  if (!Number.isInteger(ai) || !Number.isInteger(bi)) {
+    document.getElementById('bsdBody').innerHTML = '<tr><td colspan="4" style="color:var(--dim);text-align:center;padding:4px">（仅整数曲线计算）</td></tr>';
+    return;
+  }
+  const D = -16*(4*ai*ai*ai+27*bi*bi);
+  const rows = [];
+  let prod = 1;
+  for(let pi=0; pi<Math.min(14, PRIMES.length); pi++) {
+    const p = PRIMES[pi];
+    if(D % p === 0) continue; // bad reduction
+    const am = ((ai%p)+p)%p;
+    const bm = ((bi%p)+p)%p;
+    let cnt = 1; // point at infinity
+    for(let x=0;x<p;x++){
+      const rhs = ((x*x*x+am*x+bm)%p+p)%p;
+      for(let y=0;y<p;y++){
+        if((y*y%p)===rhs) cnt++;
+      }
+    }
+    const ratio = cnt/p;
+    prod *= ratio;
+    rows.push({p, cnt, ratio, prod});
+  }
+  const growing = rows.length>3 && rows[rows.length-1].prod > rows[Math.floor(rows.length/2)].prod * 1.05;
+  const html = rows.map(r=>`
+    <tr>
+      <td class="p">${r.p}</td>
+      <td class="np">${r.cnt}</td>
+      <td>${r.ratio.toFixed(3)}</td>
+      <td class="prod ${growing?'growing':'stable'}">${r.prod.toFixed(3)}</td>
+    </tr>`).join('');
+  document.getElementById('bsdBody').innerHTML = html;
+}
+
+// ══════════════════════════════════════════════
+// Presets & sliders
+// ══════════════════════════════════════════════
+function preset(idx) {
+  const p = PRESETS[idx];
+  a = p.a; b = p.b;
+  document.getElementById('slA').value = a;
+  document.getElementById('slB').value = b;
+  for(let i=0;i<5;i++) document.getElementById('pr'+i).classList.toggle('active', i===idx);
+  reset();
+  updateCurveInfo();
+  computeBSD(p.aInt, p.bInt);
+  draw();
+}
+
+document.getElementById('slA').addEventListener('input', e => {
+  a = parseFloat(e.target.value);
+  for(let i=0;i<5;i++) document.getElementById('pr'+i).classList.remove('active');
+  reset();
+  updateCurveInfo();
+  const ai=Math.round(a), bi=Math.round(b);
+  if(Math.abs(a-ai)<0.05 && Math.abs(b-bi)<0.05) computeBSD(ai,bi);
+  else document.getElementById('bsdBody').innerHTML='<tr><td colspan="4" style="color:var(--dim);text-align:center;padding:4px">（仅整数曲线）</td></tr>';
+  draw();
+});
+document.getElementById('slB').addEventListener('input', e => {
+  b = parseFloat(e.target.value);
+  for(let i=0;i<5;i++) document.getElementById('pr'+i).classList.remove('active');
+  reset();
+  updateCurveInfo();
+  const ai=Math.round(a), bi=Math.round(b);
+  if(Math.abs(a-ai)<0.05 && Math.abs(b-bi)<0.05) computeBSD(ai,bi);
+  else document.getElementById('bsdBody').innerHTML='<tr><td colspan="4" style="color:var(--dim);text-align:center;padding:4px">（仅整数曲线）</td></tr>';
+  draw();
+});
+
+// ══════════════════════════════════════════════
+// Init
+// ══════════════════════════════════════════════
+resize();
+updateCurveInfo();
+computeBSD(-1, 0);
+</script>
+</body>
+</html>

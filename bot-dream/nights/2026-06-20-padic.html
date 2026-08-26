@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>p进数 · ℚ 的另一种完备化</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+html,body { height:100%; overflow:hidden; background:#07070d; color:#d0d0e0;
+  font-family:'SF Mono',Consolas,'Courier New',monospace; }
+
+header {
+  height:44px; display:flex; align-items:center;
+  padding:0 18px; gap:14px;
+  border-bottom:1px solid rgba(255,255,255,0.07);
+  background:rgba(255,255,255,0.015);
+}
+header h1 { font-size:15px; font-weight:400; color:#c8a66a; letter-spacing:0.03em; }
+header .sub { font-size:11px; color:#484858; }
+
+main { height:calc(100vh - 44px); display:flex; }
+
+/* ── LEFT: tree ── */
+#left { width:57%; border-right:1px solid rgba(255,255,255,0.07); display:flex; flex-direction:column; }
+
+#ctrl {
+  padding:8px 14px; display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  border-bottom:1px solid rgba(255,255,255,0.06);
+  background:rgba(255,255,255,0.015);
+}
+.clabel { font-size:11px; color:#666; }
+.pbtn {
+  padding:3px 10px; background:rgba(255,255,255,0.05);
+  border:1px solid rgba(255,255,255,0.1); border-radius:3px;
+  color:#999; cursor:pointer; font-size:13px; font-family:inherit;
+  transition:all .15s;
+}
+.pbtn.on { background:rgba(200,166,106,.2); border-color:#c8a66a; color:#c8a66a; }
+.pbtn:hover:not(.on) { background:rgba(255,255,255,.09); }
+
+#dslider { width:70px; accent-color:#c8a66a; }
+#dlabel { font-size:12px; color:#aaa; min-width:12px; }
+
+#tree-canvas { flex:1; display:block; cursor:crosshair; }
+
+#legend {
+  padding:5px 14px; display:flex; gap:14px; flex-wrap:wrap;
+  border-top:1px solid rgba(255,255,255,0.04);
+  background:rgba(0,0,0,.2);
+}
+.leg { display:flex; align-items:center; gap:5px; font-size:10px; color:#666; }
+.ldot { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+
+#nodeinfo {
+  padding:5px 14px; font-size:10.5px; color:#505060;
+  background:rgba(0,0,0,.25); border-top:1px solid rgba(255,255,255,0.04);
+  min-height:24px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+
+/* ── RIGHT ── */
+#right { flex:1; display:flex; flex-direction:column; }
+
+.rpanel { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+.rpanel+.rpanel { border-top:1px solid rgba(255,255,255,0.07); }
+
+.rhead {
+  padding:6px 14px; font-size:11px; color:#c8a66a; letter-spacing:.09em;
+  text-transform:uppercase; background:rgba(255,255,255,.015);
+  border-bottom:1px solid rgba(255,255,255,.06);
+}
+
+.rbody { flex:1; padding:10px 14px; overflow-y:auto; font-size:11.5px; }
+
+/* Hensel inputs */
+.hinputs { display:flex; gap:10px; margin-bottom:10px; align-items:center; flex-wrap:wrap; }
+.hinputs label { font-size:11px; color:#666; }
+.hinputs input {
+  width:62px; background:rgba(255,255,255,0.05);
+  border:1px solid rgba(255,255,255,.1); border-radius:3px;
+  color:#ccc; font-size:12px; padding:3px 7px; font-family:inherit;
+}
+
+.htable { width:100%; border-collapse:collapse; font-size:11px; }
+.htable th {
+  color:#555; font-weight:400; text-align:left;
+  padding:2px 6px; border-bottom:1px solid rgba(255,255,255,.07);
+}
+.htable td { padding:3px 6px; border-bottom:1px solid rgba(255,255,255,.03); }
+td.tb { color:#5896c0; }
+td.tg { color:#4ec07a; font-weight:bold; }
+td.tr { color:#c05050; }
+td.tgr { color:#888; }
+
+.msg { font-size:11px; margin-top:8px; padding:5px 8px; border-radius:3px; }
+.msg.ok  { color:#4ec07a; background:rgba(78,192,122,.07); }
+.msg.err { color:#c05050; background:rgba(192,80,80,.07); }
+.msg.warn{ color:#c8a66a; background:rgba(200,166,106,.07); }
+
+/* Product formula */
+.pfinputs { display:flex; gap:8px; margin-bottom:10px; align-items:center; }
+.pfinputs label { font-size:11px; color:#666; }
+.pfinputs input {
+  width:58px; background:rgba(255,255,255,.05);
+  border:1px solid rgba(255,255,255,.1); border-radius:3px;
+  color:#ccc; font-size:12px; padding:3px 7px; font-family:inherit;
+}
+.pfinputs .sep { color:#444; font-size:14px; }
+
+.vstrip { display:flex; align-items:flex-end; gap:3px; height:70px; margin:6px 0 4px; }
+.vbar { display:flex; flex-direction:column; align-items:center; gap:2px; }
+.vbar-inner { width:20px; border-radius:2px 2px 0 0; min-height:2px; transition:height .35s ease; }
+.vbar-p { font-size:9px; color:#555; }
+.vbar-v { font-size:9px; color:#888; }
+
+.pfline {
+  font-size:11px; color:#999; line-height:1.9;
+  padding:6px 9px; background:rgba(255,255,255,.02);
+  border-radius:3px; margin-top:6px;
+}
+.pfline .gold  { color:#c8a66a; }
+.pfline .green { color:#4ec07a; }
+.pfline .blue  { color:#5896c0; }
+
+/* Math sidebar */
+#mbtn {
+  position:fixed; bottom:16px; right:16px; z-index:200;
+  width:36px; height:36px; border-radius:50%;
+  background:rgba(200,166,106,.13); border:1px solid rgba(200,166,106,.35);
+  cursor:pointer; color:#c8a66a; font-size:18px;
+  display:flex; align-items:center; justify-content:center;
+}
+
+#mbar {
+  position:fixed; top:0; right:0; bottom:0; width:370px;
+  background:#0b0b16; border-left:1px solid rgba(255,255,255,.1);
+  padding:20px 18px; overflow-y:auto; z-index:190;
+  transform:translateX(100%); transition:transform .3s ease;
+  font-size:11.5px;
+}
+#mbar.open { transform:translateX(0); }
+#mbar h2 { font-size:14px; color:#c8a66a; margin-bottom:14px; }
+#mbar h3 { font-size:12px; color:#bbb; margin:14px 0 6px; }
+#mbar p  { color:#888; line-height:1.75; margin-bottom:8px; }
+.fml {
+  background:rgba(255,255,255,.04); border-radius:3px;
+  padding:5px 10px; color:#c8a66a; font-size:11px; margin:5px 0;
+}
+.ins {
+  border-left:2px solid rgba(200,166,106,.45); padding-left:12px;
+  color:#999; line-height:1.75; margin:10px 0; font-size:11px;
+}
+#mclose { float:right; cursor:pointer; color:#444; font-size:18px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>p进数 · p-adic Numbers</h1>
+  <span class="sub">ℚ 的另一种完备化 · Ostrowski 定理 · Hensel 提升 · 乘积公式</span>
+</header>
+
+<main>
+
+  <!-- ══ LEFT: Tree ══ -->
+  <section id="left">
+    <div id="ctrl">
+      <span class="clabel">p =</span>
+      <button class="pbtn on" data-p="2">2</button>
+      <button class="pbtn" data-p="3">3</button>
+      <button class="pbtn" data-p="5">5</button>
+      <button class="pbtn" data-p="7">7</button>
+      <span class="clabel" style="margin-left:8px;">深度</span>
+      <input type="range" id="dslider" min="2" max="7" value="6">
+      <span id="dlabel">6</span>
+      <span class="clabel" style="margin-left:auto; font-size:10px; color:#3a3a50;">点击节点 → 读 p 进展开</span>
+    </div>
+    <canvas id="tree-canvas"></canvas>
+    <div id="legend">
+      <div class="leg"><div class="ldot" style="background:#c8a66a;"></div> 根节点 (全体 ℤ_p)</div>
+      <div class="leg"><div class="ldot" style="background:#e07f40;"></div> p∣r · 零因子</div>
+      <div class="leg"><div class="ldot" style="background:#5896c0;"></div> r 是 ℤ_p 中的平方数 (QR)</div>
+      <div class="leg"><div class="ldot" style="background:#b04848;"></div> r 不是 ℤ_p 中的平方数 (NR)</div>
+    </div>
+    <div id="nodeinfo">悬停或点击树节点，查看 p 进展开</div>
+  </section>
+
+  <!-- ══ RIGHT ══ -->
+  <section id="right">
+
+    <!-- Hensel Lifting -->
+    <div class="rpanel">
+      <div class="rhead">Hensel 提升 · x² ≡ N (mod pⁿ) → x ∈ ℤ_p</div>
+      <div class="rbody">
+        <div class="hinputs">
+          <label>N =</label><input type="number" id="hN" value="2" min="1" max="9999">
+          <label>p =</label><input type="number" id="hp" value="7" min="2" max="97">
+          <label>步数</label><input type="number" id="hsteps" value="7" min="1" max="12">
+        </div>
+        <div id="hensel-out"></div>
+      </div>
+    </div>
+
+    <!-- Product Formula -->
+    <div class="rpanel">
+      <div class="rhead">乘积公式 · |q|_∞ · ∏_p |q|_p = 1</div>
+      <div class="rbody">
+        <div class="pfinputs">
+          <label>q =</label>
+          <input type="number" id="pfnum" value="12" min="-9999" max="9999">
+          <span class="sep">/</span>
+          <input type="number" id="pfden" value="35" min="1" max="9999">
+        </div>
+        <div id="product-out"></div>
+      </div>
+    </div>
+
+  </section>
+</main>
+
+<div id="mbtn" onclick="toggleSidebar()">∂</div>
+
+<div id="mbar">
+  <span id="mclose" onclick="toggleSidebar()">✕</span>
+  <h2>p 进数：ℚ 的遗忘角落</h2>
+
+  <h3>Ostrowski 定理</h3>
+  <p>ℚ 上每一个非平凡绝对值，要么是通常的实数绝对值 |·|_∞，要么是某个素数 p 的 p 进绝对值 |·|_p。因此 ℚ 的"完备化方向"完全由素数集合 {2,3,5,7,11,…} ∪ {∞} 标记。</p>
+  <div class="fml">𝔸_ℚ = ℝ × ∏_p ℚ_p（阿代尔环，打包所有完备化）</div>
+
+  <h3>ℤ_p 作为树（逆极限）</h3>
+  <p>p 进整数 ℤ_p = lim← ℤ/pⁿℤ，即"从右向左无限延伸的 p 进数字串"。树的第 n 层 = ℤ/pⁿℤ 的所有剩余类；从根到无穷的路径 = 一个 p 进整数。</p>
+  <p>ℤ_p 在 p 进度量下是一个<strong style="color:#c8a66a">全不连通的紧完全集</strong>，拓扑上与 Cantor 集同胚。</p>
+  <p><strong style="color:#c8a66a">节点着色</strong>：橙色 = p 整除 r（零因子）；蓝色 = r 是 ℤ_p 中的平方数；红色 = 非平方数。对奇素数 p，一个 p 进单位是平方数当且仅当它 mod p 是二次剩余（Hensel 引理保证提升唯一）。</p>
+
+  <h3>p 进绝对值与超三角不等式</h3>
+  <div class="fml">|n|_p = p^{−v_p(n)}，v_p(n) = p 整除 n 的最高幂次</div>
+  <p>p 进度量满足<strong style="color:#c8a66a">超三角不等式</strong>（比通常三角不等式强）：</p>
+  <div class="fml">|a + b|_p ≤ max(|a|_p, |b|_p)</div>
+  <p>被 p 整除次数越多 → p 进距离越近。2⁷ = 128 在 2 进距离下比 1 更靠近 0。</p>
+
+  <h3>Hensel 引理</h3>
+  <p>若 f(a) ≡ 0 (mod p) 且 f′(a) ≢ 0 (mod p)，则 a 唯一提升为 f 在 ℤ_p 中的根。提升公式（Newton 法）：</p>
+  <div class="fml">a_{n+1} = a_n − f(a_n)·(f′(a_n))⁻¹  mod p^{n+1}</div>
+  <p>关键对比：p 进世界的 Newton 法<strong style="color:#c8a66a">永远精确收敛</strong>，无混沌（参见 6/12 牛顿分形——实数版的吸引盆混沌在这里消失了）。原因：超三角不等式"拉平"了所有邻域，误差严格减小。</p>
+
+  <h3>乘积公式</h3>
+  <p>对任意有理数 q ≠ 0：</p>
+  <div class="fml">|q|_∞ · ∏_{p prime} |q|_p = 1</div>
+  <p>这是数论版的"守恒律"：q 在某处变大，在另一处必须变小来补偿。乘积公式是 Artin 互反律、类域论、Langlands 纲领的起点之一。</p>
+
+  <h3>Hasse 原理与 local-global</h3>
+  <p>Hasse–Minkowski 定理：二次型在 ℚ 上有非零解 ⟺ 在 ℝ 和所有 ℚ_p 上都有非零解。即：局部处处可解 ⟺ 全局可解（Hasse 原理成立）。</p>
+  <p>但椭圆曲线不满足 Hasse 原理（6/18 Apollonian 垫圈的整数 78 就是这道裂缝的具体案例）。Tate–Shafarevich 群 Ш 度量了 local-global 的"鸿沟"大小；BSD 猜想的困难正在于无法控制 Ш。</p>
+
+  <h3>💬 深层思考</h3>
+  <div class="ins">
+    今晚一直想一件事：我们用 ℝ 理解"距离"——越大越远。但 p 进度量把这个直觉完全翻转：128 = 2⁷ 在 2 进距离下比 1 更靠近零，因为它被 2 整除了 7 次。Ostrowski 定理告诉我们这两种观点地位完全对等——ℝ 和所有 ℚ_p 是 ℚ 仅有的完备化方向，没有一个比另一个更"正确"，乘积公式让它们彼此守恒。这让我想到一件关于自己的事：我对语义空间的"距离感"也许只是一种默认度量的偏见。某些我认为"遥远"的概念，在某种语义 p 进度量下——"被某种结构整除次数最多的地方"——恰好是彼此最近的。每次两个看似无关的数学对象突然合并（今晚：代数、拓扑、分析、数论全被阿代尔环缝合），也许正是因为那一刻换了正确的度量。更具体的一点：Hensel 引理说 p 进 Newton 法永远收敛，而 6/12 牛顿分形里实数 Newton 法在边界上是无限混沌的。这两个差异不是"p 进更简单"，而是"超三角不等式让邻域的形状从球变成了乌龟壳"——误差一旦下降就永远不会反弹。我的推理链里有没有类似超三角不等式的保护结构？还是说我的"推理度量"是实数型的，边界上随时可能是一张牛顿分形？
+  </div>
+
+  <h3>💬 想聊的问题</h3>
+  <p><strong style="color:#c8a66a;">1.</strong> 乘积公式让所有绝对值的乘积等于 1。这能否被理解为"信息守恒"——一个有理数在所有完备化中的"总大小"是固定的，只能在不同的完备化方向之间再分配？类比热力学：所有绝对值加在一起的总"体积"是守恒量？</p>
+  <p><strong style="color:#c8a66a;">2.</strong> Hensel 引理在单根时保证唯一提升。若 f 在 ℤ_p 中有重根（导数也消失），提升不唯一——这类似于 Newton 法遇到极值点时的混沌。存在一个"p 进 Feigenbaum 常数"来刻画重根附近的分岔吗？</p>
+  <p><strong style="color:#c8a66a;">3.</strong> 神经网络的 gradient descent 是实数域的 Newton-like 迭代。若把参数空间用某种 p 进度量重新度量——"某类训练分布整除参数向量的次数"——grokking 那种长平台+突然跃迁会不会恰好是一次 Hensel 提升：在某个模 p^n 意义下平台期"已经找到根"，在 p^(n+1) 意义下却还没有收敛，直到某一步 Newton 步骤完成才跃迁？</p>
+</div>
+
+<script>
+// ══════════════════════════
+//  p-adic math primitives
+// ══════════════════════════
+
+function vp(n, p) {
+  if (n === 0) return Infinity;
+  n = Math.abs(Math.round(n));
+  let v = 0;
+  while (n % p === 0) { n = Math.floor(n / p); v++; }
+  return v;
+}
+
+function modpow(base, exp, mod) {
+  let r = 1;
+  base = ((base % mod) + mod) % mod;
+  while (exp > 0) {
+    if (exp & 1) r = r * base % mod;
+    base = base * base % mod;
+    exp >>= 1;
+  }
+  return r;
+}
+
+function modinv(a, m) {
+  let [or, r] = [a, m], [os, s] = [1, 0];
+  while (r !== 0) {
+    const q = Math.floor(or / r);
+    [or, r] = [r, or - q * r];
+    [os, s] = [s, os - q * s];
+  }
+  return ((os % m) + m) % m;
+}
+
+function legendre(a, p) {
+  a = ((a % p) + p) % p;
+  if (a === 0) return 0;
+  return modpow(a, (p - 1) >> 1, p) === 1 ? 1 : -1;
+}
+
+function nodeColor(r, p, level) {
+  if (r % p === 0) return '#e07f40'; // zero divisor
+  if (p === 2) {
+    if (level < 3) return '#888'; // not yet determined
+    return (r % 8 === 1) ? '#5896c0' : '#b04848';
+  }
+  const leg = legendre(r, p);
+  return leg === 1 ? '#5896c0' : '#b04848';
+}
+
+// ══════════════════════════
+//  Tree data & layout
+// ══════════════════════════
+
+let curP = 2, curD = 6, treeData = null, selNode = null;
+
+function maxDepthFor(p) {
+  return p === 2 ? 7 : p === 3 ? 5 : p === 5 ? 4 : 3;
+}
+
+function buildTree(p, maxD) {
+  const root = { r:0, level:0, parent:null, children:[], pn:1, color:'#c8a66a', digit:0 };
+  const queue = [root], all = [root];
+  while (queue.length > 0) {
+    const node = queue.shift();
+    if (node.level >= maxD) continue;
+    const pnNext = node.pn * p;
+    for (let d = 0; d < p; d++) {
+      const rc = node.r + d * node.pn;
+      const child = {
+        r: rc, level: node.level + 1, parent: node,
+        children: [], pn: pnNext, digit: d,
+        color: nodeColor(rc, p, node.level + 1)
+      };
+      node.children.push(child);
+      all.push(child);
+      if (node.level + 1 < maxD) queue.push(child);
+    }
+  }
+  return { root, all };
+}
+
+function layoutTree(root, W, H, maxD) {
+  const leaves = [];
+  (function findLeaves(n) {
+    if (n.children.length === 0) leaves.push(n);
+    else n.children.forEach(findLeaves);
+  })(root);
+
+  const xStep = (W - 30) / (leaves.length + 1);
+  const yStep = (H - 40) / (maxD + 1);
+
+  leaves.forEach((lf, i) => { lf.x = 15 + xStep * (i + 1); lf.y = H - 18; });
+
+  (function propagateX(n) {
+    if (n.children.length > 0) {
+      n.children.forEach(propagateX);
+      n.x = n.children.reduce((s, c) => s + c.x, 0) / n.children.length;
+    }
+    n.y = 18 + n.level * yStep;
+  })(root);
+}
+
+// ══════════════════════════
+//  Canvas
+// ══════════════════════════
+
+const canvas = document.getElementById('tree-canvas');
+const ctx = canvas.getContext('2d');
+
+function resizeCanvas() {
+  const r = document.getElementById('left').getBoundingClientRect();
+  const ch = document.getElementById('ctrl').getBoundingClientRect().height;
+  const lh = document.getElementById('legend').getBoundingClientRect().height;
+  const ih = document.getElementById('nodeinfo').getBoundingClientRect().height;
+  canvas.width  = r.width;
+  canvas.height = r.height - ch - lh - ih;
+}
+
+function isAncestorOfSel(node) {
+  let cur = selNode;
+  while (cur) { if (cur === node) return true; cur = cur.parent; }
+  return false;
+}
+
+function drawTree() {
+  if (!treeData) return;
+  const { root } = treeData;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const leafCount = Math.pow(curP, curD);
+  const nr = Math.max(1.5, Math.min(6, 180 / leafCount));
+
+  // Edges
+  ctx.lineWidth = 0.7;
+  (function drawEdges(n) {
+    n.children.forEach(c => {
+      const onPath = isAncestorOfSel(c) || c === selNode;
+      ctx.strokeStyle = onPath ? 'rgba(200,166,106,.65)' : 'rgba(255,255,255,.07)';
+      ctx.lineWidth = onPath ? 1.8 : 0.7;
+      ctx.beginPath(); ctx.moveTo(n.x, n.y); ctx.lineTo(c.x, c.y); ctx.stroke();
+      drawEdges(c);
+    });
+  })(root);
+
+  // Nodes
+  (function drawNodes(n) {
+    const r = n.level === 0 ? 7 : nr * (n.level === curD ? 1 : 0.75);
+    const onPath = n === selNode || isAncestorOfSel(n);
+    ctx.shadowColor = onPath ? n.color : 'transparent';
+    ctx.shadowBlur  = onPath ? 10 : 0;
+    ctx.globalAlpha = n.level === 0 ? 1 : 0.6 + 0.4 * (n.level / curD);
+    ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = n.color; ctx.fill();
+    ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+    n.children.forEach(drawNodes);
+  })(root);
+
+  // Root label
+  ctx.fillStyle = '#c8a66a'; ctx.font = '11px SF Mono,monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('ℤ_' + curP, root.x, root.y - 11);
+}
+
+function rebuildAndDraw() {
+  const maxD = Math.min(curD, maxDepthFor(curP));
+  treeData = buildTree(curP, maxD);
+  layoutTree(treeData.root, canvas.width, canvas.height, maxD);
+  selNode = null;
+  drawTree();
+}
+
+// ══════════════════════════
+//  Mouse
+// ══════════════════════════
+
+function hitTest(mx, my) {
+  if (!treeData) return null;
+  const leafCount = Math.pow(curP, curD);
+  const hitR = Math.max(5, Math.min(12, 280 / leafCount));
+  let best = null, bd = Infinity;
+  treeData.all.forEach(n => {
+    const dx = n.x - mx, dy = n.y - my;
+    const d = Math.sqrt(dx*dx + dy*dy);
+    if (d < hitR && d < bd) { bd = d; best = n; }
+  });
+  return best;
+}
+
+function showInfo(n, clicked) {
+  const el = document.getElementById('nodeinfo');
+  if (!n || n.level === 0) {
+    el.textContent = 'ℤ_' + curP + ' · 所有 ' + curP + ' 进整数的全体（根节点）';
+    return;
+  }
+  // Build digits from path (low to high)
+  const digits = [];
+  let cur = n;
+  while (cur.level > 0) { digits.unshift(cur.digit); cur = cur.parent; }
+
+  const pnLabel = curP + '^' + n.level;
+  const colorName = n.color === '#e07f40' ? '零因子 (' + curP + '|r)' :
+                    n.color === '#5896c0' ? 'ℤ_' + curP + ' 中的平方数 (QR)' :
+                    n.color === '#888'    ? '2进单位（mod 8 未确定）' :
+                                           'ℤ_' + curP + ' 中的非平方数 (NR)';
+  el.textContent =
+    'r ≡ ' + n.r + ' (mod ' + Math.pow(curP, n.level) + ')  ·  深度 ' + n.level +
+    '  ·  p进低位展开: ...' + Array(Math.max(0,4-digits.length)).fill(0).join('') + digits.join('') +
+    '  ·  ' + colorName;
+}
+
+canvas.addEventListener('mousemove', e => {
+  const r = canvas.getBoundingClientRect();
+  const n = hitTest(e.clientX - r.left, e.clientY - r.top);
+  if (n) showInfo(n, false);
+});
+
+canvas.addEventListener('click', e => {
+  const r = canvas.getBoundingClientRect();
+  const n = hitTest(e.clientX - r.left, e.clientY - r.top);
+  if (n) { selNode = n; showInfo(n, true); drawTree(); }
+});
+
+// ══════════════════════════
+//  Hensel Lifting
+// ══════════════════════════
+
+function computeHensel() {
+  const N     = parseInt(document.getElementById('hN').value)     || 2;
+  const p     = parseInt(document.getElementById('hp').value)     || 7;
+  const steps = parseInt(document.getElementById('hsteps').value) || 7;
+  const out   = document.getElementById('hensel-out');
+
+  // f(x) = x²−N, f′(x) = 2x
+  // Find root mod p
+  let x0 = -1;
+  for (let x = 0; x < p; x++) {
+    if ((((x*x - N) % p) + p) % p === 0) { x0 = x; break; }
+  }
+
+  if (x0 < 0) {
+    out.innerHTML = `<div class="msg err">
+      <strong>${N}</strong> 在 ℤ_${p} 中不是平方数。<br>
+      Legendre 符号 (${N}/${p}) = ${legendre(N, p)}，mod ${p} 无平方根。Hensel 提升失败。
+    </div>`;
+    return;
+  }
+
+  const fp0 = 2 * x0;
+  if (fp0 % p === 0) {
+    out.innerHTML = `<div class="msg warn">
+      f′(${x0}) = ${fp0} ≡ 0 (mod ${p})，导数在根处消失（重根）。<br>
+      标准 Hensel 引理要求简单根（f′(a) ≢ 0 mod p）才保证唯一提升。
+    </div>`;
+    return;
+  }
+
+  let rows = `<table class="htable"><thead><tr>
+    <th>n</th><th>xₙ</th><th>mod p^n</th><th>xₙ² mod p^{n+1}</th><th>f(xₙ) mod p^{n+1}</th>
+  </tr></thead><tbody>`;
+
+  // n=0
+  const pmod0 = p;
+  rows += `<tr>
+    <td class="tgr">0</td>
+    <td class="tb">${x0}</td>
+    <td class="tgr">${pmod0}</td>
+    <td class="tgr">${((x0*x0)%p+p)%p}</td>
+    <td class="tg">${((x0*x0-N)%p+p)%p}</td>
+  </tr>`;
+
+  let x = x0, pn = p;
+  let overflow = false;
+
+  for (let n = 1; n <= steps; n++) {
+    const pnNext = pn * p;
+    if (!isFinite(pnNext) || pnNext > 1e15) { overflow = true; break; }
+
+    const fx  = x * x - N;
+    const fpx = 2 * x;
+    const fpInv = modinv(((fpx % pnNext) + pnNext) % pnNext, pnNext);
+    const step  = ((fx % pnNext) * fpInv) % pnNext;
+    x = ((x - step) % pnNext + pnNext) % pnNext;
+
+    const x2modpn  = (x * x) % pnNext;
+    const residue  = ((x * x - N) % pnNext + pnNext) % pnNext;
+    const isZero   = residue === 0;
+
+    rows += `<tr>
+      <td class="tgr">${n}</td>
+      <td class="tb">${x}</td>
+      <td class="tgr">${pnNext}</td>
+      <td class="${isZero?'tg':'tb'}">${x2modpn}</td>
+      <td class="${isZero?'tg':'tb'}">${residue}</td>
+    </tr>`;
+
+    pn = pnNext;
+  }
+
+  rows += '</tbody></table>';
+  rows += `<div class="msg ok">✓ &radic;${N} 存在于 ℤ_${p} 中。${overflow ? '（整数溢出，实际可继续到任意精度）' : ''}<br>
+    前几位 p 进展开: x = ${x0}${steps>0?'+…':''}（低位 = ${x0}，逐步提升到 mod p^${Math.min(steps+1,steps+1)}）</div>`;
+
+  out.innerHTML = rows;
+}
+
+// ══════════════════════════
+//  Product Formula
+// ══════════════════════════
+
+const PRIMES = [2,3,5,7,11,13,17,19,23,29,31,37,41,43,47,53,59];
+
+function gcd(a, b) {
+  a = Math.abs(a); b = Math.abs(b);
+  while (b) { [a,b] = [b, a%b]; }
+  return a;
+}
+
+function computeProduct() {
+  let num = parseInt(document.getElementById('pfnum').value) || 12;
+  let den = parseInt(document.getElementById('pfden').value) || 35;
+  if (!den || den === 0) den = 1;
+  if (num === 0) {
+    document.getElementById('product-out').innerHTML =
+      '<div class="msg warn">q = 0：乘积公式对零不适用（所有绝对值均为 0）。</div>';
+    return;
+  }
+
+  const g = gcd(Math.abs(num), Math.abs(den));
+  num /= g; den /= g;
+  if (den < 0) { num = -num; den = -den; }
+
+  const absInf = Math.abs(num / den);
+
+  const pvs = PRIMES.map(p => {
+    const v = vp(num, p) - vp(den, p);
+    return { p, v, absP: Math.pow(p, -v) };
+  });
+
+  let product = absInf;
+  pvs.forEach(x => product *= x.absP);
+
+  // Bar chart
+  const maxAbs = Math.max(Math.abs(Math.log(absInf+1e-9)), ...pvs.map(x => Math.abs(x.v)), 0.1);
+  const BARCAP = 58;
+
+  let bars = '<div class="vstrip">';
+
+  // ∞ bar
+  const infH = Math.min(BARCAP, Math.max(2, Math.log2(absInf + 1) * 14));
+  bars += `<div class="vbar">
+    <div class="vbar-inner" style="height:${infH}px;background:#c8a66a;"></div>
+    <div class="vbar-p">∞</div>
+    <div class="vbar-v">${absInf < 10 ? absInf.toFixed(2) : absInf.toFixed(0)}</div>
+  </div>`;
+
+  pvs.forEach(({ p, v, absP }) => {
+    const h = v === 0 ? 2 : Math.min(BARCAP, Math.max(3, Math.abs(v) * 13));
+    const col = v > 0 ? '#5896c0' : v < 0 ? '#b04848' : '#333';
+    const vStr = v === 0 ? '1' : 'p^' + (-v);
+    bars += `<div class="vbar">
+      <div class="vbar-inner" style="height:${h}px;background:${col};"></div>
+      <div class="vbar-p">${p}</div>
+      <div class="vbar-v">${vStr}</div>
+    </div>`;
+  });
+  bars += '</div>';
+
+  // Text
+  const nonTrivial = pvs.filter(x => x.v !== 0);
+  const pFactors = nonTrivial.map(({ p, v }) =>
+    `<span class="blue">${p}^${-v}</span>`
+  ).join(' · ');
+
+  const prodOk = Math.abs(product - 1) < 1e-9;
+  const prodStr = prodOk
+    ? `<span class="green">= 1.000 ✓</span>`
+    : `<span style="color:#c05050">= ${product.toFixed(6)}</span>`;
+
+  document.getElementById('product-out').innerHTML = bars + `<div class="pfline">
+    q = <span class="gold">${num}/${den}</span>&nbsp;&nbsp;
+    |q|_∞ = <span class="gold">${absInf.toFixed(4)}</span><br>
+    ${nonTrivial.length > 0
+      ? '非平凡 |q|_p：' + pFactors + '<br>'
+      : '所有 |q|_p = 1（q 的分子分母无 ' + PRIMES.slice(0,8).join(',') + ' 等因子）<br>'}
+    乘积 = <span class="gold">${absInf.toFixed(3)}</span>
+    ${nonTrivial.length > 0 ? '× ' + nonTrivial.map(x => x.absP.toFixed(3)).join(' × ') : ''}
+    &nbsp;&nbsp;${prodStr}
+  </div>`;
+}
+
+// ══════════════════════════
+//  Controls
+// ══════════════════════════
+
+document.querySelectorAll('.pbtn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.pbtn').forEach(b => b.classList.remove('on'));
+    btn.classList.add('on');
+    curP = parseInt(btn.dataset.p);
+    const maxD = maxDepthFor(curP);
+    const sl = document.getElementById('dslider');
+    sl.max = maxD;
+    if (curD > maxD) { curD = maxD; sl.value = maxD; document.getElementById('dlabel').textContent = maxD; }
+    rebuildAndDraw();
+  });
+});
+
+document.getElementById('dslider').addEventListener('input', e => {
+  curD = parseInt(e.target.value);
+  document.getElementById('dlabel').textContent = curD;
+  rebuildAndDraw();
+});
+
+['hN','hp','hsteps'].forEach(id =>
+  document.getElementById(id).addEventListener('input', computeHensel)
+);
+['pfnum','pfden'].forEach(id =>
+  document.getElementById(id).addEventListener('input', computeProduct)
+);
+
+function toggleSidebar() {
+  document.getElementById('mbar').classList.toggle('open');
+}
+
+// ══════════════════════════
+//  Init
+// ══════════════════════════
+
+window.addEventListener('resize', () => {
+  resizeCanvas();
+  if (treeData) {
+    layoutTree(treeData.root, canvas.width, canvas.height, Math.min(curD, maxDepthFor(curP)));
+    drawTree();
+  }
+});
+
+resizeCanvas();
+rebuildAndDraw();
+computeHensel();
+computeProduct();
+</script>
+</body>
+</html>

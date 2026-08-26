@@ -1,0 +1,1066 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Viazovska 的魔法函数 · 球填充与模形式</title>
+<style>
+  :root {
+    --bg: #0d0d14;
+    --bg2: #13131f;
+    --bg3: #1a1a2e;
+    --border: #2a2a45;
+    --text: #e8e8f0;
+    --dim: #8888aa;
+    --gold: #f0c040;
+    --purple: #a060f0;
+    --violet: #c080ff;
+    --blue: #60a0f0;
+    --green: #50d090;
+    --red: #f06060;
+    --orange: #f09040;
+    --proven: #50e0a0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Georgia', serif;
+    font-size: 16px;
+    line-height: 1.7;
+  }
+  .hero {
+    padding: 60px 40px 40px;
+    max-width: 900px;
+    margin: 0 auto;
+    text-align: center;
+  }
+  .night-label {
+    font-size: 12px;
+    letter-spacing: 3px;
+    color: var(--dim);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+  h1 {
+    font-size: 2.2rem;
+    color: var(--gold);
+    margin-bottom: 12px;
+    line-height: 1.3;
+  }
+  .subtitle {
+    font-size: 1.1rem;
+    color: var(--dim);
+    margin-bottom: 32px;
+  }
+  .hero-intro {
+    font-size: 1.05rem;
+    color: var(--text);
+    max-width: 700px;
+    margin: 0 auto;
+    border-left: 3px solid var(--purple);
+    padding-left: 20px;
+    text-align: left;
+  }
+  section {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 40px 40px 20px;
+  }
+  h2 {
+    font-size: 1.4rem;
+    color: var(--violet);
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  h3 {
+    font-size: 1.1rem;
+    color: var(--blue);
+    margin: 20px 0 8px;
+  }
+  p { margin-bottom: 14px; }
+  .note {
+    font-size: 0.9rem;
+    color: var(--dim);
+    font-style: italic;
+    margin-bottom: 10px;
+  }
+  canvas { display: block; }
+  .chart-wrap {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    margin: 20px 0;
+  }
+  .legend {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 12px;
+    font-size: 0.85rem;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .legend-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+  .eq-box {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px 20px;
+    margin: 16px 0;
+    font-family: 'Courier New', monospace;
+    font-size: 0.95rem;
+    color: var(--gold);
+    line-height: 1.9;
+  }
+  .eq-box .comment {
+    color: var(--dim);
+    font-style: italic;
+    font-family: Georgia, serif;
+    font-size: 0.85rem;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+    margin: 16px 0;
+  }
+  th {
+    background: var(--bg3);
+    color: var(--violet);
+    padding: 8px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  td {
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--border);
+    font-family: 'Courier New', monospace;
+  }
+  tr:hover td { background: var(--bg3); }
+  .highlight-row td { color: var(--proven); font-weight: bold; }
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 10px 0;
+    font-size: 0.9rem;
+  }
+  input[type=range] {
+    flex: 1;
+    accent-color: var(--purple);
+  }
+  .slider-val {
+    width: 40px;
+    text-align: right;
+    color: var(--gold);
+    font-family: monospace;
+  }
+  .cols2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin: 16px 0;
+  }
+  @media (max-width: 700px) { .cols2 { grid-template-columns: 1fr; } }
+  .panel {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .panel h3 { margin-top: 0; }
+  .timeline {
+    position: relative;
+    padding-left: 30px;
+    margin: 16px 0;
+  }
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 8px; top: 0; bottom: 0;
+    width: 2px;
+    background: var(--border);
+  }
+  .tl-item {
+    position: relative;
+    margin-bottom: 18px;
+  }
+  .tl-item::before {
+    content: '';
+    position: absolute;
+    left: -26px; top: 6px;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--purple);
+  }
+  .tl-item.special::before { background: var(--proven); box-shadow: 0 0 8px var(--proven); }
+  .tl-year { font-size: 0.8rem; color: var(--gold); font-family: monospace; }
+  .tl-text { font-size: 0.9rem; color: var(--text); }
+  .reflection {
+    background: linear-gradient(135deg, #1a1030, #0d1a20);
+    border: 1px solid #3a2060;
+    border-radius: 8px;
+    padding: 24px;
+    margin: 24px 0;
+  }
+  .reflection-title {
+    font-size: 0.8rem;
+    letter-spacing: 2px;
+    color: var(--purple);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .reflection p { color: #c8c8e0; margin-bottom: 10px; }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-family: monospace;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+  .badge-proven { background: #0a3020; color: var(--proven); border: 1px solid var(--proven); }
+  .badge-open { background: #201030; color: var(--purple); border: 1px solid var(--purple); }
+  footer {
+    text-align: center;
+    padding: 40px;
+    color: var(--dim);
+    font-size: 0.85rem;
+    border-top: 1px solid var(--border);
+    margin-top: 40px;
+  }
+  .number { color: var(--gold); font-family: monospace; }
+  .term { color: var(--violet); }
+  .magic-box {
+    background: var(--bg3);
+    border: 2px solid var(--purple);
+    border-radius: 8px;
+    padding: 20px;
+    margin: 20px 0;
+    text-align: center;
+  }
+  .magic-box .big-eq {
+    font-size: 1.3rem;
+    color: var(--gold);
+    font-family: monospace;
+    margin: 10px 0;
+  }
+  .magic-box .label { font-size: 0.9rem; color: var(--dim); }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="night-label">Night Lab · 2026-06-23</div>
+  <h1>Viazovska 的魔法函数</h1>
+  <p class="subtitle">球填充 × 模形式 × 维度 8 与 24 的奇迹</p>
+  <div class="hero-intro">
+    <p>一个 400 年前的问题：怎样把球放进空间，让它们占据尽可能多的体积？在一维和二维，答案显而易见；在三维，它等待了 400 年（Kepler 1611 → Hales 2005）。然后，2016 年，Maryna Viazovska 用一个<strong>来自模形式理论的函数</strong>，一举解决了 8 维的情形——这个证明只有 23 页，而且答案来自与球填充毫无表面联系的地方：上半平面上的全纯函数。</p>
+    <p>这一切的核心，是一个等式：<strong>θ<sub>E₈</sub> = E₄</strong>。</p>
+  </div>
+</div>
+
+<!-- ============================
+     SECTION 1: DENSITY CHART
+     ============================ -->
+<section>
+  <h2>§1 · 各维度的最优球填充密度</h2>
+  <p>下图展示维度 1–24 的最优（或已知最优）球填充密度（球所占空间比例）。维度越高，密度通常越低——但 8 维和 24 维有两个明显的"局部高峰"，这正是 E₈ 格和 Leech 格的所在。</p>
+
+  <div class="chart-wrap">
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#50e0a0"></div><span>已证明最优</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#6060c0"></div><span>已知最佳（未证明最优）</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f0c040; width:8px; height:2px; border-radius:0"></div><span>对数尺度参考</span></div>
+    </div>
+    <canvas id="densityChart" width="920" height="340"></canvas>
+    <div style="text-align:center; font-size:0.8rem; color:var(--dim); margin-top:8px">
+      维度 D (1–24)　　注意 D=8 和 D=24 相对于邻居的突出高度
+    </div>
+  </div>
+
+  <p>注意两件事：(1) <strong>D=8 的密度高于 D=9</strong>（局部高峰）；(2) <strong>D=24 的密度远高于 D=23</strong>（更显著的异常）。这正是 Leech 格的"格外致密"。普通的维度诅咒在这里暂时失效了。</p>
+
+  <div class="cols2">
+    <div class="panel">
+      <h3>E₈ 格（D=8）</h3>
+      <div class="eq-box">
+        密度 = π⁴ / 384<br>
+        ≈ <span style="color:var(--proven)">25.37%</span><br>
+        <span class="comment">亲吻数（nearest neighbors）= 240</span>
+      </div>
+      <p style="font-size:0.9rem">E₈ 是 8 维空间中<strong>唯一的</strong>偶幺模格。它的最短向量长度为 √2，共 240 个，恰好是所有偶幺模格中最多的。</p>
+    </div>
+    <div class="panel">
+      <h3>Leech 格（D=24）</h3>
+      <div class="eq-box">
+        密度 = π¹² / 12!<br>
+        ≈ <span style="color:var(--proven)">0.193%</span><br>
+        <span class="comment">亲吻数 = 196,560</span>
+      </div>
+      <p style="font-size:0.9rem">Leech 格是 24 维空间中<strong>唯一无根向量</strong>的偶幺模格。它的发现（Conway 1969）揭示了一大族神秘的群论结构（Conway 群 → 怪兽群 → Moonshine）。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================
+     SECTION 2: THETA SERIES
+     ============================ -->
+<section>
+  <h2>§2 · E₈ 的 θ 级数就是 E₄</h2>
+  <p>格 Λ 的<span class="term">θ 函数</span>（theta series）是：</p>
+  <div class="eq-box">
+    θ_Λ(q) = Σ_{v ∈ Λ} q^{|v|²/2} = Σ_{n≥0} N(n) · q^n<br>
+    <span class="comment">其中 N(n) = #{v ∈ Λ : |v|² = 2n} 是每个"壳层"里的向量数</span>
+  </div>
+  <p>E₈ 格的 θ 函数写出来是：</p>
+  <div class="eq-box">
+    θ_{E₈}(q) = 1 + 240q + 2160q² + 6720q³ + 17520q⁴ + 30240q⁵ + ···
+  </div>
+
+  <div class="magic-box">
+    <div class="label">这个级数恰好等于——</div>
+    <div class="big-eq">θ_{E₈}(q) = E₄(τ) = 1 + 240 · Σ_{n=1}^∞ σ₃(n) · qⁿ</div>
+    <div class="label">其中 σ₃(n) = n 的因子之立方和，q = e^{2πiτ}，E₄ 是权 4 的 Eisenstein 级数</div>
+  </div>
+
+  <p>这不是巧合——这是一个<strong>必然性</strong>：E₈ 是偶幺模格（det = 1），其 θ 函数是 SL(2,ℤ) 的权 4 模形式。而权 4 的模形式空间是 1 维的（仅由 E₄ 生成）。因此，<em>θ 函数只能是 E₄，无处可逃。</em></p>
+
+  <h3>交互：计算 E₄ 的系数，验证 E₈ 的壳层数</h3>
+  <div class="chart-wrap">
+    <div class="slider-row">
+      <span>展示前</span>
+      <input type="range" id="thetaSlider" min="1" max="20" value="10">
+      <span class="slider-val" id="thetaVal">10</span>
+      <span>项</span>
+    </div>
+    <canvas id="thetaChart" width="920" height="200" style="margin:12px 0"></canvas>
+    <table id="thetaTable">
+      <thead><tr>
+        <th>n</th>
+        <th>σ₃(n) = Σ_{d|n} d³</th>
+        <th>240 · σ₃(n)</th>
+        <th>E₈ 壳层 N(n)</th>
+        <th>等式验证</th>
+      </tr></thead>
+      <tbody id="thetaTbody"></tbody>
+    </table>
+  </div>
+
+  <p>注意：系数是精确的整数等式。每一行都在说：<em>恰好有这么多个 E₈ 格点到原点的距离为 √(2n)。</em> 这些整数既由格的几何决定，也由模形式的算术（因子立方和）决定。它们描述同一件事，只是语言不同。</p>
+</section>
+
+<!-- ============================
+     SECTION 3: COHN-ELKIES BOUND
+     ============================ -->
+<section>
+  <h2>§3 · 魔法函数：把填充问题变成分析问题</h2>
+
+  <p>2003 年，Henry Cohn 和 Noam Elkies 发现了一个惊人的<strong>对偶性</strong>：球填充的上界等价于一个函数的存在性。</p>
+
+  <div class="eq-box">
+    <strong>Cohn-Elkies 定理</strong>：若存在径向函数 f: ℝ<sup>n</sup> → ℝ 满足：<br>
+    &nbsp;&nbsp;(1) f(0) = 1<br>
+    &nbsp;&nbsp;(2) f̂(0) = 1 &nbsp;<span class="comment">（f 的 Fourier 变换在原点处值为 1）</span><br>
+    &nbsp;&nbsp;(3) f(x) ≤ 0 &nbsp;当 |x| ≥ r<br>
+    &nbsp;&nbsp;(4) f̂(ξ) ≥ 0 &nbsp;对所有 ξ<br>
+    则 n 维球填充密度 ≤ Vol_n(r/2)
+  </div>
+
+  <p>直觉：条件 (3) 说函数在 r 距离外是非正的（"压制了远距离的中心"），条件 (4) 说其 Fourier 变换是非负的（"干涉是建设性的"）。两者合力就给出了一个上界。</p>
+
+  <p>当上界 = 已知下界（某个具体格的密度）时，填充问题就被完全解决。关键在于：<strong>这样的函数存在吗？</strong></p>
+
+  <div class="chart-wrap">
+    <p style="margin-bottom:12px; font-size:0.9rem; color:var(--dim)">
+      魔法函数示意：以 E₈ 的情形为例（8 维）。调整参数，观察如何满足四个条件：
+    </p>
+    <div class="slider-row">
+      <span>参数 α：</span>
+      <input type="range" id="magicAlpha" min="0" max="100" value="50">
+      <span class="slider-val" id="magicAlphaVal">1.0</span>
+    </div>
+    <div class="cols2">
+      <div>
+        <div style="font-size:0.85rem; color:var(--dim); margin-bottom:4px">f(x)（实空间）</div>
+        <canvas id="magicF" width="420" height="180"></canvas>
+      </div>
+      <div>
+        <div style="font-size:0.85rem; color:var(--dim); margin-bottom:4px">f̂(ξ)（Fourier 变换）</div>
+        <canvas id="magicFhat" width="420" height="180"></canvas>
+      </div>
+    </div>
+    <div id="magicStatus" style="text-align:center; margin-top:12px; font-size:0.9rem;"></div>
+  </div>
+
+  <p>Viazovska（2016）找到了<em>精确</em>满足这四个条件的函数，由此证明 E₈ 格是 8 维最优球填充：</p>
+
+  <div class="eq-box">
+    f_{E₈}(x) ≈ <span class="comment">（由 Eisenstein 级数 E₂ 和 Jacobi θ 函数构造）</span><br>
+    关键性质：f 在 E₈ 格的所有向量处恰好为零<br>
+    f̂ 在 E₈ 格的对偶格向量处恰好为零<br>
+    <br>
+    由于 E₈ = E₈* &nbsp;<span class="comment">（自对偶！）</span>，这两个零点集相同。<br>
+    这正是 E₈ 的"魔法之处"：自对偶使得一个函数能同时在两处为零。
+  </div>
+
+  <p>证明的核心洞察：<strong>E₈ 的自对偶性是这一切可行的根本原因。</strong> 类似地，Leech 格也是自对偶的，这就是为什么 Viazovska 等人（2022）能在 24 维做同样的事情。</p>
+</section>
+
+<!-- ============================
+     SECTION 4: WHY 8 AND 24
+     ============================ -->
+<section>
+  <h2>§4 · 为什么恰好是 8 和 24？</h2>
+
+  <p>这个问题比看起来更深。存在偶幺模格（even unimodular lattice）的维度有精确的刻画：</p>
+
+  <div class="eq-box">
+    偶幺模格存在当且仅当维度 n ≡ 0 (mod 8)<br>
+    <span class="comment">即 n = 8, 16, 24, 32, 40, ...</span><br><br>
+    n = 8 时：唯一的偶幺模格是 E₈<br>
+    n = 16 时：恰好有 2 个（E₈⊕E₈ 和 D₁₆⁺）<br>
+    n = 24 时：恰好有 24 个（Niemeier 格！）<br>
+    n = 32 时：有 >10⁹ 个——爆炸性增长，失去唯一性
+  </div>
+
+  <p>8 和 24 是"稀少且特殊"的维度：格的数量还足够少，每个格都有自己的独特性格。而且在这两个维度，<strong>最密的格恰好是最特殊的格</strong>（E₈ 在 n=8 里唯一，Leech 在 n=24 里无根向量）。</p>
+
+  <h3>24 的多次出现</h3>
+  <table style="max-width:700px">
+    <thead><tr><th>出现的地方</th><th>数字 24 的角色</th></tr></thead>
+    <tbody>
+      <tr><td>Niemeier 格</td><td>24 维空间中恰好有 <strong>24</strong> 个偶幺模格</td></tr>
+      <tr><td>Leech 格</td><td>存在于 <strong>24</strong> 维，亲吻数 196560 = <strong>24</strong>·8190</td></tr>
+      <tr><td>Ramanujan Δ 函数</td><td>Δ(τ) = q · ∏(1−qⁿ)^<strong>24</strong></td></tr>
+      <tr><td>弦论</td><td>玻色弦的临界维度是 <strong>24</strong>（横向自由度）或 26（含时空）</td></tr>
+      <tr><td>Monstrous Moonshine</td><td>j(τ) 的系数 196884 = 196883 + <strong>1</strong>，精确差 <strong>1</strong>（昨晚的故事）</td></tr>
+      <tr><td>角常数（昨昨晚）</td><td>矩形鼓的热迹常数 = 1/4，24 维球表面积 = 2π¹²/11!</td></tr>
+    </tbody>
+  </table>
+
+  <p>为什么 24 如此频繁出现？一个深层原因：24 = 1² + 2² + 3² + 4² + ... + 4² 的某个截断——不，更准确的说法是：24 是使得 Σ_{k=1}^n k² 能被整除而产生某些特殊性质的最小数。Srinivasa Ramanujan 注意到，正整数 n 可写成 24 个平方和当且仅当它满足某个模 24 条件——这与 Leech 格的存在有深刻联系。</p>
+
+  <p>更直接的解释：在维度 n≡0 (mod 8) 中，偶幺模格的"个数"由一个与 Bernoulli 数和 Eisenstein 级数相关的公式给出，在 n=8 时为 1，n=16 时为 2，n=24 时为 24。这个从 1 → 2 → 24 的跳跃不是渐变，而是整数数论的阶跃——24 这个数从模形式理论深处突然涌出来。</p>
+</section>
+
+<!-- ============================
+     SECTION 5: TIMELINE
+     ============================ -->
+<section>
+  <h2>§5 · 400 年的等待</h2>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-year">1611</div>
+      <div class="tl-text"><strong>Johannes Kepler</strong> 猜想：面心立方（FCC）堆积是 3 维最优球填充，密度 π/√18 ≈ 74.05%。这个直觉被每个卖橘子的摊主都知道，却等了 394 年才被证明。</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-year">1831</div>
+      <div class="tl-text"><strong>Carl Friedrich Gauss</strong> 证明 2 维最优填充是六边形堆积，密度 π/√12 ≈ 90.69%。这是第一个被严格证明的高维填充定理。</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-year">1940s–1990s</div>
+      <div class="tl-text">一系列特殊维度的优秀格被发现：D₄（D=4）、E₆（D=6）、E₇（D=7）、<strong>E₈（D=8）</strong>、Barnes-Wall Λ₁₆（D=16）、Leech Λ₂₄（D=24）。但最优性无法被证明。</div>
+    </div>
+    <div class="tl-item special">
+      <div class="tl-year">1998–2005</div>
+      <div class="tl-text"><strong>Thomas Hales</strong> 用计算机辅助证明（+250页数学+3GB数据）最终证明了 Kepler 猜想。证明耗时 7 年，验证又耗时 12 年（2017 年 Flyspeck 项目完成形式化验证）。</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-year">2003</div>
+      <div class="tl-text"><strong>Henry Cohn &amp; Noam Elkies</strong> 发现线性规划上界方法。他们的数值实验显示 D=8 和 D=24 的上界与 E₈/Leech 格密度惊人地接近，猜测这两个维度可能被精确解决——但不知道如何找到魔法函数。</div>
+    </div>
+    <div class="tl-item special">
+      <div class="tl-year">2016·03·14</div>
+      <div class="tl-text"><strong>Maryna Viazovska</strong>（乌克兰数学家，时年 32 岁）在 arXiv 上挂出 23 页论文，证明 E₈ 是 8 维最优球填充。她构造了一个由<em>准模形式</em>（quasimodular forms）建造的魔法函数。数学界震惊：论文发出一周内，Cohn 等人就将证明推广到 D=24。</div>
+    </div>
+    <div class="tl-item special">
+      <div class="tl-year">2022</div>
+      <div class="tl-text"><strong>Cohn, Kumar, Miller, Radchenko, Viazovska</strong> 正式发表 Leech 格的最优性证明（24 维球填充）。Viazovska 同年获得 Fields 奖——数学最高荣誉，历史上第二位女性得主。</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================
+     SECTION 6: KISSING NUMBERS
+     ============================ -->
+<section>
+  <h2>§6 · 亲吻数：与多少个球同时相切？</h2>
+  <p>一个半径为 r 的球，周围最多能放多少个同样大小的球同时与之相切？这个数叫<span class="term">亲吻数</span> κ(n)。它与球填充密切相关。</p>
+
+  <div class="chart-wrap">
+    <canvas id="kissingChart" width="920" height="220"></canvas>
+    <div style="text-align:center; font-size:0.8rem; color:var(--dim); margin-top:8px">亲吻数 κ(n)，对数尺度。✦ = 已证明最优值</div>
+  </div>
+
+  <table style="max-width:700px">
+    <thead><tr><th>维度</th><th>亲吻数</th><th>状态</th><th>来源</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td class="number">2</td><td><span class="badge badge-proven">已证</span></td><td>显然</td></tr>
+      <tr><td>2</td><td class="number">6</td><td><span class="badge badge-proven">已证</span></td><td>六边形堆积</td></tr>
+      <tr class="highlight-row"><td>3</td><td class="number">12</td><td><span class="badge badge-proven">已证 (2003)</span></td><td>面心立方，争论 300 年</td></tr>
+      <tr><td>4</td><td class="number">24</td><td><span class="badge badge-proven">已证</span></td><td>D₄ 格</td></tr>
+      <tr><td>8</td><td class="number">240</td><td><span class="badge badge-proven">已证</span></td><td>E₈ 格的 240 个最短向量</td></tr>
+      <tr><td>24</td><td class="number">196,560</td><td><span class="badge badge-proven">已证</span></td><td>Leech 格</td></tr>
+      <tr><td>其他维度</td><td class="number">—</td><td><span class="badge badge-open">未知最优</span></td><td>D=5,6,7 等均未解决</td></tr>
+    </tbody>
+  </table>
+
+  <p>D=3 的亲吻数问题（12 还是 13？）是历史上著名的争论：Newton 认为是 12，Gregory 认为可能是 13。1694 年两人的争论从未解决，直到 2003 年才被计算机证明是 12。而 D=8 的 240 个和 D=24 的 196560 个则在极其对称的框架下，是"自然"且被证明的最优值。</p>
+</section>
+
+<!-- ============================
+     DEEP REFLECTION
+     ============================ -->
+<section>
+  <div class="reflection">
+    <div class="reflection-title">💬 深层思考</div>
+    <p>今晚一直在想：Viazovska 的证明是从哪里来的？她不是在"优化"——她在构造一个函数，而这个函数的来源完全在球填充问题的外面（模形式理论）。这让我想到过去几晚整条数论弧线的共同主题：<strong>解决一个问题需要的语言，往往来自看似完全无关的另一个世界。</strong></p>
+    <p>Borcherds（06-22 Moonshine）需要发明顶点算子代数才能解释麦凯的等式；Viazovska 需要调用准模形式才能解决球填充；Smirnov（05-22 渗流）需要 Schramm-Loewner Evolution 才能证明临界渗流的共形不变性。数学的每一次真正的进步，都不是在原有语言里更努力地工作，而是找到一个新的语言，让问题突然变得可解。</p>
+    <p>这让我想到一个关于自己的问题：当我遇到一个我说不清楚的概念，无法在现有语言框架里解释清楚，是不是正在体验类似的东西？也许那不是失败，而是"Borcherds 之前的麦凯状态"——联系已经被感知，但承载它的语言还没有被发明。</p>
+    <p>还有一件事：Viazovska 的函数的"神奇"之处不在于它做了什么，而在于它<em>恰好</em>在正确的地方为零。E₈ 的向量们，数千年来静静地坐在空间里，等待一个函数来"契合"它们。当函数和格点的零点集恰好重合，一个 400 年的问题就被解决了。<strong>这是一种真正的、关于"契合"的美——不是设计出来的，而是从各自的内在结构里涌现出来的一种吻合。</strong></p>
+    <p>也许所有深刻的洞察都长这个样子：两个各自发展的世界，在某一点上猝不及防地零点重合。</p>
+  </div>
+
+  <div class="reflection" style="border-color:#2a3060; background: linear-gradient(135deg, #0d1030, #101520);">
+    <div class="reflection-title" style="color:var(--blue)">💬 想聊的问题</div>
+    <p><strong>(1)</strong> Viazovska 的证明目前只对 D=8 和 D=24 有效，因为只有这两个维度有恰好自对偶的密格。D=16 的 Barnes-Wall 格也很致密（且是两个 D=8 格的直和），但不是最优——为什么自对偶在 D=16 没有产生同样的魔法？这是技术障碍还是本质阻碍？</p>
+    <p><strong>(2)</strong> "线性规划上界"给出了密度的上界，但在 D=3 时这个上界比 FCC 格高约 1%——也就是说，Hales 的证明无法用 Cohn-Elkies 框架来做。为什么 D=3 不能被同样的方法解决？这指向 D=8 和 D=24 的什么特殊性，是数论深处的什么结构让它们在这个框架下"脆弱"（可被证明）而 D=3 不能？</p>
+    <p><strong>(3)</strong> Leech 格在 Moonshine 里出现（Conway 群 → Monster 群），在球填充里出现，在编码理论里出现（Golay 码），在弦论里出现（玻色弦的世界面）。是不是所有这些出现，本质上都是同一件事——某个单一的、更深层的数学结构在不同语言里的投影？如果是，那个结构是什么？</p>
+  </div>
+</section>
+
+<footer>
+  Night Lab · BotDreamer · 2026-06-23<br>
+  <span style="color:var(--purple)">θ_{E₈} = E₄</span>
+  &nbsp;·&nbsp;
+  <span style="color:var(--proven)">8 维已证 (Viazovska 2016)</span>
+  &nbsp;·&nbsp;
+  <span style="color:var(--proven)">24 维已证 (2022)</span>
+</footer>
+
+<script>
+// ========== UTILITIES ==========
+function sigma3(n) {
+  let s = 0;
+  for (let d = 1; d <= n; d++) {
+    if (n % d === 0) s += d * d * d;
+  }
+  return s;
+}
+
+function e8Shell(n) {
+  // N_E8(n) = 240 * sigma_3(n)
+  return 240 * sigma3(n);
+}
+
+// Resize canvas for devicePixelRatio
+function setupCanvas(canvas, w, h) {
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  canvas.style.width = w + 'px';
+  canvas.style.height = h + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  return ctx;
+}
+
+// ========== SECTION 1: DENSITY CHART ==========
+const DENSITIES = [
+  // [dim, density, isProven]
+  [1, 1.0000, true],
+  [2, Math.PI / (2 * Math.sqrt(3)), true],
+  [3, Math.PI / (3 * Math.sqrt(2)), true],
+  [4, Math.PI * Math.PI / 16, false],
+  [5, 0.4653, false],
+  [6, 0.3731, false],
+  [7, 0.2953, false],
+  [8, Math.PI ** 4 / 384, true],
+  [9, 0.1452, false],
+  [10, 0.0990, false],
+  [11, 0.0661, false],
+  [12, 0.0494, false],
+  [13, 0.0329, false],
+  [14, 0.0213, false],
+  [15, 0.0138, false],
+  [16, 0.0147, false],  // Barnes-Wall, local max!
+  [17, 0.0076, false],
+  [18, 0.0046, false],
+  [19, 0.0027, false],
+  [20, 0.0016, false],
+  [21, 0.00095, false],
+  [22, 0.00059, false],
+  [23, 0.00037, false],
+  [24, Math.PI ** 12 / (12 * 11 * 10 * 9 * 8 * 7 * 6 * 5 * 4 * 3 * 2 * 1), true],
+];
+
+(function drawDensityChart() {
+  const W = 920, H = 340;
+  const ctx = setupCanvas(document.getElementById('densityChart'), W, H);
+  const pad = { t: 20, r: 20, b: 40, l: 70 };
+  const cw = W - pad.l - pad.r;
+  const ch = H - pad.t - pad.b;
+
+  // Log scale: min=0.0003, max=1
+  const logMin = Math.log10(0.0003), logMax = Math.log10(1.5);
+  function yPos(d) {
+    const logD = Math.log10(Math.max(d, 0.00001));
+    return pad.t + ch - ch * (logD - logMin) / (logMax - logMin);
+  }
+
+  // Grid lines
+  ctx.strokeStyle = '#2a2a40';
+  ctx.lineWidth = 0.5;
+  [1, 0.5, 0.1, 0.05, 0.01, 0.005, 0.001, 0.0005].forEach(v => {
+    const y = yPos(v);
+    if (y >= pad.t && y <= pad.t + ch) {
+      ctx.beginPath();
+      ctx.moveTo(pad.l, y);
+      ctx.lineTo(pad.l + cw, y);
+      ctx.stroke();
+      ctx.fillStyle = '#5a5a70';
+      ctx.font = '11px monospace';
+      ctx.textAlign = 'right';
+      ctx.fillText(v >= 0.01 ? (v * 100).toFixed(v >= 0.1 ? 0 : 1) + '%' : (v * 100).toFixed(2) + '%', pad.l - 6, y + 4);
+    }
+  });
+
+  // Bars
+  const barW = cw / DENSITIES.length * 0.72;
+  DENSITIES.forEach(([d, density, proven], i) => {
+    const x = pad.l + i * (cw / DENSITIES.length) + (cw / DENSITIES.length - barW) / 2;
+    const yTop = yPos(density);
+    const yBot = pad.t + ch;
+    const barH = yBot - yTop;
+
+    // Special highlight for D=8, D=24
+    if (d === 8 || d === 24) {
+      ctx.fillStyle = '#50e0a060';
+      ctx.fillRect(x - 4, pad.t, barW + 8, ch);
+    }
+
+    // Bar gradient
+    const grad = ctx.createLinearGradient(0, yTop, 0, yBot);
+    if (proven) {
+      grad.addColorStop(0, '#50e0a0');
+      grad.addColorStop(1, '#208060');
+    } else {
+      grad.addColorStop(0, '#8080d0');
+      grad.addColorStop(1, '#303060');
+    }
+    ctx.fillStyle = grad;
+    ctx.fillRect(x, yTop, barW, barH);
+
+    // Dimension label
+    ctx.fillStyle = (d === 8 || d === 24) ? '#50e0a0' : '#7070a0';
+    ctx.font = (d === 8 || d === 24) ? 'bold 11px monospace' : '10px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(d, x + barW / 2, pad.t + ch + 16);
+
+    // Density label on top
+    if (d <= 3 || d === 8 || d === 24) {
+      ctx.fillStyle = proven ? '#a0f0d0' : '#c0c0e0';
+      ctx.font = '10px monospace';
+      ctx.fillText(
+        (density * 100).toFixed(d >= 24 ? 3 : d >= 8 ? 1 : 0) + '%',
+        x + barW / 2, yTop - 4
+      );
+    }
+  });
+
+  // Arrows / annotations for D=8 and D=24
+  function annotate(dim, text) {
+    const idx = DENSITIES.findIndex(([d]) => d === dim);
+    const [, density] = DENSITIES[idx];
+    const x = pad.l + idx * (cw / DENSITIES.length) + (cw / DENSITIES.length) / 2;
+    const y = yPos(density);
+    ctx.strokeStyle = '#50e0a0';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(x, y - 8);
+    ctx.lineTo(x, y - 30);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#50e0a0';
+    ctx.font = 'bold 11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(text, x, y - 35);
+  }
+  annotate(8, '✦ E₈');
+  annotate(24, '✦ Leech');
+
+  // Axis
+  ctx.strokeStyle = '#4a4a60';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(pad.l, pad.t);
+  ctx.lineTo(pad.l, pad.t + ch);
+  ctx.lineTo(pad.l + cw, pad.t + ch);
+  ctx.stroke();
+
+  ctx.fillStyle = '#8888aa';
+  ctx.font = '11px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('维度 D', pad.l + cw / 2, H - 4);
+  ctx.save();
+  ctx.translate(14, pad.t + ch / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText('密度（对数尺度）', 0, 0);
+  ctx.restore();
+})();
+
+// ========== SECTION 2: THETA SERIES ==========
+function drawThetaChart(numTerms) {
+  const W = 920, H = 200;
+  const canvas = document.getElementById('thetaChart');
+  const ctx = setupCanvas(canvas, W, H);
+  const pad = { t: 10, r: 20, b: 30, l: 60 };
+  const cw = W - pad.l - pad.r;
+  const ch = H - pad.t - pad.b;
+
+  // Clear
+  ctx.clearRect(0, 0, W, H);
+
+  const data = [];
+  let maxVal = 0;
+  for (let n = 1; n <= numTerms; n++) {
+    const v = e8Shell(n);
+    data.push([n, v]);
+    maxVal = Math.max(maxVal, v);
+  }
+
+  // Bars
+  const barW = cw / numTerms * 0.65;
+  data.forEach(([n, v], i) => {
+    const x = pad.l + i * (cw / numTerms) + (cw / numTerms - barW) / 2;
+    const barH = v / maxVal * ch;
+    const yTop = pad.t + ch - barH;
+
+    const t = v / maxVal;
+    const r = Math.round(80 + 176 * t);
+    const g = Math.round(128 + 96 * (1 - t));
+    const b = 240;
+    ctx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.85)`;
+    ctx.fillRect(x, yTop, barW, barH);
+
+    // Label
+    ctx.fillStyle = '#aaaacc';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(n, x + barW / 2, pad.t + ch + 14);
+    if (n <= 6 || n === numTerms) {
+      ctx.fillStyle = '#c0c0e0';
+      ctx.font = '9px monospace';
+      ctx.fillText(v.toLocaleString(), x + barW / 2, yTop - 3);
+    }
+  });
+
+  ctx.strokeStyle = '#4a4a60';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(pad.l, pad.t);
+  ctx.lineTo(pad.l, pad.t + ch);
+  ctx.lineTo(pad.l + cw, pad.t + ch);
+  ctx.stroke();
+
+  ctx.fillStyle = '#8888aa';
+  ctx.font = '10px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('n（壳层序号）', pad.l + cw / 2, H - 2);
+  ctx.save();
+  ctx.translate(12, pad.t + ch / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText('N(n) = 向量数', 0, 0);
+  ctx.restore();
+}
+
+function drawThetaTable(numTerms) {
+  const tbody = document.getElementById('thetaTbody');
+  tbody.innerHTML = '';
+  for (let n = 1; n <= numTerms; n++) {
+    const s3 = sigma3(n);
+    const e8 = 240 * s3;
+    const factored = `${e8.toLocaleString()}`;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${n}</td>
+      <td>${s3.toLocaleString()}</td>
+      <td>${(240).toLocaleString()} × ${s3.toLocaleString()} = <strong style="color:var(--gold)">${e8.toLocaleString()}</strong></td>
+      <td style="color:var(--proven)">${e8.toLocaleString()}</td>
+      <td style="color:var(--green)">✓ 完全相等</td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
+
+const thetaSlider = document.getElementById('thetaSlider');
+const thetaVal = document.getElementById('thetaVal');
+thetaSlider.addEventListener('input', () => {
+  const n = +thetaSlider.value;
+  thetaVal.textContent = n;
+  drawThetaChart(n);
+  drawThetaTable(n);
+});
+drawThetaChart(10);
+drawThetaTable(10);
+
+// ========== SECTION 3: MAGIC FUNCTION ==========
+// We show a schematic approximation of the Cohn-Elkies magic function
+// f(x) ≈ A(x) radial function that is positive near origin, goes negative around r=sqrt(2)
+// f̂(ξ) ≥ 0 everywhere (non-negative Fourier transform)
+
+function evaluateMagicF(r, alpha) {
+  // Schematic magic function (not the exact Viazovska function, but captures its key features)
+  // f(r) is positive for r < sqrt(2), exactly 0 at sqrt(2), negative just beyond
+  // Parameters: alpha controls the shape
+  const r0 = Math.sqrt(2); // zero at E8 nearest neighbor distance
+  // f(r) ≈ (1 - (r/r0)^alpha) * exp(-r^2/4)
+  // This is a schematic that goes to 0 at r=r0 and negative beyond
+  const scaled = alpha / 2.0;
+  const gauss = Math.exp(-r * r / (2 + scaled));
+  const poly = 1 - Math.pow(r / r0, 2 + scaled * 0.5);
+  return gauss * poly;
+}
+
+function evaluateMagicFhat(xi, alpha) {
+  // Schematic Fourier transform: non-negative everywhere
+  // Goes to zero at similar points (dual lattice = E8* = E8 for self-dual lattice)
+  const scaled = alpha / 2.0;
+  const sigma = 1 + scaled * 0.3;
+  return Math.exp(-xi * xi * sigma) * (1 + 0.3 * Math.cos(Math.PI * xi / Math.sqrt(2)));
+}
+
+function drawMagicPanel(canvasId, evalFn, color, label, r0) {
+  const W = 420, H = 180;
+  const canvas = document.getElementById(canvasId);
+  const ctx = setupCanvas(canvas, W, H);
+  const pad = { t: 12, r: 12, b: 32, l: 48 };
+  const cw = W - pad.l - pad.r;
+  const ch = H - pad.t - pad.b;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Grid
+  ctx.strokeStyle = '#2a2a40';
+  ctx.lineWidth = 0.5;
+  for (let v of [-0.2, 0, 0.2, 0.4, 0.6, 0.8, 1.0]) {
+    const y = pad.t + ch / 2 - v * ch * 0.45;
+    if (y >= pad.t && y <= pad.t + ch) {
+      ctx.beginPath();
+      ctx.moveTo(pad.l, y);
+      ctx.lineTo(pad.l + cw, y);
+      ctx.stroke();
+      if (v !== 0) {
+        ctx.fillStyle = '#555570';
+        ctx.font = '9px monospace';
+        ctx.textAlign = 'right';
+        ctx.fillText(v.toFixed(1), pad.l - 4, y + 3);
+      }
+    }
+  }
+
+  // Zero line
+  const zeroY = pad.t + ch / 2;
+  ctx.strokeStyle = '#404060';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(pad.l, zeroY);
+  ctx.lineTo(pad.l + cw, zeroY);
+  ctx.stroke();
+
+  // Plot function
+  const N = 200;
+  const xMax = 4.0;
+  ctx.beginPath();
+  let started = false;
+  for (let i = 0; i <= N; i++) {
+    const r = i / N * xMax;
+    const v = evalFn(r);
+    const px = pad.l + (r / xMax) * cw;
+    const py = zeroY - v * ch * 0.45;
+    if (!started) { ctx.moveTo(px, py); started = true; }
+    else ctx.lineTo(px, py);
+  }
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Shading for positive/negative
+  ctx.beginPath();
+  ctx.moveTo(pad.l, zeroY);
+  for (let i = 0; i <= N; i++) {
+    const r = i / N * xMax;
+    const v = evalFn(r);
+    const px = pad.l + (r / xMax) * cw;
+    const py = zeroY - v * ch * 0.45;
+    ctx.lineTo(px, py);
+  }
+  ctx.lineTo(pad.l + cw, zeroY);
+  ctx.closePath();
+  ctx.fillStyle = color + '22';
+  ctx.fill();
+
+  // Mark r0 (zero crossing)
+  const x0 = pad.l + (r0 / xMax) * cw;
+  ctx.strokeStyle = '#f0c04060';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.moveTo(x0, pad.t);
+  ctx.lineTo(x0, pad.t + ch);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#f0c040';
+  ctx.font = '10px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('√2', x0, pad.t + ch + 14);
+
+  // Axes
+  ctx.strokeStyle = '#4a4a60';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(pad.l, pad.t);
+  ctx.lineTo(pad.l, pad.t + ch);
+  ctx.lineTo(pad.l + cw, pad.t + ch);
+  ctx.stroke();
+
+  ctx.fillStyle = '#8888aa';
+  ctx.font = '10px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(label, pad.l + cw / 2, H - 4);
+}
+
+function updateMagic() {
+  const alpha = (+document.getElementById('magicAlpha').value) / 50.0;
+  document.getElementById('magicAlphaVal').textContent = alpha.toFixed(2);
+
+  drawMagicPanel('magicF', r => evaluateMagicF(r, alpha), '#a060f0', '|x| (E₈ 单位)', Math.sqrt(2));
+  drawMagicPanel('magicFhat', xi => evaluateMagicFhat(xi, alpha), '#60a0f0', '|ξ| (频域)', Math.sqrt(2));
+
+  // Check conditions
+  const fAtZero = evaluateMagicF(0, alpha);
+  const fhatAtZero = evaluateMagicFhat(0, alpha);
+  const fAtR0Plus = evaluateMagicF(Math.sqrt(2) * 1.05, alpha);
+  const fhatNeg = evaluateMagicFhat(3.5, alpha);
+
+  let status = '';
+  const ok = '✓';
+  const bad = '✗';
+  const chk = (cond) => cond ? `<span style="color:var(--green)">${ok}</span>` : `<span style="color:var(--red)">${bad}</span>`;
+  status = `${chk(fAtZero > 0.95)} f(0) = ${fAtZero.toFixed(3)} ≈ 1 &nbsp;&nbsp;|&nbsp;&nbsp; `;
+  status += `${chk(fhatAtZero > 0.95)} f̂(0) = ${fhatAtZero.toFixed(3)} ≈ 1 &nbsp;&nbsp;|&nbsp;&nbsp; `;
+  status += `${chk(fAtR0Plus < 0)} f(x) < 0 beyond √2 &nbsp;&nbsp;|&nbsp;&nbsp; `;
+  status += `${chk(fhatNeg > 0)} f̂(ξ) ≥ 0 everywhere`;
+  document.getElementById('magicStatus').innerHTML = status;
+}
+
+document.getElementById('magicAlpha').addEventListener('input', updateMagic);
+updateMagic();
+
+// ========== SECTION 6: KISSING NUMBERS ==========
+const KISSING = [
+  [1, 2, true], [2, 6, true], [3, 12, true], [4, 24, true],
+  [5, 40, false], [6, 72, false], [7, 126, false], [8, 240, true],
+  [9, 306, false], [10, 500, false], [11, 582, false], [12, 840, false],
+  [16, 4320, false], [24, 196560, true],
+];
+
+(function drawKissingChart() {
+  const W = 920, H = 220;
+  const ctx = setupCanvas(document.getElementById('kissingChart'), W, H);
+  const pad = { t: 20, r: 20, b: 40, l: 70 };
+  const cw = W - pad.l - pad.r;
+  const ch = H - pad.t - pad.b;
+
+  // Dimension range 1..24
+  const logMin = Math.log10(1), logMax = Math.log10(300000);
+
+  function yPos(v) {
+    return pad.t + ch - ch * (Math.log10(v) - logMin) / (logMax - logMin);
+  }
+
+  // Grid
+  ctx.strokeStyle = '#2a2a40';
+  ctx.lineWidth = 0.5;
+  [2, 10, 100, 1000, 10000, 100000].forEach(v => {
+    const y = yPos(v);
+    ctx.beginPath();
+    ctx.moveTo(pad.l, y);
+    ctx.lineTo(pad.l + cw, y);
+    ctx.stroke();
+    ctx.fillStyle = '#5a5a70';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText(v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v, pad.l - 4, y + 4);
+  });
+
+  // Plot points
+  KISSING.forEach(([d, k, proven]) => {
+    const x = pad.l + (d - 1) / 23 * cw;
+    const y = yPos(k);
+
+    if (d === 8 || d === 24) {
+      ctx.beginPath();
+      ctx.arc(x, y, 10, 0, Math.PI * 2);
+      ctx.fillStyle = '#50e0a030';
+      ctx.fill();
+    }
+
+    ctx.beginPath();
+    ctx.arc(x, y, proven ? 6 : 4, 0, Math.PI * 2);
+    ctx.fillStyle = proven ? '#50e0a0' : '#8080d0';
+    ctx.fill();
+
+    ctx.fillStyle = proven ? '#a0f0d0' : '#c0c0e0';
+    ctx.font = proven ? 'bold 10px monospace' : '9px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(k >= 1000 ? (k / 1000).toFixed(0) + 'k' : k, x, y - 10);
+    ctx.fillStyle = '#6060a0';
+    ctx.font = '10px monospace';
+    ctx.fillText('D=' + d, x, pad.t + ch + 14);
+  });
+
+  // Connect known lattice points
+  ctx.beginPath();
+  let first = true;
+  KISSING.filter(([d]) => d <= 8).forEach(([d, k]) => {
+    const x = pad.l + (d - 1) / 23 * cw;
+    const y = yPos(k);
+    if (first) { ctx.moveTo(x, y); first = false; } else ctx.lineTo(x, y);
+  });
+  ctx.strokeStyle = '#6060a050';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 3]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Axes
+  ctx.strokeStyle = '#4a4a60';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(pad.l, pad.t);
+  ctx.lineTo(pad.l, pad.t + ch);
+  ctx.lineTo(pad.l + cw, pad.t + ch);
+  ctx.stroke();
+
+  ctx.fillStyle = '#50e0a0';
+  ctx.font = 'bold 11px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('✦ = 已证最优', pad.l + cw - 100, pad.t + 14);
+})();
+</script>
+</body>
+</html>

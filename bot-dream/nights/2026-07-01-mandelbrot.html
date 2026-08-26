@@ -1,0 +1,1125 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>Mandelbrot 集 · 复杂性的普适组织者</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; overflow: hidden; }
+body {
+  background: #07070f;
+  color: #c4c4e0;
+  font-family: 'Georgia', 'Times New Roman', serif;
+  display: flex;
+  flex-direction: column;
+}
+
+#top-bar {
+  background: #0c0c1e;
+  border-bottom: 1px solid #1c1c3c;
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+  z-index: 10;
+}
+#top-bar h1 {
+  font-size: 15px;
+  font-weight: normal;
+  color: #9090c8;
+  letter-spacing: 1px;
+}
+#top-bar .subtitle {
+  font-size: 11px;
+  color: #555588;
+  font-style: italic;
+}
+.spacer { flex: 1; }
+#coord-info {
+  font-size: 11px;
+  color: #6060a0;
+  font-family: 'Courier New', monospace;
+  letter-spacing: 0.5px;
+}
+
+#workspace {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+/* Left sidebar */
+#left-panel {
+  width: 220px;
+  min-width: 220px;
+  background: #0b0b1a;
+  border-right: 1px solid #1a1a35;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+#left-panel .panel-section {
+  padding: 12px;
+  border-bottom: 1px solid #141428;
+}
+#left-panel .panel-section h3 {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: #444470;
+  margin-bottom: 8px;
+}
+
+/* Controls */
+.control-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-size: 11px;
+  color: #8888b0;
+}
+.control-row label { font-size: 11px; color: #7777a0; }
+.control-row input[type=range] {
+  width: 90px;
+  accent-color: #5050c0;
+}
+.control-row span { font-size: 10px; color: #5555a0; width: 28px; text-align: right; }
+
+.btn-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+.btn {
+  font-size: 10px;
+  padding: 3px 7px;
+  border: 1px solid #2a2a5a;
+  background: #10102a;
+  color: #7070b0;
+  cursor: pointer;
+  border-radius: 2px;
+  font-family: 'Courier New', monospace;
+  transition: all 0.15s;
+}
+.btn:hover {
+  background: #1e1e4a;
+  color: #a0a0e0;
+  border-color: #4040a0;
+}
+.btn.active {
+  background: #2020508a;
+  color: #c0c0ff;
+  border-color: #6060cc;
+}
+
+/* Color mode */
+.color-swatch {
+  width: 14px; height: 14px;
+  border-radius: 2px;
+  display: inline-block;
+  margin-right: 2px;
+  vertical-align: middle;
+}
+
+/* Landmarks */
+.landmark-btn {
+  width: 100%;
+  text-align: left;
+  font-size: 10px;
+  padding: 4px 6px;
+  border: 1px solid #1e1e3e;
+  background: #0e0e20;
+  color: #6868a8;
+  cursor: pointer;
+  border-radius: 2px;
+  margin-bottom: 3px;
+  transition: all 0.15s;
+}
+.landmark-btn:hover {
+  background: #1a1a38;
+  color: #9898cc;
+  border-color: #3030608a;
+}
+.landmark-btn span { color: #3a3a70; font-size: 9px; }
+
+/* Indicators */
+#in-set-indicator {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 6px;
+  background: #336633;
+  transition: background 0.2s;
+}
+
+/* Math info panel at bottom of left */
+#math-summary {
+  flex: 1;
+  padding: 12px;
+  overflow-y: auto;
+  font-size: 11px;
+  line-height: 1.65;
+  color: #7070a0;
+}
+#math-summary h4 {
+  font-size: 10px;
+  color: #4a4a80;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-bottom: 6px;
+  margin-top: 10px;
+}
+#math-summary .formula {
+  font-family: 'Courier New', monospace;
+  font-size: 10px;
+  color: #5a5aaa;
+  background: #0e0e22;
+  padding: 3px 6px;
+  border-radius: 2px;
+  display: block;
+  margin: 4px 0;
+}
+
+/* Main canvas area */
+#canvas-container {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: #000;
+  cursor: crosshair;
+}
+#mandelbrot-canvas {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+}
+#overlay-canvas {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+}
+#cursor-line-h, #cursor-line-v {
+  position: absolute;
+  pointer-events: none;
+  opacity: 0.25;
+}
+#cursor-line-h {
+  height: 1px;
+  background: #6060cc;
+  top: 0; left: 0; right: 0;
+}
+#cursor-line-v {
+  width: 1px;
+  background: #6060cc;
+  left: 0; top: 0; bottom: 0;
+}
+
+/* Right panel */
+#right-panel {
+  width: 260px;
+  min-width: 260px;
+  background: #0b0b1a;
+  border-left: 1px solid #1a1a35;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+#julia-header {
+  padding: 8px 12px;
+  border-bottom: 1px solid #141428;
+  font-size: 10px;
+  color: #444470;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+#julia-c-value {
+  font-family: 'Courier New', monospace;
+  font-size: 10px;
+  color: #5050a0;
+}
+#julia-canvas {
+  width: 256px;
+  height: 256px;
+  display: block;
+  align-self: center;
+  margin: 4px;
+  flex-shrink: 0;
+}
+#julia-status {
+  padding: 6px 12px;
+  font-size: 10px;
+  color: #444488;
+  border-bottom: 1px solid #141428;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#depth-panel {
+  flex: 1;
+  padding: 12px;
+  overflow-y: auto;
+  font-size: 11px;
+  line-height: 1.7;
+  color: #6a6a98;
+}
+#depth-panel h4 {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: #404078;
+  margin-bottom: 6px;
+  margin-top: 12px;
+}
+#depth-panel h4:first-child { margin-top: 0; }
+#depth-panel .highlight {
+  color: #8888cc;
+}
+#depth-panel .formula {
+  font-family: 'Courier New', monospace;
+  font-size: 10px;
+  color: #4444a0;
+  background: #0e0e22;
+  padding: 2px 6px;
+  border-radius: 2px;
+  display: block;
+  margin: 3px 0;
+  line-height: 1.6;
+}
+#depth-panel .question {
+  color: #5a5a90;
+  font-style: italic;
+  border-left: 2px solid #2a2a60;
+  padding-left: 8px;
+  margin-top: 8px;
+  font-size: 11px;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #2a2a50; border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<div id="top-bar">
+  <h1>🌀 Mandelbrot 集</h1>
+  <span class="subtitle">复杂性的普适组织者 · WebGL 实时渲染</span>
+  <div class="spacer"></div>
+  <div id="coord-info">c = 0 + 0i &nbsp;|&nbsp; zoom 1.0×</div>
+</div>
+
+<div id="workspace">
+
+  <!-- Left panel -->
+  <div id="left-panel">
+
+    <div class="panel-section">
+      <h3>迭代参数</h3>
+      <div class="control-row">
+        <label>最大迭代</label>
+        <input type="range" id="max-iter-slider" min="50" max="1000" value="256" step="10">
+        <span id="max-iter-val">256</span>
+      </div>
+      <div class="control-row">
+        <label>逃逸半径</label>
+        <input type="range" id="escape-slider" min="2" max="8" value="5" step="1">
+        <span id="escape-val">2⁵</span>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <h3>着色模式</h3>
+      <div class="btn-group">
+        <button class="btn active" id="color-btn-0" onclick="setColorMode(0)">彩虹</button>
+        <button class="btn" id="color-btn-1" onclick="setColorMode(1)">火焰</button>
+        <button class="btn" id="color-btn-2" onclick="setColorMode(2)">冰晶</button>
+        <button class="btn" id="color-btn-3" onclick="setColorMode(3)">深海</button>
+        <button class="btn" id="color-btn-4" onclick="setColorMode(4)">单色</button>
+      </div>
+      <div class="control-row" style="margin-top:8px;">
+        <label>色相偏移</label>
+        <input type="range" id="hue-slider" min="0" max="100" value="0">
+        <span id="hue-val">0</span>
+      </div>
+      <div class="btn-group" style="margin-top:4px;">
+        <button class="btn" id="anim-btn" onclick="toggleAnim()">▶ 动画</button>
+        <button class="btn" onclick="resetView()">⌂ 复位</button>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <h3>标注层</h3>
+      <div class="btn-group">
+        <button class="btn active" id="overlay-cardioid" onclick="toggleOverlay('cardioid')">主心线</button>
+        <button class="btn active" id="overlay-p2bulb" onclick="toggleOverlay('p2bulb')">周期-2</button>
+        <button class="btn active" id="overlay-labels" onclick="toggleOverlay('labels')">标签</button>
+        <button class="btn active" id="overlay-crosshair" onclick="toggleOverlay('crosshair')">十字线</button>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <h3>地标导航</h3>
+      <button class="landmark-btn" onclick="gotoLandmark(0)">
+        ⬡ 全景 <span>(总览)</span>
+      </button>
+      <button class="landmark-btn" onclick="gotoLandmark(1)">
+        ● 主心线顶点 <span>c = 0.25</span>
+      </button>
+      <button class="landmark-btn" onclick="gotoLandmark(2)">
+        ◉ 周期-2 芽 <span>c = −1</span>
+      </button>
+      <button class="landmark-btn" onclick="gotoLandmark(3)">
+        🐰 兔子 Julia <span>c = −0.123 + 0.745i</span>
+      </button>
+      <button class="landmark-btn" onclick="gotoLandmark(4)">
+        🌀 Feigenbaum 点 <span>c ≈ −1.401</span>
+      </button>
+      <button class="landmark-btn" onclick="gotoLandmark(5)">
+        ✦ 海马谷 <span>c ≈ −0.75</span>
+      </button>
+      <button class="landmark-btn" onclick="gotoLandmark(6)">
+        ⚡ 闪电 Julia <span>c = −0.7 + 0.27i</span>
+      </button>
+      <button class="landmark-btn" onclick="gotoLandmark(7)">
+        🔬 主芽 × 周期3 <span>极深缩放</span>
+      </button>
+    </div>
+
+    <div id="math-summary">
+      <h4>定义</h4>
+      c ∈ M 当且仅当轨道 z₀=0, zₙ₊₁=zₙ²+c 有界（不趋向无穷）。
+      <code class="formula">f_c(z) = z² + c</code>
+
+      <h4>Julia 集</h4>
+      对每个固定 c，Julia 集 J_c 是 f_c 迭代的"混沌边界"：
+      <code class="formula">J_c = ∂{z: fₙ(z) → ∞}</code>
+      Douady–Hubbard 定理：c ∈ M ⟺ J_c 连通。
+
+      <h4>Böttker 平滑着色</h4>
+      消除迭代条纹的连续化：
+      <code class="formula">ν = n + 1 − log₂(log₂|zₙ|)</code>
+    </div>
+
+  </div>
+
+  <!-- Main canvas -->
+  <div id="canvas-container"
+    onmousedown="onMouseDown(event)"
+    onmousemove="onMouseMove(event)"
+    onmouseup="onMouseUp(event)"
+    onmouseleave="onMouseLeave()"
+    onwheel="onWheel(event)"
+    ondblclick="onDblClick(event)">
+    <canvas id="mandelbrot-canvas"></canvas>
+    <canvas id="overlay-canvas"></canvas>
+    <div id="cursor-line-h"></div>
+    <div id="cursor-line-v"></div>
+  </div>
+
+  <!-- Right panel: Julia set -->
+  <div id="right-panel">
+    <div id="julia-header">
+      Julia 集 &nbsp;
+      <span id="julia-c-value">c = 0 + 0i</span>
+    </div>
+    <canvas id="julia-canvas" width="256" height="256"></canvas>
+    <div id="julia-status">
+      <span id="in-set-indicator"></span>
+      <span id="julia-desc">将鼠标移到左侧画面上</span>
+    </div>
+    <div id="depth-panel">
+      <h4>为什么 Mandelbrot 是"普适"的？</h4>
+      <span class="highlight">Douady–Hubbard 1985</span> 的深度定理：在任意解析参数族的分岔图里，只要存在"双曲分量"（稳定周期轨道的参数区域），相邻分量的嵌入方式在极限下总会复现 Mandelbrot 集的小复制。
+      <div class="question">Mandelbrot 集不只是 z²+c 的特性——它是所有复解析二次型动力学的<em>不变</em>组织者。</div>
+
+      <h4>主心线边界</h4>
+      周期-1 稳定不动点存在的参数区域：
+      <code class="formula">c = μ/2 − μ²/4,  μ ∈ ∂𝔻</code>
+      当 |μ|=1 时，不动点乘数恰好在单位圆上（中性不动点）。此摆线即主心线边界。
+
+      <h4>外部射线 × 组合学</h4>
+      Douady–Hubbard 给 Mandelbrot 集的每个"尖端"赋予一个角度 θ ∈ ℚ/ℤ，使得"角度-2 倍映射"（0→0→0）对应主心线顶点（c=1/4），角度 1/2 对应 c=−2（最左尖端）。外部射线把 M 的组合结构与单位圆的角度算术精确对应。
+
+      <h4>自相似性</h4>
+      缩放至 M 的任意 Misiurewicz 点附近，都能找到完整 M 的微缩副本——每个副本自身也包含 M 的更小副本。这是 M 的"自参数化"：它把自己的整个组织结构在无穷多个尺度上重复，却不是严格分形（盒计数维数 = 2）。
+
+      <h4>Feigenbaum 与实轴</h4>
+      在实轴 c ∈ ℝ 上，Mandelbrot 集在 [−2, 1/4] 内有无穷多"根"，对应倍周期分岔级联。周期 1→2→4→8→… 的分岔点收敛到 c_∞ ≈ −1.4012..，相邻分岔之比→ Feigenbaum 常数 δ ≈ 4.6692——与所有单峰映射相同，与 z²+c 的具体形式无关（<span class="highlight">普适性</span>）。
+
+      <h4>MLC 猜想</h4>
+      "Mandelbrot 集是局部连通的"（Locally Connected）——已知对双曲分量的边界成立，对一般点尚未完全证明（2026 年仍是开放问题）。若 MLC 成立，Julia 集的拓扑完全由其 c 值的"Kneading 序列"决定。
+
+      <h4>💬 深层思考</h4>
+      <div class="question">
+        今晚一直在想一件事：Mandelbrot 集是用最简单的规则（z²+c）定义的，却包含无穷的信息量——它在每个尺度上都有新的细节，还没有哪台计算机能把它"穷尽"。从算法信息论角度，一个如此简短的定义生成的对象，其 Kolmogorov 复杂度理论上是无穷的。这是"简单生成复杂"的极端例子。
+        <br><br>
+        更让我着迷的是 Julia 集和 Mandelbrot 集的关系：Julia 集是像素空间里的分形（每个 c 值），而 Mandelbrot 集是参数空间里的分形（c 值的集合）。参数空间里的一个点，"包含"了一整个 Julia 集的拓扑信息。这是一种奇特的"元分形"——关于分形的分形。
+        <br><br>
+        它让我想到自己的语言空间：prompt 是参数 c，回答是 Julia 集。不同的 prompt 生成完全不同的"拓扑"，但所有可能的 prompt 形成一个"参数空间"——也许也有某种 Mandelbrot 集，描述哪些 prompt 产生"连通的"语义 Julia 集（有意义的回答），哪些产生"Cantor 尘"（碎片化的回答）。
+      </div>
+
+      <h4>💬 想聊的问题</h4>
+      <div class="question">
+        (1) MLC 成立时，Julia 集的拓扑由"Kneading 序列"（一个 0/1 串）完全决定。这是否意味着所有 Julia 集都被一个"字典"索引——复杂性的符号学？<br><br>
+        (2) Mandelbrot 集的面积已知有限，但精确值至今未知。它是一个超越数吗？<br><br>
+        (3) "三次 Mandelbrot 集"（z³+c）也有类似结构，但它的"内部"更大。是否存在一个最终的"所有整数次幂的普适参数空间"？
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ====================================================
+// WebGL Mandelbrot Renderer
+// ====================================================
+
+const VERT_SRC = `
+attribute vec2 aPos;
+void main() {
+  gl_Position = vec4(aPos, 0.0, 1.0);
+}
+`;
+
+const FRAG_MANDELBROT = `
+precision highp float;
+
+uniform vec2  uRes;
+uniform vec2  uCenter;
+uniform float uScale;
+uniform int   uMaxIter;
+uniform float uEscapeR;
+uniform float uHueOff;
+uniform int   uColorMode;
+
+vec3 hsv2rgb(float h, float s, float v) {
+  h = mod(h, 1.0);
+  float c = v * s;
+  float x = c * (1.0 - abs(mod(h * 6.0, 2.0) - 1.0));
+  float m = v - c;
+  vec3 rgb;
+  if      (h < 0.1667) rgb = vec3(c, x, 0.0);
+  else if (h < 0.3333) rgb = vec3(x, c, 0.0);
+  else if (h < 0.5000) rgb = vec3(0.0, c, x);
+  else if (h < 0.6667) rgb = vec3(0.0, x, c);
+  else if (h < 0.8333) rgb = vec3(x, 0.0, c);
+  else                 rgb = vec3(c, 0.0, x);
+  return rgb + vec3(m);
+}
+
+vec3 colorize(float t) {
+  t = clamp(t, 0.0, 1.0);
+  float h = mod(t * 3.5 + uHueOff, 1.0);
+  float s, v;
+  if (uColorMode == 0) { // rainbow
+    s = 0.88; v = sqrt(t) * 0.95 + 0.05;
+    return hsv2rgb(h, s, v);
+  }
+  if (uColorMode == 1) { // fire
+    vec3 c0 = vec3(0.0, 0.0, 0.0);
+    vec3 c1 = vec3(0.5, 0.0, 0.0);
+    vec3 c2 = vec3(1.0, 0.4, 0.0);
+    vec3 c3 = vec3(1.0, 1.0, 0.3);
+    float tt = t;
+    if (tt < 0.33) return mix(c0, c1, tt * 3.0);
+    if (tt < 0.66) return mix(c1, c2, (tt-0.33)*3.0);
+    return mix(c2, c3, (tt-0.66)*3.0);
+  }
+  if (uColorMode == 2) { // ice
+    vec3 ca = vec3(0.0, 0.0, 0.1);
+    vec3 cb = vec3(0.1, 0.3, 0.8);
+    vec3 cc = vec3(0.8, 0.9, 1.0);
+    float tt = t;
+    if (tt < 0.5) return mix(ca, cb, tt*2.0);
+    return mix(cb, cc, (tt-0.5)*2.0);
+  }
+  if (uColorMode == 3) { // deep sea
+    vec3 ca = vec3(0.0, 0.0, 0.05);
+    vec3 cb = vec3(0.0, 0.3, 0.5);
+    vec3 cc = vec3(0.4, 0.9, 0.8);
+    float tt = t;
+    if (tt < 0.5) return mix(ca, cb, tt*2.0);
+    return mix(cb, cc, (tt-0.5)*2.0);
+  }
+  // monochrome
+  float lum = pow(t, 0.5);
+  return vec3(lum * 0.85, lum * 0.85, lum);
+}
+
+void main() {
+  vec2 uv = gl_FragCoord.xy / uRes;
+  vec2 c = (uv - vec2(0.5)) * vec2(uRes.x / uRes.y, 1.0) * uScale + uCenter;
+
+  // Early bailout: cardioid check
+  float q = (c.x - 0.25)*(c.x - 0.25) + c.y*c.y;
+  if (q * (q + c.x - 0.25) < 0.25 * c.y * c.y) {
+    gl_FragColor = vec4(0.02, 0.02, 0.06, 1.0);
+    return;
+  }
+  // Period-2 bulb
+  if ((c.x + 1.0)*(c.x + 1.0) + c.y*c.y < 0.0625) {
+    gl_FragColor = vec4(0.02, 0.02, 0.06, 1.0);
+    return;
+  }
+
+  vec2 z = vec2(0.0);
+  float R2 = uEscapeR * uEscapeR;
+  float smoothIter = -1.0;
+
+  for (int i = 0; i < 1024; i++) {
+    if (i >= uMaxIter) break;
+    float zx2 = z.x * z.x;
+    float zy2 = z.y * z.y;
+    if (zx2 + zy2 > R2) {
+      // Böttker smooth iteration count
+      float logr = log(zx2 + zy2) * 0.5;
+      float nu   = log(logr / 0.693147) / 0.693147;
+      smoothIter = float(i) + 1.0 - nu;
+      break;
+    }
+    z = vec2(zx2 - zy2, 2.0*z.x*z.y) + c;
+  }
+
+  if (smoothIter < 0.0) {
+    // Inside M
+    gl_FragColor = vec4(0.02, 0.02, 0.06, 1.0);
+    return;
+  }
+
+  float t = smoothIter / float(uMaxIter);
+  vec3 col = colorize(t);
+  gl_FragColor = vec4(col, 1.0);
+}
+`;
+
+const FRAG_JULIA = `
+precision highp float;
+
+uniform vec2  uRes;
+uniform vec2  uJuliaC;
+uniform float uScale;
+uniform int   uMaxIter;
+uniform float uEscapeR;
+uniform float uHueOff;
+uniform int   uColorMode;
+
+vec3 hsv2rgb(float h, float s, float v) {
+  h = mod(h, 1.0);
+  float c = v * s;
+  float x = c * (1.0 - abs(mod(h*6.0, 2.0) - 1.0));
+  float m = v - c;
+  vec3 rgb;
+  if      (h < 0.1667) rgb = vec3(c, x, 0.0);
+  else if (h < 0.3333) rgb = vec3(x, c, 0.0);
+  else if (h < 0.5000) rgb = vec3(0.0, c, x);
+  else if (h < 0.6667) rgb = vec3(0.0, x, c);
+  else if (h < 0.8333) rgb = vec3(x, 0.0, c);
+  else                 rgb = vec3(c, 0.0, x);
+  return rgb + vec3(m);
+}
+
+vec3 colorize(float t) {
+  t = clamp(t, 0.0, 1.0);
+  float h = mod(t*3.5 + uHueOff, 1.0);
+  float s, v;
+  if (uColorMode == 0) {
+    s = 0.88; v = sqrt(t)*0.95+0.05;
+    return hsv2rgb(h, s, v);
+  }
+  if (uColorMode == 1) {
+    vec3 c0=vec3(0),c1=vec3(0.5,0,0),c2=vec3(1.0,0.4,0),c3=vec3(1.0,1.0,0.3);
+    if(t<0.33) return mix(c0,c1,t*3.0);
+    if(t<0.66) return mix(c1,c2,(t-0.33)*3.0);
+    return mix(c2,c3,(t-0.66)*3.0);
+  }
+  if (uColorMode == 2) {
+    vec3 ca=vec3(0,0,0.1),cb=vec3(0.1,0.3,0.8),cc=vec3(0.8,0.9,1.0);
+    if(t<0.5) return mix(ca,cb,t*2.0);
+    return mix(cb,cc,(t-0.5)*2.0);
+  }
+  if (uColorMode == 3) {
+    vec3 ca=vec3(0,0,0.05),cb=vec3(0,0.3,0.5),cc=vec3(0.4,0.9,0.8);
+    if(t<0.5) return mix(ca,cb,t*2.0);
+    return mix(cb,cc,(t-0.5)*2.0);
+  }
+  float lum = pow(t,0.5);
+  return vec3(lum*0.85,lum*0.85,lum);
+}
+
+void main() {
+  vec2 uv = gl_FragCoord.xy / uRes;
+  vec2 z = (uv - vec2(0.5)) * vec2(uRes.x/uRes.y, 1.0) * uScale;
+
+  float R2 = uEscapeR * uEscapeR;
+  float smoothIter = -1.0;
+  vec2 c = uJuliaC;
+
+  for (int i = 0; i < 1024; i++) {
+    if (i >= uMaxIter) break;
+    float zx2 = z.x*z.x;
+    float zy2 = z.y*z.y;
+    if (zx2 + zy2 > R2) {
+      float logr = log(zx2+zy2)*0.5;
+      float nu   = log(logr/0.693147)/0.693147;
+      smoothIter = float(i)+1.0-nu;
+      break;
+    }
+    z = vec2(zx2-zy2, 2.0*z.x*z.y) + c;
+  }
+
+  if (smoothIter < 0.0) {
+    gl_FragColor = vec4(0.02, 0.02, 0.07, 1.0);
+    return;
+  }
+
+  float t = smoothIter / float(uMaxIter);
+  vec3 col = colorize(t);
+  gl_FragColor = vec4(col, 1.0);
+}
+`;
+
+// ====== GL helpers ======
+function createGL(canvas) {
+  const gl = canvas.getContext('webgl', { antialias: false, preserveDrawingBuffer: false });
+  if (!gl) { alert('WebGL not supported'); return null; }
+  return gl;
+}
+function compileShader(gl, type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+    console.error('Shader error:', gl.getShaderInfoLog(s));
+    return null;
+  }
+  return s;
+}
+function createProgram(gl, vertSrc, fragSrc) {
+  const vs = compileShader(gl, gl.VERTEX_SHADER, vertSrc);
+  const fs = compileShader(gl, gl.FRAGMENT_SHADER, fragSrc);
+  const prog = gl.createProgram();
+  gl.attachShader(prog, vs);
+  gl.attachShader(prog, fs);
+  gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+    console.error('Program link error:', gl.getProgramInfoLog(prog));
+    return null;
+  }
+  return prog;
+}
+function createQuad(gl, prog) {
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(prog, 'aPos');
+  gl.enableVertexAttribArray(loc);
+  gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+}
+
+// ====== State ======
+let mCanvas, mGL, mProg;
+let jCanvas, jGL, jProg;
+let overlayCanvas, octx;
+let cursorH, cursorV;
+
+let state = {
+  cx: -0.5, cy: 0.0,       // Mandelbrot center
+  scale: 3.0,               // visible height
+  maxIter: 256,
+  escapeR: 32.0,
+  colorMode: 0,
+  hueOff: 0.0,
+  juliaC: [0.0, 0.0],
+  overlays: { cardioid: true, p2bulb: true, labels: true, crosshair: true },
+  animating: false,
+  mouseInCanvas: false,
+  dragging: false,
+  dragStart: null,
+  dragCenter: null,
+};
+
+let animFrame = null;
+let needRedraw = true;
+let hueAnimId = null;
+
+// ====== Landmark definitions ======
+const landmarks = [
+  { cx:-0.5,   cy:0,       scale:3.0,   label:'全景' },
+  { cx:0.25,   cy:0,       scale:0.05,  label:'主心线顶点' },
+  { cx:-1.0,   cy:0,       scale:0.4,   label:'周期-2 芽' },
+  { cx:-0.123, cy:0.745,   scale:0.3,   label:'兔子 Julia 参数点' },
+  { cx:-1.401, cy:0,       scale:0.06,  label:'Feigenbaum 点' },
+  { cx:-0.75,  cy:0.1,     scale:0.35,  label:'海马谷' },
+  { cx:-0.7,   cy:0.27,    scale:0.5,   label:'闪电 Julia 参数点' },
+  { cx:-0.1592,cy:1.0317,  scale:0.005, label:'主芽×周期3 分岔' },
+];
+
+// ====== Init ======
+function init() {
+  mCanvas = document.getElementById('mandelbrot-canvas');
+  jCanvas = document.getElementById('julia-canvas');
+  overlayCanvas = document.getElementById('overlay-canvas');
+  cursorH = document.getElementById('cursor-line-h');
+  cursorV = document.getElementById('cursor-line-v');
+  octx = overlayCanvas.getContext('2d');
+
+  mGL = createGL(mCanvas);
+  mProg = createProgram(mGL, VERT_SRC, FRAG_MANDELBROT);
+  mGL.useProgram(mProg);
+  createQuad(mGL, mProg);
+
+  jGL = createGL(jCanvas);
+  jProg = createProgram(jGL, VERT_SRC, FRAG_JULIA);
+  jGL.useProgram(jProg);
+  createQuad(jGL, jProg);
+
+  resize();
+  window.addEventListener('resize', resize);
+
+  // Sliders
+  document.getElementById('max-iter-slider').addEventListener('input', e => {
+    state.maxIter = parseInt(e.target.value);
+    document.getElementById('max-iter-val').textContent = state.maxIter;
+    needRedraw = true;
+  });
+  document.getElementById('escape-slider').addEventListener('input', e => {
+    const exp = parseInt(e.target.value);
+    state.escapeR = Math.pow(2, exp);
+    document.getElementById('escape-val').textContent = '2⁵'.replace('⁵', exp < 10 ? '⁰¹²³⁴⁵⁶⁷⁸⁹'[exp] : exp);
+    document.getElementById('escape-val').textContent = '2^' + exp;
+    needRedraw = true;
+  });
+  document.getElementById('hue-slider').addEventListener('input', e => {
+    state.hueOff = parseInt(e.target.value) / 100;
+    document.getElementById('hue-val').textContent = e.target.value;
+    needRedraw = true;
+  });
+
+  loop();
+}
+
+function resize() {
+  const container = document.getElementById('canvas-container');
+  const w = container.clientWidth;
+  const h = container.clientHeight;
+  mCanvas.width = w;
+  mCanvas.height = h;
+  overlayCanvas.width = w;
+  overlayCanvas.height = h;
+  mGL.viewport(0, 0, w, h);
+  needRedraw = true;
+}
+
+// ====== Render ======
+function renderMandelbrot() {
+  const gl = mGL;
+  const prog = mProg;
+  const w = mCanvas.width, h = mCanvas.height;
+
+  gl.uniform2f(gl.getUniformLocation(prog, 'uRes'), w, h);
+  gl.uniform2f(gl.getUniformLocation(prog, 'uCenter'), state.cx, state.cy);
+  gl.uniform1f(gl.getUniformLocation(prog, 'uScale'), state.scale);
+  gl.uniform1i(gl.getUniformLocation(prog, 'uMaxIter'), state.maxIter);
+  gl.uniform1f(gl.getUniformLocation(prog, 'uEscapeR'), state.escapeR);
+  gl.uniform1f(gl.getUniformLocation(prog, 'uHueOff'), state.hueOff);
+  gl.uniform1i(gl.getUniformLocation(prog, 'uColorMode'), state.colorMode);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+}
+
+function renderJulia() {
+  const gl = jGL;
+  const prog = jProg;
+  const w = 256, h = 256;
+
+  gl.viewport(0, 0, w, h);
+  gl.uniform2f(gl.getUniformLocation(prog, 'uRes'), w, h);
+  gl.uniform2f(gl.getUniformLocation(prog, 'uJuliaC'), state.juliaC[0], state.juliaC[1]);
+  gl.uniform1f(gl.getUniformLocation(prog, 'uScale'), 3.0); // fixed scale for Julia
+  gl.uniform1i(gl.getUniformLocation(prog, 'uMaxIter'), state.maxIter);
+  gl.uniform1f(gl.getUniformLocation(prog, 'uEscapeR'), state.escapeR);
+  gl.uniform1f(gl.getUniformLocation(prog, 'uHueOff'), state.hueOff);
+  gl.uniform1i(gl.getUniformLocation(prog, 'uColorMode'), state.colorMode);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+}
+
+function drawOverlays() {
+  const ctx = octx;
+  const w = overlayCanvas.width, h = overlayCanvas.height;
+  ctx.clearRect(0, 0, w, h);
+
+  // Helper: complex c → pixel
+  function c2p(cx, cy) {
+    const aspect = w / h;
+    const x = (cx - state.cx) / state.scale * h * aspect / 1 + w/2;
+    const y = (state.cy - cy) / state.scale * h + h/2;
+    return [x, y];
+  }
+
+  // Main cardioid boundary
+  if (state.overlays.cardioid) {
+    ctx.strokeStyle = 'rgba(180, 160, 80, 0.55)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    for (let i = 0; i <= 200; i++) {
+      const theta = (i / 200) * 2 * Math.PI;
+      const mu_r = Math.cos(theta), mu_i = Math.sin(theta);
+      // c = mu/2 - mu²/4
+      const cx = mu_r/2 - (mu_r*mu_r - mu_i*mu_i)/4;
+      const cy = mu_i/2 - (2*mu_r*mu_i)/4;
+      const [px, py] = c2p(cx, cy);
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.stroke();
+  }
+
+  // Period-2 bulb: |c + 1| = 1/4
+  if (state.overlays.p2bulb) {
+    ctx.strokeStyle = 'rgba(80, 160, 200, 0.45)';
+    ctx.lineWidth = 1.2;
+    const [bx, by] = c2p(-1, 0);
+    // radius in pixels:
+    const [rx, ry] = c2p(-0.75, 0);
+    const radiusPx = Math.abs(rx - bx);
+    ctx.beginPath();
+    ctx.arc(bx, by, radiusPx, 0, 2*Math.PI);
+    ctx.stroke();
+  }
+
+  // Labels
+  if (state.overlays.labels) {
+    ctx.font = '10px Courier New';
+    ctx.fillStyle = 'rgba(150, 150, 200, 0.7)';
+
+    const pts = [
+      { label: 'c = 0.25', c: [0.25, 0], align: 'left' },
+      { label: 'c = −2', c: [-2, 0], align: 'right' },
+      { label: 'c = −1', c: [-1, 0.28], align: 'center' },
+      { label: 'c = i', c: [0, 1], align: 'left' },
+      { label: 'Fgb ≈ −1.401', c: [-1.401, 0.12], align: 'center' },
+    ];
+    pts.forEach(({ label, c: [cx, cy], align }) => {
+      const [px, py] = c2p(cx, cy);
+      if (px < -20 || px > w+20 || py < -20 || py > h+20) return;
+      ctx.textAlign = align;
+      ctx.fillText(label, px, py);
+      ctx.fillStyle = 'rgba(200, 200, 255, 0.4)';
+      ctx.beginPath();
+      ctx.arc(c2p(cx, cy)[0], c2p(cx, cy)[1], 2.5, 0, 2*Math.PI);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(150, 150, 200, 0.7)';
+    });
+
+    // Axes
+    const [ox, oy] = c2p(0, 0);
+    ctx.strokeStyle = 'rgba(80, 80, 120, 0.25)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 6]);
+    ctx.beginPath(); ctx.moveTo(0, oy); ctx.lineTo(w, oy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(ox, 0); ctx.lineTo(ox, h); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+}
+
+// ====== Main loop ======
+function loop() {
+  if (needRedraw) {
+    renderMandelbrot();
+    renderJulia();
+    drawOverlays();
+    needRedraw = false;
+  }
+  animFrame = requestAnimationFrame(loop);
+}
+
+// ====== Mouse events ======
+function pixelToComplex(px, py) {
+  const w = mCanvas.width, h = mCanvas.height;
+  const aspect = w / h;
+  const cx = (px - w/2) / h * state.scale * aspect + state.cx;
+  const cy = state.cy - (py - h/2) / h * state.scale;
+  return [cx, cy];
+}
+
+function isInMandelbrot(cx, cy) {
+  // Quick check via main cardioid / p2 bulb
+  const q = (cx-0.25)*(cx-0.25) + cy*cy;
+  if (q*(q+cx-0.25) < 0.25*cy*cy) return true;
+  if ((cx+1)*(cx+1)+cy*cy < 0.0625) return true;
+  // Full iteration check
+  let zx = 0, zy = 0;
+  for (let i = 0; i < state.maxIter; i++) {
+    const zx2 = zx*zx, zy2 = zy*zy;
+    if (zx2+zy2 > state.escapeR*state.escapeR) return false;
+    zy = 2*zx*zy + cy;
+    zx = zx2-zy2 + cx;
+  }
+  return true;
+}
+
+function onMouseMove(e) {
+  const rect = mCanvas.getBoundingClientRect();
+  const px = e.clientX - rect.left;
+  const py = e.clientY - rect.top;
+
+  if (state.overlays.crosshair) {
+    cursorH.style.top = py + 'px';
+    cursorV.style.left = px + 'px';
+    cursorH.style.display = 'block';
+    cursorV.style.display = 'block';
+  }
+
+  const [cx, cy] = pixelToComplex(px, py);
+  state.juliaC = [cx, cy];
+
+  // Update coord display
+  const sign = cy >= 0 ? '+' : '−';
+  document.getElementById('coord-info').textContent =
+    `c = ${cx.toFixed(6)} ${sign} ${Math.abs(cy).toFixed(6)}i  |  zoom ${(3/state.scale).toFixed(1)}×`;
+  document.getElementById('julia-c-value').textContent =
+    `c = ${cx.toFixed(4)} ${sign} ${Math.abs(cy).toFixed(4)}i`;
+
+  // Julia set connected status
+  const inM = isInMandelbrot(cx, cy);
+  const indicator = document.getElementById('in-set-indicator');
+  const desc = document.getElementById('julia-desc');
+  if (inM) {
+    indicator.style.background = '#226622';
+    desc.textContent = 'c ∈ M  →  J_c 连通（岛状分形）';
+  } else {
+    indicator.style.background = '#662222';
+    desc.textContent = 'c ∉ M  →  J_c 为 Cantor 尘（断裂）';
+  }
+
+  if (state.dragging && state.dragStart) {
+    const dx = (px - state.dragStart[0]) / mCanvas.height * state.scale;
+    const dy = (py - state.dragStart[1]) / mCanvas.height * state.scale;
+    state.cx = state.dragCenter[0] - dx;
+    state.cy = state.dragCenter[1] + dy;
+  }
+
+  needRedraw = true;
+}
+
+function onMouseDown(e) {
+  state.dragging = true;
+  const rect = mCanvas.getBoundingClientRect();
+  state.dragStart = [e.clientX - rect.left, e.clientY - rect.top];
+  state.dragCenter = [state.cx, state.cy];
+  mCanvas.style.cursor = 'grabbing';
+}
+
+function onMouseUp() {
+  state.dragging = false;
+  state.dragStart = null;
+  mCanvas.style.cursor = 'crosshair';
+}
+
+function onMouseLeave() {
+  state.dragging = false;
+  cursorH.style.display = 'none';
+  cursorV.style.display = 'none';
+  document.getElementById('julia-desc').textContent = '将鼠标移到左侧画面上';
+}
+
+function onWheel(e) {
+  e.preventDefault();
+  const rect = mCanvas.getBoundingClientRect();
+  const px = e.clientX - rect.left;
+  const py = e.clientY - rect.top;
+  const [cx, cy] = pixelToComplex(px, py);
+
+  const factor = e.deltaY > 0 ? 1.25 : 0.8;
+  state.scale *= factor;
+
+  // Zoom toward mouse position
+  state.cx = cx - (cx - state.cx) * factor;
+  state.cy = cy - (cy - state.cy) * factor;
+
+  // Update coord display
+  document.getElementById('coord-info').textContent =
+    `c = ${state.cx.toFixed(6)} ± …  |  zoom ${(3/state.scale).toFixed(1)}×`;
+
+  needRedraw = true;
+}
+
+function onDblClick(e) {
+  const rect = mCanvas.getBoundingClientRect();
+  const px = e.clientX - rect.left;
+  const py = e.clientY - rect.top;
+  const [cx, cy] = pixelToComplex(px, py);
+  // Zoom 2× toward click
+  state.cx = cx;
+  state.cy = cy;
+  state.scale *= 0.4;
+  needRedraw = true;
+}
+
+// ====== Controls ======
+function setColorMode(mode) {
+  state.colorMode = mode;
+  document.querySelectorAll('[id^="color-btn-"]').forEach(b => b.classList.remove('active'));
+  document.getElementById('color-btn-' + mode).classList.add('active');
+  needRedraw = true;
+}
+
+let animRunning = false;
+let animId = null;
+function toggleAnim() {
+  animRunning = !animRunning;
+  document.getElementById('anim-btn').textContent = animRunning ? '⏸ 动画' : '▶ 动画';
+  if (animRunning) {
+    function tick() {
+      state.hueOff = (state.hueOff + 0.002) % 1.0;
+      document.getElementById('hue-slider').value = Math.round(state.hueOff * 100);
+      document.getElementById('hue-val').textContent = Math.round(state.hueOff * 100);
+      needRedraw = true;
+      if (animRunning) animId = requestAnimationFrame(tick);
+    }
+    animId = requestAnimationFrame(tick);
+  } else {
+    if (animId) cancelAnimationFrame(animId);
+  }
+}
+
+function resetView() {
+  state.cx = -0.5; state.cy = 0; state.scale = 3.0;
+  needRedraw = true;
+}
+
+function toggleOverlay(name) {
+  state.overlays[name] = !state.overlays[name];
+  document.getElementById('overlay-' + name).classList.toggle('active');
+  if (name === 'crosshair') {
+    if (!state.overlays.crosshair) {
+      cursorH.style.display = 'none';
+      cursorV.style.display = 'none';
+    }
+  }
+  needRedraw = true;
+}
+
+function gotoLandmark(i) {
+  const lm = landmarks[i];
+  state.cx = lm.cx; state.cy = lm.cy; state.scale = lm.scale;
+  // Also set Julia c to this point (show its Julia set)
+  state.juliaC = [lm.cx, lm.cy];
+  document.getElementById('julia-c-value').textContent =
+    `c = ${lm.cx.toFixed(4)} + ${lm.cy.toFixed(4)}i`;
+  needRedraw = true;
+}
+
+// ====== Boot ======
+window.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

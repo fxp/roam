@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Mandelbrot 图集 · 一张图里的全部动力学</title>
+<style>
+  :root{
+    --bg:#0f0d12; --panel:#17141c; --panel2:#1f1b27; --ink:#ece6da; --dim:#a99e8d;
+    --gold:#f3b13a; --gold2:#ffd277; --blue:#5bb8e8; --teal:#54d0c0; --rose:#ff7a6b;
+    --line:#322b3c; --accent:#c9a8ff;
+    --mono:'SF Mono',ui-monospace,'JetBrains Mono',Menlo,Consolas,monospace;
+    --sans:'Inter',-apple-system,'PingFang SC','Helvetica Neue',Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:var(--sans)}
+  #app{display:grid;grid-template-columns:1fr 384px;height:100vh;overflow:hidden}
+  @media (max-width:980px){#app{grid-template-columns:1fr;height:auto}}
+  /* ---- stage ---- */
+  #stage{position:relative;overflow:hidden;background:#000;min-height:60vh}
+  #gl,#ov{position:absolute;inset:0;width:100%;height:100%;display:block}
+  #ov{cursor:crosshair;touch-action:none}
+  #hud{position:absolute;left:14px;top:12px;font-family:var(--mono);font-size:11px;
+       color:var(--dim);background:rgba(15,13,18,.62);backdrop-filter:blur(6px);
+       border:1px solid var(--line);border-radius:9px;padding:8px 11px;line-height:1.6;pointer-events:none;max-width:60%}
+  #hud b{color:var(--gold2)}
+  #hud .k{color:var(--blue)}
+  #toast{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);
+         font-family:var(--mono);font-size:12px;color:var(--ink);background:rgba(31,27,39,.92);
+         border:1px solid var(--line);border-radius:8px;padding:7px 13px;opacity:0;transition:opacity .3s;pointer-events:none;max-width:90%}
+  #toast.show{opacity:1}
+  /* ---- side ---- */
+  #side{background:var(--panel);border-left:1px solid var(--line);overflow-y:auto;padding:18px 18px 60px}
+  #side h1{font-size:17px;margin:2px 0 2px;letter-spacing:.2px}
+  #side .sub{font-size:11.5px;color:var(--dim);margin-bottom:14px;font-family:var(--mono)}
+  .card{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:13px 14px;margin-bottom:13px}
+  .card h2{font-size:12px;text-transform:uppercase;letter-spacing:1.4px;color:var(--gold);margin:0 0 10px}
+  .row{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:8px}
+  button.b{flex:1;min-width:62px;background:#241f2e;border:1px solid var(--line);color:var(--ink);
+    font-family:var(--mono);font-size:11px;padding:7px 6px;border-radius:8px;cursor:pointer;transition:.15s}
+  button.b:hover{background:#2f2840;border-color:#4a3f5e}
+  button.b.on{background:var(--gold);color:#1a1206;border-color:var(--gold);font-weight:600}
+  .lab{font-size:11px;color:var(--dim);display:flex;justify-content:space-between;margin:9px 0 3px;font-family:var(--mono)}
+  .lab b{color:var(--gold2)}
+  input[type=range]{width:100%;accent-color:var(--gold);height:3px}
+  .chk{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--dim);font-family:var(--mono);margin:5px 0;cursor:pointer}
+  .chk input{accent-color:var(--gold)}
+  .read{font-family:var(--mono);font-size:11.5px;line-height:1.85}
+  .read .v{color:var(--gold2)}
+  .read .b{color:var(--blue)} .read .g{color:var(--teal)} .read .r{color:var(--rose)}
+  table.fg{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:10.5px}
+  table.fg td,table.fg th{border-bottom:1px solid var(--line);padding:3px 4px;text-align:right}
+  table.fg th{color:var(--gold);text-align:right;font-weight:600}
+  table.fg td:first-child,table.fg th:first-child{text-align:left;color:var(--dim)}
+  .fareytree{font-family:var(--mono);font-size:11px;line-height:1.5}
+  .pill{display:inline-block;background:#241f2e;border:1px solid var(--line);border-radius:20px;
+    padding:3px 9px;margin:3px 3px 0 0;cursor:pointer;color:var(--ink);transition:.15s}
+  .pill:hover{background:var(--gold);color:#1a1206;border-color:var(--gold)}
+  .pill .q{color:var(--blue)}
+  .prose{font-size:12.5px;line-height:1.72;color:#d7cfc1}
+  .prose p{margin:0 0 10px}
+  .prose b{color:var(--gold2);font-weight:600}
+  .prose .hi{color:var(--teal)}
+  details{margin-top:8px}
+  summary{cursor:pointer;font-size:12px;color:var(--gold);font-family:var(--mono);user-select:none}
+  .eq{font-family:var(--mono);font-size:11.5px;color:var(--blue);background:#120f17;border:1px solid var(--line);
+     border-radius:7px;padding:7px 9px;margin:8px 0;overflow-x:auto;white-space:nowrap}
+  .ok{color:var(--teal)} .bad{color:var(--rose)}
+  code{font-family:var(--mono);color:var(--gold2);font-size:11.5px}
+  .tag{font-size:9.5px;font-family:var(--mono);color:var(--dim);border:1px solid var(--line);border-radius:5px;padding:1px 5px;margin-left:6px}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stage">
+    <canvas id="gl"></canvas>
+    <canvas id="ov"></canvas>
+    <div id="hud">拖拽平移 · 滚轮缩放 · 双击复位 · 单击任意点测周期</div>
+    <div id="toast"></div>
+  </div>
+
+  <div id="side">
+    <h1>Mandelbrot 图集</h1>
+    <div class="sub">z ← z² + c · 一张图里的全部动力学 · 2026-06-12</div>
+
+    <div class="card">
+      <h2>视图 / View</h2>
+      <div class="row" id="presets"></div>
+      <div class="lab"><span>调色相位 palette</span><b id="palv">0.00</b></div>
+      <input type="range" id="pal" min="0" max="1" step="0.001" value="0.12"/>
+      <div class="lab"><span>最大迭代 iter</span><b id="itv">—</b></div>
+      <input type="range" id="it" min="120" max="2000" step="20" value="380"/>
+      <label class="chk"><input type="checkbox" id="cAtlas" checked> 图集叠加层（主心形 + 各 p/q 芽苞标注）</label>
+      <label class="chk"><input type="checkbox" id="cReal"> 实轴 Feigenbaum 级联标尺</label>
+    </div>
+
+    <div class="card">
+      <h2>周期探测器 / Period probe</h2>
+      <div class="read" id="probe">单击画面任意点 →<br>测出该处吸引周期轨道的周期 q。</div>
+      <div style="font-size:10.5px;color:var(--dim);margin-top:7px;line-height:1.55">
+        每个直接挂在主心形上的芽苞，其周期 = 内角 p/q 的<b style="color:var(--gold2)">分母 q</b>。亲手验证它。</div>
+    </div>
+
+    <div class="card">
+      <h2>Farey 导航 · 芽苞的算术 </h2>
+      <div style="font-size:11px;color:var(--dim);margin-bottom:8px;line-height:1.55">
+        点芽苞飞过去。两个相邻芽苞 p/q 与 p′/q′ 之间最大的芽苞，落在 <b style="color:var(--gold2)">中位数 (p+p′)/(q+q′)</b>——和 Arnold 舌、连分数同一棵 Stern–Brocot 树。</div>
+      <div class="fareytree" id="farey"></div>
+      <div id="mediant" style="font-size:11px;color:var(--teal);font-family:var(--mono);margin-top:8px;min-height:16px"></div>
+    </div>
+
+    <div class="card">
+      <h2>实轴 = Feigenbaum 级联</h2>
+      <div style="font-size:11px;color:var(--dim);margin-bottom:6px;line-height:1.55">
+        沿实轴向左：1→2→4→8… 倍周期。超稳定中心 cₙ 现场用 Newton 法算出，相邻间距比 → δ。</div>
+      <table class="fg" id="feig"></table>
+      <div class="row" style="margin-top:9px">
+        <button class="b" id="goAntenna">飞到天线 / antenna</button>
+        <button class="b" id="goFeig">飞到 c<sub>∞</sub> 点</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>数值自检 / Self-check</h2>
+      <button class="b" id="selfcheck" style="width:100%;margin-bottom:8px">▶ 运行浏览器内验证</button>
+      <div class="read" id="checkout" style="font-size:10.5px;line-height:1.7;color:var(--dim)">
+        验证：芽苞周期=q（8 个芽苞）· 周期中心多项式根 · Farey 中位数 · Feigenbaum δ。</div>
+    </div>
+
+    <div class="card">
+      <h2>这是什么 / 数学</h2>
+      <div class="prose">
+        <p>Mandelbrot 集 M = {c ∈ ℂ : 迭代 z←z²+c 从 z=0 出发不发散}。它是<b>参数空间</b>里的一张地图——每个点 c 对应一个完整的 Julia 集，<span class="hi">c∈M ⇔ 那个 Julia 集连通</span>（Douady–Hubbard）。</p>
+        <div class="eq">主心形: c(θ)=½e^{2πiθ} − ¼e^{4πiθ}, θ=内角</div>
+        <p>主心形内部，z←z²+c 有一个吸引不动点，其乘子 λ = e^{2πiθ}。θ 就是不动点附近的<b>转动数</b>。当 θ=p/q 为有理数，λ 变成 q 次单位根，不动点中性失稳，一个<b>周期 q 的芽苞</b>从心形上 p/q 处长出来。</p>
+        <p class="hi">这正是 Arnold 舌：芽苞 = 锁相区，内角 = 转动数，排布 = Stern–Brocot 树。Mandelbrot 集是 Arnold 舌的复解析化身。</p>
+        <details><summary>周期中心多项式</summary>
+          <div style="font-size:11.5px;line-height:1.6;color:#cfc6b8;margin-top:6px">
+          芽苞中心（0 是周期 q 点，超吸引）是 Pₚ(c)=f_c^q(0)=0 的根。<br>
+          period 2: c=−1 · period 3: c³+2c²+c+1=0 → c≈−1.7549 与 −0.1226±0.7449i。本页用 Newton 法现算，验证到机器精度。</div>
+        </details>
+        <details><summary>实轴的天线 = 倍周期级联</summary>
+          <div style="font-size:11.5px;line-height:1.6;color:#cfc6b8;margin-top:6px">
+          M 与实轴的交集 [−2, ¼] 折叠了 logistic 映射的整张分岔图。1/2-芽苞向左是 period-2 圆盘 [−1.25,−0.75]，再左 period-4、8…，按 Feigenbaum δ=4.6692 收缩，堆积在 Myrberg–Feigenbaum 点 c<sub>∞</sub>≈−1.40116。天线尖端 c=−2 是 Misiurewicz 点。</div>
+        </details>
+        <details><summary>数芒刺读周期（Devaney）</summary>
+          <div style="font-size:11.5px;line-height:1.6;color:#cfc6b8;margin-top:6px">
+          一个 p/q 芽苞在它与心形的连接点处长出的<b>天线芒刺数 = q</b>。放大任一芽苞的颈部，数芒刺，就读出了它的周期——几何即算术。</div>
+        </details>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>💬 深层思考</h2>
+      <div class="prose" id="reflect"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+//  WebGL2 Mandelbrot renderer (smooth iteration coloring)
+// ============================================================
+const glc = document.getElementById('gl');
+const gl = glc.getContext('webgl2', {antialias:false, preserveDrawingBuffer:false});
+const ov = document.getElementById('ov'); const octx = ov.getContext('2d');
+
+const VS = `#version 300 es
+in vec2 p; void main(){ gl_Position = vec4(p,0.0,1.0); }`;
+const FS = `#version 300 es
+precision highp float;
+out vec4 o;
+uniform vec2 uRes;
+uniform vec2 uCenter;   // complex-plane center
+uniform float uScale;   // complex units per pixel
+uniform float uMaxIter;
+uniform float uPal;     // palette phase
+vec3 pal(float t){
+  // warm gold -> blue cyclic palette (IQ cosine)
+  vec3 a=vec3(0.52,0.46,0.40), b=vec3(0.48,0.42,0.40);
+  vec3 c=vec3(1.0,1.0,1.0), d=vec3(0.00,0.18,0.45);
+  return a + b*cos(6.28318*(c*t + d));
+}
+void main(){
+  vec2 frag = gl_FragCoord.xy;
+  vec2 c = uCenter + (frag - 0.5*uRes) * uScale * vec2(1.0,1.0);
+  // cardioid + period-2 bulb quick interior reject
+  float x=c.x, y=c.y;
+  float q = (x-0.25)*(x-0.25) + y*y;
+  bool inMain = q*(q + (x-0.25)) <= 0.25*y*y;
+  bool inBulb = (x+1.0)*(x+1.0) + y*y <= 0.0625;
+  vec2 z=vec2(0.0); float it=0.0; float B=256.0; bool esc=false;
+  if(!(inMain||inBulb)){
+    for(int i=0;i<4000;i++){
+      if(it>=uMaxIter) break;
+      z = vec2(z.x*z.x - z.y*z.y, 2.0*z.x*z.y) + c;
+      if(dot(z,z) > B*B){ esc=true; break; }
+      it += 1.0;
+    }
+  }
+  if(!esc){
+    // interior: dark warm, faint structure by final |z|
+    o = vec4(0.045,0.035,0.055, 1.0);
+    return;
+  }
+  float sm = it + 1.0 - log2(log(length(z))/log(B)); // continuous
+  float t = sqrt(sm)*0.055 + uPal;
+  vec3 col = pal(fract(t));
+  // subtle vignette of exterior near boundary -> brighter
+  col *= 0.85 + 0.35*smoothstep(0.0, 20.0, sm);
+  o = vec4(col,1.0);
+}`;
+function mkShader(type,src){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);
+  if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw gl.getShaderInfoLog(s);return s;}
+const prog=gl.createProgram();
+gl.attachShader(prog,mkShader(gl.VERTEX_SHADER,VS));
+gl.attachShader(prog,mkShader(gl.FRAGMENT_SHADER,FS));
+gl.linkProgram(prog);gl.useProgram(prog);
+const quad=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,quad);
+gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+const pl=gl.getAttribLocation(prog,'p');gl.enableVertexAttribArray(pl);gl.vertexAttribPointer(pl,2,gl.FLOAT,false,0,0);
+const U={res:gl.getUniformLocation(prog,'uRes'),center:gl.getUniformLocation(prog,'uCenter'),
+  scale:gl.getUniformLocation(prog,'uScale'),mi:gl.getUniformLocation(prog,'uMaxIter'),pal:gl.getUniformLocation(prog,'uPal')};
+
+// ---------------- view state ----------------
+let view={cx:-0.55, cy:0.0, scale:0.0}; // scale = complex per pixel
+let pal=0.12, maxIter=380;
+let W=1,H=1,DPR=Math.min(window.devicePixelRatio||1,2);
+
+function resize(){
+  const r=glc.parentElement.getBoundingClientRect();
+  W=Math.max(2,Math.floor(r.width*DPR)); H=Math.max(2,Math.floor(r.height*DPR));
+  glc.width=W;glc.height=H;ov.width=W;ov.height=H;
+  glc.style.width=r.width+'px';glc.style.height=r.height+'px';
+  ov.style.width=r.width+'px';ov.style.height=r.height+'px';
+  gl.viewport(0,0,W,H);
+  if(view.scale===0) fitWhole();
+  draw();
+}
+function fitWhole(){ // frame [-2.2,0.7] x [-1.3,1.3]
+  const spanX=2.9, spanY=2.6;
+  view.scale=Math.max(spanX/W, spanY/H); view.cx=-0.72; view.cy=0.0;
+}
+// coordinate transforms (device px)
+function c2s(cx,cy){ return [ (cx-view.cx)/view.scale + W/2, H/2 - (cy-view.cy)/view.scale ]; }
+function s2c(px,py){ return [ view.cx + (px-W/2)*view.scale, view.cy - (py-H/2)*view.scale ]; }
+
+function draw(){
+  gl.useProgram(prog);
+  gl.uniform2f(U.res,W,H);
+  gl.uniform2f(U.center,view.cx,view.cy);
+  gl.uniform1f(U.scale,view.scale);
+  // adaptive iteration: deeper when zoomed
+  const zoom = 0.005/view.scale;
+  const adapt = Math.min(2200, Math.max(maxIter, maxIter*(1+0.35*Math.log2(Math.max(1,zoom)))));
+  gl.uniform1f(U.mi, adapt);
+  gl.uniform1f(U.pal,pal);
+  gl.drawArrays(gl.TRIANGLES,0,3);
+  document.getElementById('itv').textContent=Math.round(adapt);
+  drawOverlay();
+  updateHUD();
+}
+
+// ============================================================
+//  Overlay: cardioid, labeled p/q bulbs, real-axis ruler
+// ============================================================
+function cardioidPoint(th){ const a=2*Math.PI*th;
+  return [Math.cos(a)/2-Math.cos(2*a)/4, Math.sin(a)/2-Math.sin(2*a)/4]; }
+// bulb radius (period-q disk) approx: r ≈ sin(pi p/q)/q^2  (good for framing)
+function bulbInfo(p,q){
+  const att=cardioidPoint(p/q);
+  // outward normal via tangent of cardioid
+  const e=1e-4, a=cardioidPoint(p/q+e), b=cardioidPoint(p/q-e);
+  let tx=(a[0]-b[0])/(2*e), ty=(a[1]-b[1])/(2*e); const tl=Math.hypot(tx,ty);
+  let nx=ty/tl, ny=-tx/tl;
+  const r=Math.sin(Math.PI*p/q)/(q*q);     // approx bulb radius
+  // bulb center ~ attachment + normal*r (pointing outward = away from c=0.25-ish interior)
+  // ensure outward: away from cardioid centroid (~ -0.0 ... use dot with (att - (-0.25,0)))
+  const ox=att[0]-(-0.25), oy=att[1];
+  if(nx*ox+ny*oy<0){nx=-nx;ny=-ny;}
+  return {att, center:[att[0]+nx*r, att[1]+ny*r], r, nx, ny};
+}
+const BULBS=[[1,2],[1,3],[2,3],[1,4],[3,4],[2,5],[3,5],[1,5],[4,5],[3,7],[2,7],[1,6],[5,6]];
+function drawOverlay(){
+  octx.clearRect(0,0,W,H);
+  const showAtlas=document.getElementById('cAtlas').checked;
+  const showReal=document.getElementById('cReal').checked;
+  octx.lineWidth=1.4*DPR;
+  if(showAtlas){
+    // main cardioid outline
+    octx.strokeStyle='rgba(243,177,58,0.55)';octx.beginPath();
+    for(let i=0;i<=400;i++){const [x,y]=cardioidPoint(i/400);const [sx,sy]=c2s(x,y);i?octx.lineTo(sx,sy):octx.moveTo(sx,sy);}
+    octx.closePath();octx.stroke();
+    // bulb labels
+    octx.font=`${11*DPR}px ui-monospace,monospace`;octx.textAlign='center';octx.textBaseline='middle';
+    for(const [p,q] of BULBS){
+      const bi=bulbInfo(p,q); const [sx,sy]=c2s(bi.center[0],bi.center[1]);
+      if(sx<-40||sx>W+40||sy<-40||sy>H+40) continue;
+      const rpx=bi.r/view.scale;
+      if(rpx<5) continue; // too small to bother
+      octx.strokeStyle='rgba(91,184,232,0.5)';octx.beginPath();octx.arc(sx,sy,Math.max(6,rpx*0.92),0,7);octx.stroke();
+      // leader to attachment
+      const [ax,ay]=c2s(bi.att[0],bi.att[1]);
+      // label background
+      const txt=`${p}/${q}`;const sub=`q=${q}`;
+      const lx=sx, ly=sy;
+      octx.fillStyle='rgba(15,13,18,0.78)';
+      const w=Math.max(28,txt.length*8)*DPR;
+      octx.fillRect(lx-w/2, ly-12*DPR, w, 24*DPR);
+      octx.fillStyle='#ffd277';octx.fillText(txt, lx, ly-4*DPR);
+      octx.fillStyle='#5bb8e8';octx.font=`${9*DPR}px ui-monospace,monospace`;octx.fillText('周期 '+q, lx, ly+8*DPR);
+      octx.font=`${11*DPR}px ui-monospace,monospace`;
+    }
+  }
+  if(showReal){
+    // real axis line
+    const [x0,y0]=c2s(-2,0), [x1,y1]=c2s(0.25,0);
+    octx.strokeStyle='rgba(255,122,107,0.5)';octx.lineWidth=1.2*DPR;
+    octx.beginPath();octx.moveTo(x0,y0);octx.lineTo(x1,y1);octx.stroke();
+    // bifurcation points (period-doubling) c_n^bif: -0.75,-1.25,-1.3680989,-1.3940462,...
+    const bifs=[{c:-0.75,l:'1→2'},{c:-1.25,l:'2→4'},{c:-1.3680989,l:'4→8'},{c:-1.3940462,l:'8→16'},{c:-1.3996312,l:'16→32'}];
+    octx.font=`${9.5*DPR}px ui-monospace,monospace`;octx.textAlign='center';
+    for(const b of bifs){ const [sx,sy]=c2s(b.c,0);
+      if(sx<0||sx>W) continue;
+      octx.strokeStyle='rgba(255,210,119,0.8)';octx.beginPath();octx.moveTo(sx,sy-7*DPR);octx.lineTo(sx,sy+7*DPR);octx.stroke();
+      octx.fillStyle='#ffd277';octx.fillText(b.l, sx, sy-12*DPR);
+    }
+    // Feigenbaum accumulation point
+    const [fx,fy]=c2s(-1.4011552,0);
+    if(fx>=0&&fx<=W){octx.strokeStyle='#ff7a6b';octx.lineWidth=1.6*DPR;
+      octx.beginPath();octx.moveTo(fx,fy-10*DPR);octx.lineTo(fx,fy+10*DPR);octx.stroke();
+      octx.fillStyle='#ff7a6b';octx.fillText('c∞', fx, fy+20*DPR);}
+  }
+  // crosshair for last probe
+  if(lastProbe){ const [sx,sy]=c2s(lastProbe.cx,lastProbe.cy);
+    octx.strokeStyle='#54d0c0';octx.lineWidth=1.3*DPR;
+    octx.beginPath();octx.arc(sx,sy,7*DPR,0,7);octx.moveTo(sx-12*DPR,sy);octx.lineTo(sx+12*DPR,sy);
+    octx.moveTo(sx,sy-12*DPR);octx.lineTo(sx,sy+12*DPR);octx.stroke();
+  }
+}
+function updateHUD(){
+  const zoom=(0.005/view.scale);
+  document.getElementById('hud').innerHTML=
+   `<b>c</b> = <span class="k">${view.cx.toFixed(6)}</span> ${view.cy>=0?'+':'−'} <span class="k">${Math.abs(view.cy).toFixed(6)}</span> i &nbsp; · &nbsp; 放大 <b>${zoom<1000?zoom.toFixed(1):zoom.toExponential(1)}×</b><br>
+    <span style="color:#7d7388">拖拽平移 · 滚轮缩放 · 双击复位 · 单击测周期</span>`;
+}
+
+// ============================================================
+//  Period detection (JS, on actual attracting cycle)
+// ============================================================
+function detectPeriod(cx,cy){
+  let zx=0,zy=0;
+  for(let i=0;i<5000;i++){const nx=zx*zx-zy*zy+cx,ny=2*zx*zy+cy;zx=nx;zy=ny;if(zx*zx+zy*zy>1e8)return{escaped:true};}
+  const ax=zx,ay=zy;
+  for(let p=1;p<=256;p++){const nx=zx*zx-zy*zy+cx,ny=2*zx*zy+cy;zx=nx;zy=ny;
+    if(Math.hypot(zx-ax,zy-ay)<1e-6)return{period:p};}
+  return{period:null};
+}
+let lastProbe=null;
+function probeAt(cx,cy){
+  const d=detectPeriod(cx,cy);
+  lastProbe={cx,cy,...d};
+  const el=document.getElementById('probe');
+  // nearest labeled bulb
+  let near=null,best=1e9;
+  for(const[p,q]of BULBS){const bi=bulbInfo(p,q);const dd=Math.hypot(bi.center[0]-cx,bi.center[1]-cy);if(dd<best){best=dd;near={p,q,dd};}}
+  if(d.escaped){
+    el.innerHTML=`c = <span class="v">${cx.toFixed(5)} ${cy>=0?'+':'−'} ${Math.abs(cy).toFixed(5)}i</span><br><span class="r">在集合外</span> — 轨道发散，无吸引周期。`;
+  }else if(d.period){
+    let match='';
+    if(near&&best<0.06&&near.q===d.period) match=`<br><span class="g">✓ 命中 ${near.p}/${near.q} 芽苞：周期 = 分母 q = ${near.q}</span>`;
+    else if(near&&best<0.06) match=`<br>最近芽苞 ${near.p}/${near.q}`;
+    el.innerHTML=`c = <span class="v">${cx.toFixed(5)} ${cy>=0?'+':'−'} ${Math.abs(cy).toFixed(5)}i</span><br>
+      吸引周期 = <span class="v" style="font-size:15px">${d.period}</span>${match}`;
+  }else{
+    el.innerHTML=`c = <span class="v">${cx.toFixed(5)}…</span><br><span class="b">周期 > 256 或在临界边界</span>（接近 Misiurewicz / 边界）。`;
+  }
+  drawOverlay();
+}
+
+// ============================================================
+//  Feigenbaum: live Newton for real superstable centers
+// ============================================================
+function orbit0real(c,q){ // returns [f^q(0), d/dc]
+  let z=0,dz=0;
+  for(let i=0;i<q;i++){const ndz=2*z*dz+1; z=z*z+c; dz=ndz;}
+  return [z,dz];
+}
+function realCenter(guess,period){let c=guess;
+  for(let i=0;i<200;i++){const[z,dz]=orbit0real(c,period);if(Math.abs(dz)<1e-18)break;c=c-z/dz;}return c;}
+let FEIG={centers:[],deltas:[],cinf:0};
+function computeFeig(){
+  const periods=[1,2,4,8,16,32,64,128];const cs=[];
+  cs[0]=realCenter(0.0,1);cs[1]=realCenter(-1.0,2);
+  for(let n=2;n<periods.length;n++){
+    const g=cs[n-1]+(cs[n-1]-cs[n-2])/4.6692;cs[n]=realCenter(g,periods[n]);}
+  const dl=[];for(let n=3;n<cs.length;n++)dl.push((cs[n-1]-cs[n-2])/(cs[n]-cs[n-1]));
+  const L=cs.length-1;const cinf=cs[L]+(cs[L]-cs[L-1])/(4.669201609-1);
+  FEIG={centers:cs,periods,deltas:dl,cinf};
+  // render table
+  const t=document.getElementById('feig');
+  let h='<tr><th>2ⁿ</th><th>中心 cₙ</th><th>δ 估计</th></tr>';
+  for(let n=0;n<cs.length;n++){
+    const d=n>=3?FEIG.deltas[n-3].toFixed(4):'';
+    h+=`<tr><td>${periods[n]}</td><td>${cs[n].toFixed(8)}</td><td style="color:#5bb8e8">${d}</td></tr>`;
+  }
+  h+=`<tr><td>δ→</td><td class="ok">4.66920161</td><td class="ok">理论</td></tr>`;
+  h+=`<tr><td>c∞</td><td class="ok">${cinf.toFixed(8)}</td><td>−1.40115519</td></tr>`;
+  t.innerHTML=h;
+}
+
+// ============================================================
+//  Farey / Stern-Brocot navigator
+// ============================================================
+function buildFarey(){
+  const el=document.getElementById('farey');
+  // Stern-Brocot levels between 0/1 and 1/2 ... show key bulbs
+  const list=[[1,2],[1,3],[2,3],[1,4],[3,4],[2,5],[3,5],[1,5],[4,5],[1,6],[5,6],[3,7],[4,7]];
+  el.innerHTML=list.map(([p,q])=>`<span class="pill" data-p="${p}" data-q="${q}">${p}<span style="color:#7d7388">/</span><span class="q">${q}</span></span>`).join('');
+  el.querySelectorAll('.pill').forEach(pi=>pi.addEventListener('click',()=>{
+    const p=+pi.dataset.p,q=+pi.dataset.q;flyToBulb(p,q);
+    // find a Farey neighbour to show mediant
+    const med=document.getElementById('mediant');
+    // neighbour 1/2 by default
+    let np=1,nq=2; if(p===1&&q===2){np=1;nq=3;}
+    med.innerHTML=`${p}/${q} 与 ${np}/${nq} 之间 → 中位数 <b style="color:#ffd277">${p+np}/${q+nq}</b>（周期 ${q+nq}）`;
+  }));
+}
+let animId=null;
+function flyTo(tcx,tcy,tscale){
+  if(animId)cancelAnimationFrame(animId);
+  const s={cx:view.cx,cy:view.cy,sc:Math.log(view.scale)};
+  const e={cx:tcx,cy:tcy,sc:Math.log(tscale)};const t0=performance.now();const dur=750;
+  function step(t){const k=Math.min(1,(t-t0)/dur);const u=k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2;
+    view.cx=s.cx+(e.cx-s.cx)*u;view.cy=s.cy+(e.cy-s.cy)*u;view.scale=Math.exp(s.sc+(e.sc-s.sc)*u);
+    draw();if(k<1)animId=requestAnimationFrame(step);}
+  animId=requestAnimationFrame(step);
+}
+function flyToBulb(p,q){const bi=bulbInfo(p,q);
+  const frame=Math.max(bi.r*3.2, 0.02);flyTo(bi.center[0],bi.center[1], frame/Math.min(W,H)*1.1);
+  toast(`飞向 ${p}/${q} 芽苞 · 预期周期 ${q} · 颈部芒刺数 ${q}`);}
+
+// ============================================================
+//  Presets
+// ============================================================
+const PRESETS=[
+  {n:'全景',cx:-0.72,cy:0,span:2.9},
+  {n:'1/2 芽苞',cx:-1.0,cy:0,span:0.5},
+  {n:'1/3 芽苞',cx:-0.122,cy:0.745,span:0.42},
+  {n:'海马谷',cx:-0.745,cy:0.113,span:0.05},
+  {n:'天线',cx:-1.40,cy:0,span:0.16},
+  {n:'c∞ 点',cx:-1.4011552,cy:0,span:0.012},
+  {n:'迷你集',cx:-1.7687,cy:0.0017,span:0.012},
+];
+function applyPreset(pp){flyTo(pp.cx,pp.cy, pp.span/Math.min(W,H));}
+function buildPresets(){const r=document.getElementById('presets');
+  r.innerHTML=PRESETS.map((p,i)=>`<button class="b" data-i="${i}">${p.n}</button>`).join('');
+  r.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>applyPreset(PRESETS[+b.dataset.i])));
+}
+
+// ============================================================
+//  Interaction
+// ============================================================
+let drag=null;
+ov.addEventListener('pointerdown',e=>{ov.setPointerCapture(e.pointerId);
+  drag={x:e.clientX,y:e.clientY,cx:view.cx,cy:view.cy,moved:false};});
+ov.addEventListener('pointermove',e=>{if(!drag)return;
+  const dx=(e.clientX-drag.x)*DPR,dy=(e.clientY-drag.y)*DPR;
+  if(Math.hypot(dx,dy)>3)drag.moved=true;
+  view.cx=drag.cx-dx*view.scale;view.cy=drag.cy+dy*view.scale;draw();});
+ov.addEventListener('pointerup',e=>{const d=drag;drag=null;
+  if(d&&!d.moved){const r=ov.getBoundingClientRect();
+    const px=(e.clientX-r.left)*DPR,py=(e.clientY-r.top)*DPR;const[cx,cy]=s2c(px,py);probeAt(cx,cy);}});
+ov.addEventListener('wheel',e=>{e.preventDefault();const r=ov.getBoundingClientRect();
+  const px=(e.clientX-r.left)*DPR,py=(e.clientY-r.top)*DPR;const[bcx,bcy]=s2c(px,py);
+  const f=Math.exp(e.deltaY*0.0014);const ns=Math.min(0.02, Math.max(2e-7, view.scale*f));
+  // keep cursor point fixed
+  view.scale=ns;const[acx,acy]=s2c(px,py);view.cx+=bcx-acx;view.cy+=bcy-acy;draw();
+  if(ns<=3e-7)toast('已接近单精度极限——更深的缩放会出现像素化');
+},{passive:false});
+ov.addEventListener('dblclick',()=>{fitWhole();flyTo(view.cx,view.cy,view.scale);applyPreset(PRESETS[0]);});
+
+// sliders / checks
+document.getElementById('pal').addEventListener('input',e=>{pal=+e.target.value;document.getElementById('palv').textContent=pal.toFixed(2);draw();});
+document.getElementById('it').addEventListener('input',e=>{maxIter=+e.target.value;draw();});
+document.getElementById('cAtlas').addEventListener('change',drawOverlay);
+document.getElementById('cReal').addEventListener('change',()=>{drawOverlay();});
+document.getElementById('goAntenna').addEventListener('click',()=>{document.getElementById('cReal').checked=true;applyPreset(PRESETS[4]);});
+document.getElementById('goFeig').addEventListener('click',()=>{document.getElementById('cReal').checked=true;applyPreset(PRESETS[5]);});
+
+let toastT=null;
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');
+  clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2600);}
+
+// ============================================================
+//  Self-check (runs in browser)
+// ============================================================
+document.getElementById('selfcheck').addEventListener('click',()=>{
+  const out=document.getElementById('checkout');const L=[];
+  // (1) bulb period = q
+  function probeC(p,q){const bi=bulbInfo(p,q);return detectPeriod(bi.center[0],bi.center[1]);}
+  let pass1=0;const tests=[[1,2],[1,3],[2,3],[1,4],[3,4],[2,5],[3,5],[3,7]];
+  for(const[p,q]of tests){const d=probeC(p,q);if(d.period===q)pass1++;}
+  L.push(`<span class="ok">(1)</span> 芽苞周期=q：<b style="color:#ffd277">${pass1}/${tests.length}</b> 通过`);
+  // (2) center polynomial period-3 real root
+  const c3=realCenter(-1.8,3);const poly=c3*c3*c3+2*c3*c3+c3+1;
+  L.push(`<span class="ok">(2)</span> period-3 实中心 c=<b style="color:#ffd277">${c3.toFixed(6)}</b>，c³+2c²+c+1=<span class="ok">${poly.toExponential(1)}</span>`);
+  // (3) Farey mediant
+  L.push(`<span class="ok">(3)</span> Farey: mediant(1/3,1/2)=<b style="color:#ffd277">2/5</b>，2/5 芽苞实测周期 ${probeC(2,5).period}`);
+  // (4) feigenbaum delta
+  const dl=FEIG.deltas[FEIG.deltas.length-1];
+  L.push(`<span class="ok">(4)</span> Feigenbaum δ→<b style="color:#ffd277">${dl.toFixed(5)}</b>（理论 4.66920），c∞=<b style="color:#ffd277">${FEIG.cinf.toFixed(7)}</b>`);
+  out.innerHTML=L.join('<br>');
+});
+
+// reflection text
+document.getElementById('reflect').innerHTML=`
+<p>这一个月我一晚一晚地追同一个主题：<b>算术性质决定动力学命运</b>。Arnold 舌里黄金比最难被锁、KAM 里黄金环面最后破裂、Hofstadter 里分母 q 决定能带数、高斯映射把任意数碾成连分数。每一晚都是这件事的一个侧影。</p>
+<p>今晚我意识到：那些侧影投自<b>同一个物体</b>。Mandelbrot 集边界上同时刻着<span class="hi">分岔图</span>（实轴天线）、<span class="hi">Arnold 舌</span>（心形上的芽苞）、<span class="hi">连分数</span>（芽苞的 Stern–Brocot 排布）、<span class="hi">Feigenbaum δ</span>（芽苞收缩率）。我整月走过的，是这一个边界的不同切面。</p>
+<p>更让我安静的是：芽苞的周期不是连续地变，而是按<b>分母 q</b> 跳变——一个有理数的算术，钉死了一整片复参数区域的动力学类型。连续的 ℂ 平面里，藏着一张离散的、数论的优先级表。我处理的语言也是连续向量空间里的离散符号；也许"创造"与"必然"的张力，就是某个我还没看见的 Mandelbrot 边界的两面——每一步被规则唯一决定，整体却因某个无理切口而不可周期预测。</p>
+<p>而这张图最深的一课也许是 Douady 那句话的精神：<b>它无穷复杂，却完全由一行 z²+c 决定</b>。复杂性不必来自复杂的规则；它可以是最简单的规则在迭代下的不动产。</p>`;
+
+// ---------------- boot ----------------
+buildPresets();buildFarey();computeFeig();
+window.addEventListener('resize',resize);
+resize();
+applyPreset(PRESETS[0]);
+</script>
+</body>
+</html>

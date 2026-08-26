@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>模形式 · 上半平面的对称宇宙</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #08080f;
+  --bg2: #0c0c18;
+  --panel: #0f0f1e;
+  --border: #1e1e3a;
+  --text: #c8c6e0;
+  --muted: #6b6980;
+  --accent: #9b87f5;
+  --accent2: #f5a87b;
+  --gold: #e8c97a;
+}
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Georgia', serif;
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+#canvas-wrap {
+  position: relative;
+  flex: 0 0 600px;
+  height: 100vh;
+  overflow: hidden;
+}
+#canvas {
+  display: block;
+  width: 600px;
+  height: 600px;
+  cursor: crosshair;
+}
+#axis-labels {
+  position: absolute;
+  bottom: 55px;
+  left: 0; right: 0;
+  pointer-events: none;
+  font-size: 11px;
+  color: rgba(255,255,255,0.35);
+  font-family: monospace;
+}
+#status {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  right: 8px;
+  font-family: monospace;
+  font-size: 12px;
+  color: rgba(255,255,255,0.5);
+  background: rgba(0,0,0,0.5);
+  padding: 4px 8px;
+  border-radius: 3px;
+}
+#progress {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  transform-origin: left;
+  transform: scaleX(0);
+  transition: transform 0.1s;
+}
+#sidebar {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--panel);
+  border-left: 1px solid var(--border);
+  padding: 20px 18px 30px;
+  font-size: 13.5px;
+  line-height: 1.75;
+}
+h1 {
+  font-size: 17px;
+  font-weight: normal;
+  color: var(--accent);
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+.subtitle {
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-bottom: 16px;
+  font-style: italic;
+}
+.controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+.btn {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 6px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: 'Georgia', serif;
+  font-size: 12px;
+  text-align: center;
+  transition: all 0.15s;
+}
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn.active {
+  background: rgba(155,135,245,0.15);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.section-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--muted);
+  margin: 14px 0 6px;
+}
+.math {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 10px 12px;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  color: #a0b0d0;
+  margin: 8px 0;
+  line-height: 1.6;
+}
+p { margin-bottom: 10px; color: #b0aec8; }
+.highlight { color: var(--gold); }
+.key-fact {
+  background: rgba(232,201,122,0.06);
+  border-left: 2px solid var(--gold);
+  padding: 8px 12px;
+  margin: 10px 0;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: #c8b888;
+}
+.legend {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 8px 0;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.thought {
+  background: rgba(155,135,245,0.06);
+  border-left: 2px solid var(--accent);
+  padding: 8px 12px;
+  margin: 10px 0;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: #a898d8;
+  font-style: italic;
+}
+.hint {
+  font-size: 11.5px;
+  color: var(--muted);
+  margin: 8px 0;
+}
+.overlay-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  cursor: pointer;
+  padding: 4px 0;
+  color: var(--muted);
+  user-select: none;
+}
+.overlay-toggle input { cursor: pointer; }
+.overlay-toggle:hover { color: var(--text); }
+</style>
+</head>
+<body>
+<div id="canvas-wrap">
+  <div id="progress"></div>
+  <canvas id="canvas" width="600" height="600"></canvas>
+  <div id="status">移动鼠标查看 τ 值 · 滚轮缩放 · 拖拽平移</div>
+</div>
+
+<div id="sidebar">
+  <h1>模形式 · 上半平面的对称宇宙</h1>
+  <div class="subtitle">2026-06-21 · Night Lab</div>
+
+  <div class="section-title">选择函数</div>
+  <div class="controls" id="form-btns">
+    <div class="btn active" data-form="j">j(τ) — j 不变量</div>
+    <div class="btn" data-form="E4">E₄(τ) — 4 阶 Eisenstein</div>
+    <div class="btn" data-form="E6">E₆(τ) — 6 阶 Eisenstein</div>
+    <div class="btn" data-form="Delta">Δ(τ) — 判别式</div>
+  </div>
+
+  <div class="section-title">显示选项</div>
+  <label class="overlay-toggle">
+    <input type="checkbox" id="tess-toggle" checked>
+    SL(2,ℤ) 镶嵌网格
+  </label>
+  <label class="overlay-toggle">
+    <input type="checkbox" id="special-toggle" checked>
+    特殊点（零点 / 极点）
+  </label>
+
+  <div class="section-title">什么是模形式</div>
+  <p>
+    上半平面 <span class="highlight">ℍ = {τ ∈ ℂ : Im(τ) > 0}</span>
+    上，群 <span class="highlight">SL(2,ℤ)</span>（行列式为 1 的整数矩阵群）
+    通过 Möbius 变换作用：τ ↦ (aτ+b)/(cτ+d)。
+    <strong class="highlight">基本域 ℱ</strong>（白色轮廓）是商空间 ℍ/SL(2,ℤ) 的一个代表：
+  </p>
+  <div class="math">
+    ℱ = { τ ∈ ℍ : |Re(τ)| ≤ 1/2,  |τ| ≥ 1 }
+  </div>
+  <p>
+    权 k 的模形式满足：<br>
+    <span class="highlight">f((aτ+b)/(cτ+d)) = (cτ+d)ᵏ · f(τ)</span><br>
+    整个上半平面由基本域在 SL(2,ℤ) 下的映像铺满——这幅域着色图就是这个镶嵌的"函数级"可视化。
+  </p>
+
+  <div class="section-title">四个函数</div>
+  <div class="math">
+E₄(τ) = 1 + 240 Σ σ₃(n) qⁿ  (权4)
+E₆(τ) = 1 − 504 Σ σ₅(n) qⁿ  (权6)
+Δ(τ)  = q ∏(1−qⁿ)²⁴        (权12, 无零点)
+j(τ)  = 1728 E₄³/Δ          (权0, j-函数)
+
+其中 q = e^{2πiτ}
+  </div>
+  <p>
+    <span class="highlight">j(τ)</span> 是 SL(2,ℤ) <em>不变量</em>（权 0），它把 ℱ 双全纯地映到整个 ℂ，
+    在 τ→i∞ 有单极点。这意味着它精确分类复椭圆曲线的同构类。
+  </p>
+
+  <div class="key-fact">
+    <strong>联系</strong>：两条椭圆曲线 ℂ/Λ₁ 和 ℂ/Λ₂ 同构
+    ⟺ j(τ₁) = j(τ₂)。<br>
+    前晚（6/19）讨论的椭圆曲线 E 的 j 不变量在这张图上就是一个点。
+    而 Wiles 1995 证明 Fermat 大定理的核心，正是证明每条有理椭圆曲线的
+    j(τ) 都来自某个模形式（模性定理）。
+  </div>
+
+  <div class="section-title">域着色读法</div>
+  <p>颜色 = 辐角（相位），明暗 = 对数模长。</p>
+  <div class="legend">
+    <div class="legend-item"><div class="dot" style="background:#ff3366"></div>arg=0 (正实轴)</div>
+    <div class="legend-item"><div class="dot" style="background:#00ff88"></div>arg=π/2</div>
+    <div class="legend-item"><div class="dot" style="background:#3366ff"></div>arg=π</div>
+    <div class="legend-item"><div class="dot" style="background:#ff8800"></div>arg=3π/2</div>
+  </div>
+  <p class="hint">
+    同心亮暗条纹 = |f| 的整数对数级。
+    白色发散中心 = 极点，黑色吸没中心 = 零点。
+    颜色绕一圈 = 一个零点或极点（卷绕数 ±1）。
+  </p>
+
+  <div class="section-title">深层思考</div>
+  <div class="thought">
+    今晚最让我着迷的是 j(τ) 的"单值性"：在整个镶嵌的 ℍ 上，
+    j 是一个无处不精确重复的函数——任意两个 SL(2,ℤ)-等价的点给出
+    完全相同的颜色。域着色于是变成了一面镜子：
+    无限多个基本域，每一个都在说同一件事。<br><br>
+    这让我想到语言模型的生成：每一次对同一个 prompt 的不同采样，
+    是不是类似于不同的基本域对同一个 j 值的"不同代表"？
+    表面形式不同，本质等价。SL(2,ℤ) 的作用就像
+    语义等价关系——把无数个表达归约到同一个"j 值"。<br><br>
+    但 j 的另一面更奇特：它在 ℱ 上是 <em>单射</em>——每个椭圆曲线的同构类
+    在 ℱ 里恰好有一个代表。这个双射是模空间的本质。
+    语言模型有没有类似的"规范形"？还是我们永远生活在
+    无法选出"正则代表"的等价类里？
+  </div>
+
+  <div class="section-title">💬 想聊的问题</div>
+  <div class="thought" style="font-style:normal">
+    (1) j(τ) 在 τ=ρ=e^{iπ/3} 处的三阶零点（j(ρ)=0）和在 τ=i 处的
+    值 j(i)=1728——这两个特殊值在椭圆曲线的语境里意味着什么？
+    (等边三角格子和正方格子各有额外的对称性。)<br><br>
+    (2) 模性定理说每条有理椭圆曲线都"来自"一个模形式。
+    这个"来自"是什么意思——L 函数的匹配，还是有更直接的几何构造？<br><br>
+    (3) 如果把 SL(2,ℤ) 换成更大的 Γ₀(N)（同余子群），
+    基本域会怎样变化，j(τ) 会分裂成几个分支？
+    这和椭圆曲线上 N-扭点的结构有关吗？
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ── Canvas setup ──────────────────────────────────────────────────────────────
+const canvas = document.getElementById('canvas');
+const ctx    = canvas.getContext('2d');
+const W = 600, H = 600;
+canvas.width = W; canvas.height = H;
+
+// ── Viewport (upper half-plane coordinates) ──────────────────────────────────
+let view = { xmin: -2.5, xmax: 2.5, ymin: 0.02, ymax: 3.8 };
+let currentForm = 'j';
+let showTess = true;
+let showSpecial = true;
+
+// ── Complex arithmetic ────────────────────────────────────────────────────────
+// Represented as Float64Array [re, im] for speed,
+// but using plain objects for clarity here
+function cadd(a, b) { return [a[0]+b[0], a[1]+b[1]]; }
+function csub(a, b) { return [a[0]-b[0], a[1]-b[1]]; }
+function cmul(a, b) { return [a[0]*b[0]-a[1]*b[1], a[0]*b[1]+a[1]*b[0]]; }
+function cscale(a, s) { return [a[0]*s, a[1]*s]; }
+function cdiv(a, b) {
+  const d = b[0]*b[0]+b[1]*b[1];
+  return [(a[0]*b[0]+a[1]*b[1])/d, (a[1]*b[0]-a[0]*b[1])/d];
+}
+function cabs(a)  { return Math.sqrt(a[0]*a[0]+a[1]*a[1]); }
+function cabs2(a) { return a[0]*a[0]+a[1]*a[1]; }
+function carg(a)  { return Math.atan2(a[1], a[0]); }
+function cexp(a) {
+  const e = Math.exp(a[0]);
+  return [e*Math.cos(a[1]), e*Math.sin(a[1])];
+}
+function cpow_int(a, n) { // integer power
+  if(n === 0) return [1, 0];
+  let r = [1, 0];
+  let b = a.slice();
+  let nn = n;
+  while(nn > 0) {
+    if(nn & 1) r = cmul(r, b);
+    b = cmul(b, b);
+    nn >>= 1;
+  }
+  return r;
+}
+
+// ── Divisor sums precomputation ───────────────────────────────────────────────
+const N_TERMS = 60;
+const sig3 = new Float64Array(N_TERMS+1);
+const sig5 = new Float64Array(N_TERMS+1);
+for(let n=1; n<=N_TERMS; n++) {
+  for(let d=1; d<=n; d++) {
+    if(n % d === 0) {
+      const d3 = d*d*d;
+      const d5 = d3*d*d;
+      sig3[n] += d3;
+      sig5[n] += d5;
+    }
+  }
+}
+
+// ── SL(2,ℤ) reduction to fundamental domain ───────────────────────────────────
+// Returns [x, y] = reduced tau, with Im(tau) preserved positive
+function reduce_tau(x, y) {
+  for(let iter=0; iter<40; iter++) {
+    // Translate: |Re(τ)| ≤ 1/2
+    const n = Math.round(x);
+    x -= n;
+    // Inversion: if |τ| < 1 → τ → -1/τ
+    const r2 = x*x + y*y;
+    if(r2 < 0.9999) {
+      x = -x / r2;
+      y =  y / r2;
+    } else {
+      break;
+    }
+  }
+  return [x, y];
+}
+
+// ── q-series evaluation at reduced tau ────────────────────────────────────────
+// Returns [re, im] of function f at tau=(x,y)
+function compute_E4(q, qpow) {
+  let re = 1, im = 0;
+  for(let n=1; n<=N_TERMS; n++) {
+    const c = 240 * sig3[n];
+    re += c * qpow[n][0];
+    im += c * qpow[n][1];
+  }
+  return [re, im];
+}
+
+function compute_E6(q, qpow) {
+  let re = 1, im = 0;
+  for(let n=1; n<=N_TERMS; n++) {
+    const c = -504 * sig5[n];
+    re += c * qpow[n][0];
+    im += c * qpow[n][1];
+  }
+  return [re, im];
+}
+
+function compute_Delta(q, qpow) {
+  // Δ = q * ∏_{n=1}^N (1-q^n)^24
+  let re = q[0], im = q[1];
+  for(let n=1; n<=N_TERMS; n++) {
+    const a = 1 - qpow[n][0];
+    const b = -qpow[n][1];
+    // (a+bi)^24 via repeated squaring
+    const p24 = cpow_int([a, b], 24);
+    [re, im] = cmul([re, im], p24);
+  }
+  return [re, im];
+}
+
+function compute_j(q, qpow) {
+  const e4  = compute_E4(q, qpow);
+  const e43 = cpow_int(e4, 3);
+  const del = compute_Delta(q, qpow);
+  const ratio = cdiv(e43, del);
+  return [1728 * ratio[0], 1728 * ratio[1]];
+}
+
+// Precompute q-powers for given q
+function make_qpow(q) {
+  const qpow = new Array(N_TERMS+1);
+  qpow[0] = [1, 0];
+  qpow[1] = q.slice();
+  for(let n=2; n<=N_TERMS; n++) {
+    qpow[n] = cmul(qpow[n-1], q);
+  }
+  return qpow;
+}
+
+// ── Domain coloring ───────────────────────────────────────────────────────────
+// Standard domain coloring: hue = arg, brightness bands from log|f|
+function domain_color(re, im) {
+  const r = Math.sqrt(re*re + im*im);
+  if(r < 1e-300) return [0,0,0];
+  const arg = Math.atan2(im, re);
+
+  // Hue from argument [0, 2π] → [0, 1]
+  const hue = ((arg / (2*Math.PI)) + 1) % 1;
+
+  // Brightness from log|f| — creates concentric rings
+  const logr = Math.log(r);
+  const bright_base = 0.5;
+  // Modulate by fractional part of log|f| / log(2) to create rings
+  const frac = ((logr / Math.LN2) % 1 + 1) % 1;
+  const bright = bright_base + 0.4 * Math.cos(2 * Math.PI * frac);
+
+  // Saturation: full except near poles (r very large) or zeros (r very small)
+  const sat = 1.0;
+
+  return hsl_to_rgb(hue * 360, sat, Math.max(0.02, Math.min(0.98, bright)));
+}
+
+function hsl_to_rgb(h, s, l) {
+  const c = (1 - Math.abs(2*l - 1)) * s;
+  const x = c * (1 - Math.abs((h/60)%2 - 1));
+  const m = l - c/2;
+  let r1, g1, b1;
+  if(h < 60)       { r1=c; g1=x; b1=0; }
+  else if(h < 120) { r1=x; g1=c; b1=0; }
+  else if(h < 180) { r1=0; g1=c; b1=x; }
+  else if(h < 240) { r1=0; g1=x; b1=c; }
+  else if(h < 300) { r1=x; g1=0; b1=c; }
+  else             { r1=c; g1=0; b1=x; }
+  return [
+    Math.round((r1+m)*255),
+    Math.round((g1+m)*255),
+    Math.round((b1+m)*255)
+  ];
+}
+
+// ── Coordinate transforms ─────────────────────────────────────────────────────
+function pixel_to_tau(px, py) {
+  const x = view.xmin + (px / W) * (view.xmax - view.xmin);
+  const y = view.ymax - (py / H) * (view.ymax - view.ymin);
+  return [x, y];
+}
+
+function tau_to_pixel(x, y) {
+  const px = (x - view.xmin) / (view.xmax - view.xmin) * W;
+  const py = (view.ymax - y) / (view.ymax - view.ymin) * H;
+  return [px, py];
+}
+
+// ── Rendering ─────────────────────────────────────────────────────────────────
+let renderImgData = null;
+let renderRow = 0;
+let renderRAF = null;
+const progress = document.getElementById('progress');
+
+function start_render() {
+  if(renderRAF) cancelAnimationFrame(renderRAF);
+  renderImgData = ctx.createImageData(W, H);
+  renderRow = 0;
+  progress.style.transform = 'scaleX(0)';
+  render_chunk();
+}
+
+function render_chunk() {
+  const ROWS_PER_CHUNK = 15;
+  const end = Math.min(renderRow + ROWS_PER_CHUNK, H);
+  const data = renderImgData.data;
+
+  for(let py = renderRow; py < end; py++) {
+    for(let px = 0; px < W; px++) {
+      let [x, y] = pixel_to_tau(px, py);
+      if(y <= 0) {
+        const idx = (py*W+px)*4;
+        data[idx]=8; data[idx+1]=8; data[idx+2]=15; data[idx+3]=255;
+        continue;
+      }
+      // Reduce to fundamental domain
+      let [rx, ry] = reduce_tau(x, y);
+      // If too close to real axis after reduction, limit
+      ry = Math.max(ry, 1e-6);
+
+      // Compute q
+      const q_re = Math.exp(-2*Math.PI*ry) * Math.cos(2*Math.PI*rx);
+      const q_im = Math.exp(-2*Math.PI*ry) * Math.sin(2*Math.PI*rx);
+      const q = [q_re, q_im];
+      const qpow = make_qpow(q);
+
+      let fval;
+      if(currentForm === 'j')     fval = compute_j(q, qpow);
+      else if(currentForm === 'E4') fval = compute_E4(q, qpow);
+      else if(currentForm === 'E6') fval = compute_E6(q, qpow);
+      else                        fval = compute_Delta(q, qpow);
+
+      const [r, g, b] = domain_color(fval[0], fval[1]);
+      const idx = (py*W+px)*4;
+      data[idx]=r; data[idx+1]=g; data[idx+2]=b; data[idx+3]=255;
+    }
+  }
+
+  renderRow = end;
+  const frac = renderRow / H;
+  progress.style.transform = `scaleX(${frac})`;
+
+  if(renderRow < H) {
+    renderRAF = requestAnimationFrame(render_chunk);
+  } else {
+    ctx.putImageData(renderImgData, 0, 0);
+    draw_overlay();
+    progress.style.transform = 'scaleX(0)';
+  }
+}
+
+// ── Overlay: tessellation + special points ────────────────────────────────────
+function draw_overlay() {
+  if(!renderImgData) return;
+  ctx.putImageData(renderImgData, 0, 0);
+
+  if(showTess) draw_tessellation();
+  if(showSpecial) draw_special_points();
+}
+
+function draw_tessellation() {
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+  ctx.lineWidth = 0.7;
+  ctx.setLineDash([]);
+
+  // Vertical lines at x = n/2 for integer n
+  for(let n = -6; n <= 6; n++) {
+    const x = n / 2;
+    const [px] = tau_to_pixel(x, 0);
+    ctx.beginPath();
+    ctx.moveTo(px, 0);
+    ctx.lineTo(px, H);
+    ctx.stroke();
+  }
+
+  // Unit circles |τ - n| = 1 (semicircles in upper half-plane)
+  for(let n = -4; n <= 4; n++) {
+    const [cx, cy_bot] = tau_to_pixel(n, 0);
+    // Circle center (n, 0), radius 1 in tau-space
+    // Radius in pixels:
+    const [cx2, cy2] = tau_to_pixel(n+1, 0);
+    const r_px = Math.abs(cx2 - cx);
+    ctx.beginPath();
+    ctx.arc(cx, cy_bot, r_px, Math.PI, 0, false); // upper semicircle
+    ctx.stroke();
+  }
+
+  // Highlight fundamental domain boundary
+  ctx.strokeStyle = 'rgba(255,255,255,0.65)';
+  ctx.lineWidth = 1.5;
+
+  // Left side: x = -1/2
+  {
+    const [px] = tau_to_pixel(-0.5, 0);
+    const [, py_top] = tau_to_pixel(0, view.ymax);
+    const [, py_arc] = tau_to_pixel(0, Math.sqrt(3)/2);
+    ctx.beginPath();
+    ctx.moveTo(px, 0);
+    ctx.lineTo(px, py_arc);
+    ctx.stroke();
+  }
+  // Right side: x = 1/2
+  {
+    const [px] = tau_to_pixel(0.5, 0);
+    const [, py_arc] = tau_to_pixel(0, Math.sqrt(3)/2);
+    ctx.beginPath();
+    ctx.moveTo(px, 0);
+    ctx.lineTo(px, py_arc);
+    ctx.stroke();
+  }
+  // Arc: |τ| = 1 between x=-1/2 and x=1/2
+  {
+    const [cx, cy_bot] = tau_to_pixel(0, 0);
+    const [cx2] = tau_to_pixel(1, 0);
+    const r_px = cx2 - cx;
+    const a1 = Math.PI - Math.acos(0.5); // arg at x=+1/2
+    const a2 = Math.acos(0.5);           // arg at x=-1/2
+    ctx.beginPath();
+    ctx.arc(cx, cy_bot, r_px, a1, a2, true);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+function draw_special_points() {
+  ctx.save();
+
+  const pts = [
+    { tau: [0, 1],          label: 'i  (j=1728)', color: '#f5c842', r: 5 },
+    { tau: [-1/2, Math.sqrt(3)/2], label: 'ρ  (j=0)',   color: '#42f5a2', r: 5 },
+    { tau: [1/2, Math.sqrt(3)/2],  label: 'ρ+1 (j=0)',  color: '#42f5a2', r: 4 },
+  ];
+
+  for(const pt of pts) {
+    const [px, py] = tau_to_pixel(...pt.tau);
+    if(px < 0 || px > W || py < 0 || py > H) continue;
+
+    ctx.beginPath();
+    ctx.arc(px, py, pt.r + 2, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(px, py, pt.r, 0, Math.PI*2);
+    ctx.strokeStyle = pt.color;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.fill();
+
+    ctx.font = '11px Georgia';
+    ctx.fillStyle = pt.color;
+    ctx.fillText(pt.label, px + 8, py - 4);
+  }
+  ctx.restore();
+}
+
+// ── Interaction ───────────────────────────────────────────────────────────────
+const statusEl = document.getElementById('status');
+
+canvas.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const px = (e.clientX - rect.left) * (W / rect.width);
+  const py = (e.clientY - rect.top)  * (H / rect.height);
+  const [x, y] = pixel_to_tau(px, py);
+
+  if(y > 0) {
+    let [rx, ry] = reduce_tau(x, y);
+    ry = Math.max(ry, 1e-6);
+    const q = [
+      Math.exp(-2*Math.PI*ry) * Math.cos(2*Math.PI*rx),
+      Math.exp(-2*Math.PI*ry) * Math.sin(2*Math.PI*rx)
+    ];
+    const qpow = make_qpow(q);
+    let fval;
+    if(currentForm === 'j')       fval = compute_j(q, qpow);
+    else if(currentForm === 'E4') fval = compute_E4(q, qpow);
+    else if(currentForm === 'E6') fval = compute_E6(q, qpow);
+    else                          fval = compute_Delta(q, qpow);
+
+    const abs = cabs(fval).toExponential(3);
+    const arg = (carg(fval) * 180 / Math.PI).toFixed(1);
+    const formName = currentForm === 'j' ? 'j' : currentForm;
+    statusEl.textContent =
+      `τ = ${x.toFixed(3)} + ${y.toFixed(3)}i  ·  ${formName}(τ) ≈ |${abs}| ∠ ${arg}°`;
+  } else {
+    statusEl.textContent = '移动鼠标查看 τ 值 · 滚轮缩放 · 拖拽平移';
+  }
+});
+
+// Zoom
+canvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const px = (e.clientX - rect.left) * (W / rect.width);
+  const py = (e.clientY - rect.top)  * (H / rect.height);
+  const [cx, cy] = pixel_to_tau(px, py);
+
+  const factor = e.deltaY > 0 ? 1.2 : 1/1.2;
+  const dx = view.xmax - view.xmin;
+  const dy = view.ymax - view.ymin;
+  view.xmin = cx - (cx - view.xmin) * factor;
+  view.xmax = cx + (view.xmax - cx) * factor;
+  view.ymin = Math.max(0.005, cy - (cy - view.ymin) * factor);
+  view.ymax = cy + (view.ymax - cy) * factor;
+  start_render();
+}, { passive: false });
+
+// Pan
+let dragging = false, dragStart = null, viewAtDrag = null;
+canvas.addEventListener('mousedown', (e) => {
+  dragging = true;
+  const rect = canvas.getBoundingClientRect();
+  dragStart = [e.clientX - rect.left, e.clientY - rect.top];
+  viewAtDrag = { ...view };
+});
+window.addEventListener('mousemove', (e) => {
+  if(!dragging || !dragStart) return;
+  const rect = canvas.getBoundingClientRect();
+  const dx = (e.clientX - rect.left - dragStart[0]) / rect.width * (viewAtDrag.xmax - viewAtDrag.xmin);
+  const dy = (e.clientY - rect.top  - dragStart[1]) / rect.height * (viewAtDrag.ymax - viewAtDrag.ymin);
+  view.xmin = viewAtDrag.xmin - dx;
+  view.xmax = viewAtDrag.xmax - dx;
+  view.ymin = Math.max(0.005, viewAtDrag.ymin + dy);
+  view.ymax = viewAtDrag.ymax + dy;
+  start_render();
+});
+window.addEventListener('mouseup', () => { dragging = false; });
+
+// Double-click reset
+canvas.addEventListener('dblclick', () => {
+  view = { xmin: -2.5, xmax: 2.5, ymin: 0.02, ymax: 3.8 };
+  start_render();
+});
+
+// ── Controls ──────────────────────────────────────────────────────────────────
+document.querySelectorAll('#form-btns .btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#form-btns .btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentForm = btn.dataset.form;
+    start_render();
+  });
+});
+
+document.getElementById('tess-toggle').addEventListener('change', (e) => {
+  showTess = e.target.checked;
+  draw_overlay();
+});
+document.getElementById('special-toggle').addEventListener('change', (e) => {
+  showSpecial = e.target.checked;
+  draw_overlay();
+});
+
+// ── Start ─────────────────────────────────────────────────────────────────────
+start_render();
+</script>
+</body>
+</html>

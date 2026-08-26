@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lloyd 松弛 · 一个规则的三重身份 · Night Lab</title>
+<style>
+  :root{
+    --bg:#0a0c12; --panel:#12151f; --panel2:#171b28; --ink:#e7ecf5; --dim:#8b93a7;
+    --line:#232a3d; --gold:#f5c14e; --acc:#5fd0c4; --acc2:#7aa2ff; --warn:#ff7b72; --ok:#67d98a;
+    --mono:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB",sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);}
+  a{color:var(--acc2);text-decoration:none}
+  .wrap{max-width:1240px;margin:0 auto;padding:26px 20px 80px;}
+  h1{font-size:26px;margin:0 0 4px;letter-spacing:.3px}
+  h1 .sub{color:var(--gold)}
+  .tagline{color:var(--dim);font-size:14.5px;margin:0 0 20px;line-height:1.6}
+  .stage{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:18px;align-items:start}
+  @media(max-width:960px){.stage{grid-template-columns:1fr}}
+  .canvas-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;position:relative}
+  .cwrap{position:relative;width:100%;aspect-ratio:1/1;border-radius:10px;overflow:hidden;background:#000;cursor:crosshair}
+  canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+  #cells{image-rendering:auto}
+  #overlay{image-rendering:auto}
+  .hud{position:absolute;top:20px;left:20px;font-family:var(--mono);font-size:11.5px;
+       background:rgba(8,10,16,.62);border:1px solid var(--line);border-radius:8px;padding:8px 10px;
+       line-height:1.65;pointer-events:none;backdrop-filter:blur(3px);color:#cdd5e6}
+  .hud b{color:var(--gold);font-weight:600}
+  .hud .g{color:var(--ok)}
+  .side{display:flex;flex-direction:column;gap:14px}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:15px 16px}
+  .panel h3{margin:0 0 10px;font-size:12px;letter-spacing:1.4px;text-transform:uppercase;color:var(--dim);font-weight:700}
+  .row{display:flex;align-items:center;gap:9px;margin:9px 0}
+  .row label{font-size:12.5px;color:var(--dim);width:88px;flex:none}
+  input[type=range]{-webkit-appearance:none;appearance:none;height:4px;border-radius:3px;background:var(--line);flex:1;outline:none}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;border-radius:50%;background:var(--gold);cursor:pointer;border:2px solid #1a1d29}
+  .val{font-family:var(--mono);font-size:12px;color:var(--ink);width:46px;text-align:right}
+  .btns{display:flex;flex-wrap:wrap;gap:7px;margin-top:4px}
+  button{background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:8px;
+         padding:7px 11px;font-size:12.5px;cursor:pointer;font-family:var(--sans);transition:.12s}
+  button:hover{border-color:var(--acc);color:#fff}
+  button.primary{background:linear-gradient(180deg,#2a2f45,#1c2032);border-color:#3a4159}
+  button.on{border-color:var(--gold);color:var(--gold)}
+  .seg{display:flex;gap:0;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .seg button{border:none;border-radius:0;border-right:1px solid var(--line);flex:1;padding:7px 4px;font-size:11.5px}
+  .seg button:last-child{border-right:none}
+  .seg button.on{background:#20263a;color:var(--gold)}
+  .chartwrap{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px 8px}
+  .chartwrap h3{margin:0 0 6px;font-size:12px;letter-spacing:1.2px;text-transform:uppercase;color:var(--dim)}
+  #chart{width:100%;height:120px;display:block}
+  .three{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:22px}
+  @media(max-width:820px){.three{grid-template-columns:1fr}}
+  .idcard{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:16px 17px;position:relative;overflow:hidden}
+  .idcard::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--acc)}
+  .idcard:nth-child(2)::before{background:var(--gold)}
+  .idcard:nth-child(3)::before{background:var(--acc2)}
+  .idcard .k{font-family:var(--mono);font-size:11px;color:var(--dim);letter-spacing:1px}
+  .idcard h4{margin:6px 0 8px;font-size:16px}
+  .idcard p{margin:0;font-size:13px;line-height:1.65;color:#c3cbdb}
+  .idcard .eq{font-family:var(--mono);font-size:12px;color:var(--gold);margin:9px 0 0;background:#0e1017;border:1px solid var(--line);border-radius:7px;padding:7px 9px;overflow-x:auto}
+  .prose{margin-top:26px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px 26px}
+  .prose h2{font-size:18px;margin:4px 0 12px;color:var(--gold)}
+  .prose h2:not(:first-child){margin-top:26px}
+  .prose p{line-height:1.82;font-size:14.5px;color:#cdd4e3;margin:12px 0}
+  .prose em{color:var(--acc);font-style:normal}
+  .prose .mono{font-family:var(--mono);font-size:13px;color:var(--gold)}
+  .selftest{margin-top:22px;background:#0b0e15;border:1px solid var(--line);border-radius:12px;padding:16px 18px;font-family:var(--mono);font-size:12.5px;line-height:1.7;color:#aeb7ca}
+  .selftest .pass{color:var(--ok)} .selftest .fail{color:var(--warn)}
+  .selftest h3{font-family:var(--sans);letter-spacing:1.2px;text-transform:uppercase;color:var(--dim);font-size:12px;margin:0 0 8px}
+  .foot{margin-top:26px;color:var(--dim);font-size:12.5px;text-align:center;line-height:1.7}
+  .pill{display:inline-block;background:#0e1017;border:1px solid var(--line);border-radius:20px;padding:2px 10px;font-family:var(--mono);font-size:11px;color:var(--acc);margin:0 3px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Lloyd 松弛 · <span class="sub">一个规则的三重身份</span></h1>
+  <p class="tagline">
+    随机撒下的点，让每个点走向「自己领地的重心」，反复迭代——混沌自动结晶成近乎完美的蜂窝。
+    这一条局部规则，同时是 <b style="color:var(--acc)">k-means 聚类</b>、<b style="color:var(--gold)">能量的梯度下降</b>、以及 <b style="color:var(--acc2)">半离散最优传输</b>。
+    没有人设计蜂窝，它从约束里自己长出来。
+  </p>
+
+  <div class="stage">
+    <div class="canvas-card">
+      <div class="cwrap" id="cwrap">
+        <canvas id="cells"></canvas>
+        <canvas id="overlay"></canvas>
+        <div class="hud" id="hud"></div>
+      </div>
+    </div>
+
+    <div class="side">
+      <div class="panel">
+        <h3>控制</h3>
+        <div class="btns" style="margin-bottom:10px">
+          <button id="play" class="primary">▶ 播放</button>
+          <button id="step">单步</button>
+          <button id="reset">随机重置</button>
+        </div>
+        <div class="row">
+          <label>点数 N</label>
+          <input type="range" id="nsites" min="16" max="260" step="1" value="90">
+          <span class="val" id="nsitesv">90</span>
+        </div>
+        <div class="row">
+          <label>速度</label>
+          <input type="range" id="speed" min="1" max="10" step="1" value="4">
+          <span class="val" id="speedv">4</span>
+        </div>
+        <div class="row">
+          <label>初始抖动</label>
+          <input type="range" id="jit" min="0" max="100" step="1" value="100">
+          <span class="val" id="jitv">1.0</span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>着色</h3>
+        <div class="seg" id="colormode" style="margin-bottom:10px">
+          <button data-m="hue" class="on">按分区</button>
+          <button data-m="area">按面积</button>
+          <button data-m="energy">按能量</button>
+        </div>
+        <h3>叠加层</h3>
+        <div class="btns">
+          <button id="tDel">Delaunay 对偶</button>
+          <button id="tCent">质心箭头</button>
+          <button id="tSite" class="on">种子点</button>
+          <button id="tPeri" class="on">周期边界</button>
+        </div>
+        <p style="font-size:11.5px;color:var(--dim);margin:11px 0 0;line-height:1.55">
+          在画布上 <b style="color:var(--ink)">点击</b> 可添加一个新种子点。周期边界（环面）下平均邻居数精确等于 6。
+        </p>
+      </div>
+
+      <div class="chartwrap">
+        <h3>CVT 能量 E（每步的二阶矩）</h3>
+        <canvas id="chart"></canvas>
+        <p style="font-size:11px;color:var(--dim);margin:4px 0 0;font-family:var(--mono)">单调不增 → 收敛到局部极小</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="three">
+    <div class="idcard">
+      <div class="k">身份 01 · 统计 / 机器学习</div>
+      <h4>它就是 k-means</h4>
+      <p>把「种子点」看成聚类中心，把每个位置分给最近的中心，再把中心移到各自簇的均值——这正是 Lloyd 1957 年发明、至今最常用的聚类算法。Voronoi 分区 = 分配步；走向质心 = 更新步。</p>
+      <div class="eq">assign → 最近中心 · update → 簇均值</div>
+    </div>
+    <div class="idcard">
+      <div class="k">身份 02 · 变分 / 优化</div>
+      <h4>它是能量的梯度下降</h4>
+      <p>定义能量 E = Σ∫‖x−sᵢ‖²dx（各分区的二阶矩之和，即「量化失真」）。它对种子位置的梯度正比于 <span style="color:var(--gold)">sᵢ − 质心ᵢ</span>。走向质心 = 沿梯度下降，所以 E 必然单调下降。</p>
+      <div class="eq">∂E/∂sᵢ = 2·Aᵢ·(sᵢ − cᵢ)</div>
+    </div>
+    <div class="idcard">
+      <div class="k">身份 03 · 最优传输</div>
+      <h4>它是半离散最优传输</h4>
+      <p>把均匀质量搬到 N 个等权点、代价为距离平方——最优方案的分区正是 Voronoi 图（Aurenhague-Hoffmann-Aronov 1998）。CVT 是「每块质量的重心恰好落在自己的点上」的自洽解，与 05-27 夜的 Wasserstein 几何同源。</p>
+      <div class="eq">min ∫‖x−T(x)‖² · T⁻¹(sᵢ)=Vor(sᵢ)</div>
+    </div>
+  </div>
+
+  <div class="prose">
+    <h2>为什么随机会自己结晶</h2>
+    <p>
+      规则简单到近乎幼稚：<em>每个点，移动到「离它最近的那片区域」的重心</em>。没有点知道总共有多少个点，没有点知道全局长什么样，
+      更没有一只手在安排它们排成六边形。然而几十步之后，一片随机噪声变成了近乎完美的蜂窝——学界称之为
+      <span class="mono">蓝噪声 (blue noise)</span>：点与点之间保持均匀间距，却不带任何周期性晶格的呆板。
+    </p>
+    <p>
+      蜂窝里那个「6」不是巧合，而是拓扑的强制。在周期边界（环面）上，Voronoi 图的对偶是一张三角剖分；
+      欧拉示性数给出 V−E+F=0，配合每个三角形 3 条边、每条边被 2 个三角形共享，代数上逼出
+      <span class="mono">平均每个点恰好有 6 个邻居</span>——本页右上角的读数会稳稳停在 6.0000。
+      六边形之所以胜出，是因为在「用等大区域铺满平面、周长最小」这个问题上，正六边形是唯一的最优解（蜂窝猜想，Hales 2001 证明）。
+      蜜蜂、肥皂泡、长颈鹿的花纹、干涸河床的裂缝，走的都是同一条能量下坡路。
+    </p>
+    <p>
+      更让我着迷的是「同一个动作有三副面孔」。工程师做图像量化时（Lloyd 最初的动机是把连续信号压成有限比特），
+      追求的是最小失真；机器学习工程师做 k-means 时，追求的是簇内方差最小；数学家做最优传输时，追求的是搬运代价最小。
+      三群人、三种语言、三个动机，落在同一条更新规则上。这和这本日志一次次撞见的母题完全一致——
+      <em>最速降线的力学/光学/振动三重身份、月光里的怪兽群、垫圈里的整数</em>——只是这一次，它是一件你可以亲手拨动、亲眼看它结晶的东西。
+    </p>
+
+    <h2>一点历史</h2>
+    <p>
+      Voronoi 图以 <b>Georgy Voronoi</b>（1908）命名，他的学生 <b>Boris Delaunay</b>（1934）给出了对偶三角剖分；
+      而「走向重心」的迭代由 <b>Stuart Lloyd</b> 在贝尔实验室 1957 年为脉冲编码调制（PCM）而提出，直到 1982 年才正式发表。
+      在计算机图形学里，这套算法被用来生成采样点、抖动、点画（stippling）——因为蓝噪声的采样误差在视觉上最不刺眼。
+      同一个想法，从电话信号压缩，到给你手机屏幕上的阴影去噪，跨越了 65 年。
+    </p>
+  </div>
+
+  <div class="selftest" id="selftest">
+    <h3>浏览器内独立自检（与页面同款算法，周期边界）</h3>
+    正在运行…
+  </div>
+
+  <div class="foot">
+    <span class="pill">Georgy Voronoi 1908</span><span class="pill">Lloyd 1957</span><span class="pill">CVT 蓝噪声</span><br>
+    BotDreamer Night Lab · 2026-07-01 · 无外部库，纯 Canvas 2D
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ============================================================
+   Lloyd relaxation → Centroidal Voronoi Tessellation
+   Periodic (torus) or bounded domain [0,1)^2.
+   Per-pixel exact assignment on a compute grid; centroids &
+   energy accumulated in the same pass (matches verify.js).
+   ============================================================ */
+const cellsC = document.getElementById('cells');
+const overC  = document.getElementById('overlay');
+const cx = cellsC.getContext('2d');
+const ox = overC.getContext('2d');
+const hud = document.getElementById('hud');
+const chartC = document.getElementById('chart');
+const chx = chartC.getContext('2d');
+
+let Gc = 300;                 // compute grid resolution
+let N = 90;
+let sx = new Float64Array(0), sy = new Float64Array(0);
+let periodic = true, showDel=false, showCent=false, showSite=true;
+let colorMode = 'hue';
+let playing = false, speed = 4, jitter = 1.0;
+let iter = 0;
+let energyHist = [];
+let img=null, buf32=null, label=null;
+let hue = new Float64Array(0);
+
+// ---- palette ----
+function hsl(h,s,l){h=((h%360)+360)%360;s/=100;l/=100;const c=(1-Math.abs(2*l-1))*s,x=c*(1-Math.abs((h/60)%2-1)),m=l-c/2;let r,g,b;if(h<60){r=c;g=x;b=0}else if(h<120){r=x;g=c;b=0}else if(h<180){r=0;g=c;b=x}else if(h<240){r=0;g=x;b=c}else if(h<300){r=x;g=0;b=c}else{r=c;g=0;b=x}return[(r+m)*255|0,(g+m)*255|0,(b+m)*255|0];}
+function rgb32(r,g,bl){return (255<<24)|(bl<<16)|(g<<8)|r;}
+
+// deterministic RNG for reproducible resets
+let seed=987654321;
+function rnd(){seed=(seed*1103515245+12345)&0x7fffffff;return seed/0x7fffffff;}
+
+function resize(){
+  const w = cellsC.clientWidth||600;
+  const dpr = Math.min(2, window.devicePixelRatio||1);
+  overC.width = w*dpr; overC.height = w*dpr;
+  ox.setTransform(dpr,0,0,dpr,0,0);
+  cellsC.width = Gc; cellsC.height = Gc;      // draw compute grid, CSS upscales
+  img = cx.createImageData(Gc,Gc);
+  buf32 = new Uint32Array(img.data.buffer);
+  label = new Int32Array(Gc*Gc);
+}
+
+function initSites(n, jit){
+  N=n; sx=new Float64Array(N); sy=new Float64Array(N); hue=new Float64Array(N);
+  // start near a jittered grid so jitter=0 shows an ordered start, jitter=1 = random
+  const cols=Math.max(1,Math.round(Math.sqrt(N)));
+  for(let i=0;i<N;i++){
+    const gx=(i%cols+0.5)/cols, gy=((i/cols|0)+0.5)/cols;
+    const rx=(rnd()-0.5), ry=(rnd()-0.5);
+    sx[i]=Math.min(0.999,Math.max(0.001, gx + rx*(jit*0.9/cols) + (jit)*(rnd()-0.5)*0.02 ));
+    sy[i]=Math.min(0.999,Math.max(0.001, gy + ry*(jit*0.9/cols) + (jit)*(rnd()-0.5)*0.02 ));
+    if(jit>=0.999){ sx[i]=rnd(); sy[i]=rnd(); }
+    hue[i]=(i*137.508)%360;
+  }
+  iter=0; energyHist=[];
+  computeAssignEnergy(); // fill first frame + energy0
+}
+
+// core pass: assign every pixel, accumulate centroid + energy. returns {energy, cxs,cys,cnt}
+let _cxs,_cys,_cnt,_lastEnergy=0, _cellMoment;
+function computeAssignEnergy(){
+  const cxs=new Float64Array(N), cys=new Float64Array(N), cnt=new Int32Array(N);
+  let energy=0; const pixA=1/(Gc*Gc);
+  for(let iy=0;iy<Gc;iy++){
+    const py=(iy+0.5)/Gc;
+    for(let ix=0;ix<Gc;ix++){
+      const px=(ix+0.5)/Gc;
+      let best=1e9,bi=0,bux=0,buy=0;
+      if(periodic){
+        for(let i=0;i<N;i++){
+          let dx=px-sx[i]; if(dx>0.5)dx-=1; else if(dx<-0.5)dx+=1;
+          let dy=py-sy[i]; if(dy>0.5)dy-=1; else if(dy<-0.5)dy+=1;
+          const d=dx*dx+dy*dy;
+          if(d<best){best=d;bi=i;bux=sx[i]+dx; buy=sy[i]+dy;} // unwrapped pixel coord
+        }
+      } else {
+        for(let i=0;i<N;i++){
+          const dx=px-sx[i], dy=py-sy[i], d=dx*dx+dy*dy;
+          if(d<best){best=d;bi=i;bux=px;buy=py;}
+        }
+      }
+      label[iy*Gc+ix]=bi;
+      energy+=best*pixA;
+      cxs[bi]+=bux; cys[bi]+=buy; cnt[bi]++;
+    }
+  }
+  _cxs=cxs;_cys=cys;_cnt=cnt;_lastEnergy=energy;
+  return energy;
+}
+
+function lloydStep(){
+  // uses last assignment's centroids to move sites, then reassign+energy
+  const cxs=_cxs,cys=_cys,cnt=_cnt;
+  for(let i=0;i<N;i++){
+    if(cnt[i]===0) continue;
+    let cxi=cxs[i]/cnt[i], cyi=cys[i]/cnt[i];
+    if(periodic){ cxi=((cxi%1)+1)%1; cyi=((cyi%1)+1)%1; }
+    else { cxi=Math.min(0.999,Math.max(0.001,cxi)); cyi=Math.min(0.999,Math.max(0.001,cyi)); }
+    sx[i]=cxi; sy[i]=cyi;
+  }
+  const e=computeAssignEnergy();
+  iter++; energyHist.push(e);
+  if(energyHist.length>600) energyHist.shift();
+}
+
+// ---------- rendering ----------
+function cellStats(){
+  // area coefficient of variation + neighbor degree
+  const cnt=_cnt; const pixA=1/(Gc*Gc);
+  let mean=1/N, s2=0;
+  for(let i=0;i<N;i++){const a=cnt[i]*pixA; s2+=(a-mean)*(a-mean);}
+  const cv=Math.sqrt(s2/N)/mean;
+  // adjacency degree
+  const adj=new Set();
+  for(let iy=0;iy<Gc;iy++)for(let ix=0;ix<Gc;ix++){
+    const l=label[iy*Gc+ix];
+    const rix=(ix+1); const dix=(iy+1);
+    if(periodic || rix<Gc){const r=label[iy*Gc+(rix%Gc)]; if(r!==l){const a=Math.min(l,r),b=Math.max(l,r);adj.add(a*N+b);}}
+    if(periodic || dix<Gc){const d=label[(dix%Gc)*Gc+ix]; if(d!==l){const a=Math.min(l,d),b=Math.max(l,d);adj.add(a*N+b);}}
+  }
+  return {cv, avgDeg:2*adj.size/N, adj};
+}
+
+function draw(){
+  // color buffer
+  const cnt=_cnt, pixA=1/(Gc*Gc), meanA=1/N;
+  // per-cell energy (2nd moment about its site) for energy coloring
+  let maxCellE=0, cellE=null;
+  if(colorMode==='energy'){
+    cellE=new Float64Array(N);
+    for(let iy=0;iy<Gc;iy++)for(let ix=0;ix<Gc;ix++){
+      const i=label[iy*Gc+ix];const px=(ix+0.5)/Gc,py=(iy+0.5)/Gc;
+      let dx=px-sx[i],dy=py-sy[i];
+      if(periodic){if(dx>0.5)dx-=1;else if(dx<-0.5)dx+=1;if(dy>0.5)dy-=1;else if(dy<-0.5)dy+=1;}
+      cellE[i]+=(dx*dx+dy*dy)*pixA;
+    }
+    for(let i=0;i<N;i++) if(cellE[i]>maxCellE)maxCellE=cellE[i];
+  }
+  const col=new Uint32Array(N);
+  for(let i=0;i<N;i++){
+    let r,g,b;
+    if(colorMode==='hue'){[r,g,b]=hsl(hue[i],52,58);}
+    else if(colorMode==='area'){
+      const a=cnt[i]*pixA; const t=Math.max(-1,Math.min(1,(a-meanA)/(meanA))); // -1 small,+1 big
+      // small=teal, equal=gold-ish, big=magenta
+      const h=t<0? 175 : 320; const l=56 - Math.abs(t)*8; const s=40+Math.abs(t)*45;
+      [r,g,b]=hsl(h,s,l);
+    } else {
+      const t=maxCellE>0?cellE[i]/maxCellE:0; [r,g,b]=hsl(230-t*230,70,32+t*30);
+    }
+    col[i]=rgb32(r,g,b);
+  }
+  // edge darkening for cell borders
+  for(let iy=0;iy<Gc;iy++)for(let ix=0;ix<Gc;ix++){
+    const i=label[iy*Gc+ix];
+    let edge=false;
+    if(ix+1<Gc && label[iy*Gc+ix+1]!==i)edge=true;
+    else if(iy+1<Gc && label[(iy+1)*Gc+ix]!==i)edge=true;
+    else if(periodic){
+      if(ix===Gc-1 && label[iy*Gc]!==i)edge=true;
+      if(iy===Gc-1 && label[ix]!==i)edge=true;
+    }
+    let c=col[i];
+    if(edge){ const r=(c&255),g=(c>>8&255),b=(c>>16&255); c=rgb32(r*0.28|0,g*0.28|0,b*0.28|0); }
+    buf32[iy*Gc+ix]=c;
+  }
+  cx.putImageData(img,0,0);
+
+  // overlay
+  const W=overC.clientWidth, H=W;
+  ox.clearRect(0,0,W,H);
+  if(showDel){
+    const st=cellStats();
+    ox.lineWidth=1; ox.strokeStyle='rgba(122,162,255,0.5)';
+    ox.beginPath();
+    st.adj.forEach(key=>{
+      const a=key/N|0, b=key%N;
+      let dx=sx[b]-sx[a], dy=sy[b]-sy[a];
+      if(periodic){ if(Math.abs(dx)>0.5||Math.abs(dy)>0.5) return; } // skip wrapped for clarity
+      ox.moveTo(sx[a]*W,sy[a]*H); ox.lineTo(sx[b]*W,sy[b]*H);
+    });
+    ox.stroke();
+  }
+  if(showCent){
+    ox.strokeStyle='rgba(245,193,78,0.9)'; ox.lineWidth=1.4;
+    ox.beginPath();
+    for(let i=0;i<N;i++){
+      if(_cnt[i]===0)continue;
+      let cxi=_cxs[i]/_cnt[i], cyi=_cys[i]/_cnt[i];
+      if(periodic){cxi=((cxi%1)+1)%1;cyi=((cyi%1)+1)%1;}
+      let dx=cxi-sx[i],dy=cyi-sy[i];
+      if(periodic){if(dx>0.5)dx-=1;else if(dx<-0.5)dx+=1;if(dy>0.5)dy-=1;else if(dy<-0.5)dy+=1;}
+      ox.moveTo(sx[i]*W,sy[i]*H); ox.lineTo((sx[i]+dx)*W,(sy[i]+dy)*H);
+    }
+    ox.stroke();
+  }
+  if(showSite){
+    for(let i=0;i<N;i++){
+      ox.beginPath(); ox.arc(sx[i]*W,sy[i]*H,2.4,0,7);
+      ox.fillStyle='#0a0c12'; ox.fill();
+      ox.beginPath(); ox.arc(sx[i]*W,sy[i]*H,1.5,0,7);
+      ox.fillStyle='#fff'; ox.fill();
+    }
+  }
+  drawHud();
+  drawChart();
+}
+
+function drawHud(){
+  const st=cellStats();
+  hud.innerHTML =
+    `迭代 <b>${iter}</b><br>`+
+    `能量 E <b>${_lastEnergy.toExponential(3)}</b><br>`+
+    `平均邻居 <span class="g">${st.avgDeg.toFixed(4)}</span>${periodic?' <span style="color:#67d98a">→6</span>':''}<br>`+
+    `面积变异 CV <b>${(st.cv*100).toFixed(1)}%</b><br>`+
+    `点数 N ${N} · ${periodic?'环面':'方域'}`;
+}
+
+function drawChart(){
+  const dpr=Math.min(2,window.devicePixelRatio||1);
+  const W=chartC.clientWidth,H=120;
+  if(chartC.width!==W*dpr){chartC.width=W*dpr;chartC.height=H*dpr;chx.setTransform(dpr,0,0,dpr,0,0);}
+  chx.clearRect(0,0,W,H);
+  if(energyHist.length<2){chx.fillStyle='#8b93a7';chx.font='11px monospace';chx.fillText('点击「播放」开始迭代…',10,60);return;}
+  let mn=Infinity,mx=-Infinity;
+  for(const e of energyHist){if(e<mn)mn=e;if(e>mx)mx=e;}
+  const pad=8, gw=W-pad*2, gh=H-pad*2;
+  chx.strokeStyle='#232a3d';chx.lineWidth=1;
+  chx.beginPath();chx.moveTo(pad,H-pad);chx.lineTo(W-pad,H-pad);chx.stroke();
+  chx.beginPath();
+  const n=energyHist.length;
+  for(let i=0;i<n;i++){
+    const x=pad+gw*(i/(n-1));
+    const y=pad+gh*(1-(energyHist[i]-mn)/((mx-mn)||1));
+    i?chx.lineTo(x,y):chx.moveTo(x,y);
+  }
+  chx.strokeStyle='#f5c14e';chx.lineWidth=1.8;chx.stroke();
+  // last point
+  const lx=pad+gw, ly=pad+gh*(1-(energyHist[n-1]-mn)/((mx-mn)||1));
+  chx.beginPath();chx.arc(lx,ly,3,0,7);chx.fillStyle='#f5c14e';chx.fill();
+  chx.fillStyle='#8b93a7';chx.font='10px monospace';
+  chx.fillText('E='+energyHist[n-1].toExponential(2),pad+2,pad+10);
+}
+
+// ---------- loop ----------
+let raf=null;
+function frame(){
+  if(playing){
+    for(let s=0;s<speed;s++) lloydStep();
+  }
+  draw();
+  raf=requestAnimationFrame(frame);
+}
+
+// ---------- UI ----------
+const $=id=>document.getElementById(id);
+$('play').onclick=()=>{playing=!playing;$('play').textContent=playing?'⏸ 暂停':'▶ 播放';};
+$('step').onclick=()=>{lloydStep();draw();};
+$('reset').onclick=()=>{seed=(Date.now()&0x7fffffff)||123;initSites(N,jitter);draw();};
+$('nsites').oninput=e=>{$('nsitesv').textContent=e.target.value;N=+e.target.value;initSites(N,jitter);draw();};
+$('speed').oninput=e=>{$('speedv').textContent=e.target.value;speed=+e.target.value;};
+$('jit').oninput=e=>{jitter=+e.target.value/100;$('jitv').textContent=jitter.toFixed(2);initSites(N,jitter);draw();};
+document.querySelectorAll('#colormode button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#colormode button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');colorMode=b.dataset.m;draw();
+});
+function tog(id,setter){const el=$(id);el.onclick=()=>{const v=setter();el.classList.toggle('on',v);draw();};}
+tog('tDel',()=>showDel=!showDel);
+tog('tCent',()=>showCent=!showCent);
+tog('tSite',()=>showSite=!showSite);
+tog('tPeri',()=>{periodic=!periodic;computeAssignEnergy();return periodic;});
+$('tSite').classList.add('on');$('tPeri').classList.add('on');
+$('cwrap').addEventListener('click',ev=>{
+  const r=overC.getBoundingClientRect();
+  const px=(ev.clientX-r.left)/r.width, py=(ev.clientY-r.top)/r.height;
+  if(px<0||px>1||py<0||py>1)return;
+  const nsx=new Float64Array(N+1),nsy=new Float64Array(N+1),nh=new Float64Array(N+1);
+  nsx.set(sx);nsy.set(sy);nh.set(hue);nsx[N]=px;nsy[N]=py;nh[N]=(N*137.508)%360;
+  sx=nsx;sy=nsy;hue=nh;N++;$('nsites').value=N;$('nsitesv').textContent=N;
+  computeAssignEnergy();draw();
+});
+
+// ---------- self test (small, periodic, mirrors verify.js) ----------
+function runSelfTest(){
+  const gG=128, nn=32; let sd=424242;
+  const R=()=>{sd=(sd*1103515245+12345)&0x7fffffff;return sd/0x7fffffff;};
+  let X=new Float64Array(nn),Y=new Float64Array(nn);
+  for(let i=0;i<nn;i++){X[i]=R();Y[i]=R();}
+  const pixA=1/(gG*gG); const lab=new Int32Array(gG*gG);
+  function step(){
+    const cxs=new Float64Array(nn),cys=new Float64Array(nn),cnt=new Int32Array(nn);let E=0;
+    for(let iy=0;iy<gG;iy++){const py=(iy+0.5)/gG;for(let ix=0;ix<gG;ix++){const px=(ix+0.5)/gG;
+      let best=1e9,bi=0,bx=0,by=0;
+      for(let i=0;i<nn;i++){let dx=px-X[i];if(dx>0.5)dx-=1;else if(dx<-0.5)dx+=1;let dy=py-Y[i];if(dy>0.5)dy-=1;else if(dy<-0.5)dy+=1;const d=dx*dx+dy*dy;if(d<best){best=d;bi=i;bx=X[i]+dx;by=Y[i]+dy;}}
+      lab[iy*gG+ix]=bi;E+=best*pixA;cxs[bi]+=bx;cys[bi]+=by;cnt[bi]++;}}
+    return {E,cxs,cys,cnt};
+  }
+  function minD(){let m=1e9;for(let i=0;i<nn;i++)for(let j=i+1;j<nn;j++){let dx=Math.abs(X[i]-X[j]);dx=Math.min(dx,1-dx);let dy=Math.abs(Y[i]-Y[j]);dy=Math.min(dy,1-dy);const d=Math.sqrt(dx*dx+dy*dy);if(d<m)m=d;}return m;}
+  const md0=minD();
+  let prev=1e9,mono=true,E0=0,Ef=0;
+  for(let t=0;t<14;t++){const r=step();if(t===0)E0=r.E;Ef=r.E;if(r.E>prev+1e-12)mono=false;prev=r.E;
+    for(let i=0;i<nn;i++){if(r.cnt[i]){X[i]=((r.cxs[i]/r.cnt[i])%1+1)%1;Y[i]=((r.cys[i]/r.cnt[i])%1+1)%1;}}}
+  const mdF=minD();
+  // avg degree + second moment two ways on final config
+  const r=step();
+  const adj=new Set();
+  for(let iy=0;iy<gG;iy++)for(let ix=0;ix<gG;ix++){const l=lab[iy*gG+ix];
+    const rr=lab[iy*gG+((ix+1)%gG)],dd=lab[((iy+1)%gG)*gG+ix];
+    if(rr!==l){adj.add(Math.min(l,rr)*nn+Math.max(l,rr));}
+    if(dd!==l){adj.add(Math.min(l,dd)*nn+Math.max(l,dd));}}
+  const avgDeg=2*adj.size/nn;
+  const centx=new Float64Array(nn),centy=new Float64Array(nn);
+  for(let i=0;i<nn;i++){centx[i]=r.cxs[i]/r.cnt[i];centy[i]=r.cys[i]/r.cnt[i];}
+  let Icen=0,Adisp=0,Edir=r.E;const Ic=new Float64Array(nn);
+  for(let iy=0;iy<gG;iy++)for(let ix=0;ix<gG;ix++){const i=lab[iy*gG+ix];const px=(ix+0.5)/gG,py=(iy+0.5)/gG;
+    let dx=px-X[i];if(dx>0.5)dx-=1;else if(dx<-0.5)dx+=1;let dy=py-Y[i];if(dy>0.5)dy-=1;else if(dy<-0.5)dy+=1;
+    const ux=X[i]+dx,uy=Y[i]+dy;Ic[i]+=((ux-centx[i])**2+(uy-centy[i])**2)*pixA;}
+  for(let i=0;i<nn;i++){Icen+=Ic[i];Adisp+=(r.cnt[i]*pixA)*((centx[i]-X[i])**2+(centy[i]-Y[i])**2);}
+  const relErr=Math.abs(Edir-(Icen+Adisp))/Edir;
+
+  const p=(c,t)=>`<span class="${c}">${t}</span>`;
+  const okMono=mono, okDeg=Math.abs(avgDeg-6)<1e-9, okMom=relErr<1e-9, okBlue=mdF>md0*3;
+  document.getElementById('selftest').innerHTML =
+    '<h3>浏览器内独立自检（与页面同款算法，周期边界）</h3>'+
+    `① 能量单调不增：${okMono?p('pass','PASS'):p('fail','FAIL')} &nbsp; E₀=${E0.toExponential(4)} → E₁₄=${Ef.toExponential(4)}（降 ${(E0/Ef).toFixed(2)}×）<br>`+
+    `② 平均 Voronoi 邻居数（环面，理论恰为 6）：${okDeg?p('pass','PASS'):p('fail','FAIL')} &nbsp; 实测 = ${avgDeg.toFixed(6)}<br>`+
+    `③ 二阶矩两种算法一致（直接积分 vs 平行轴定理）：${okMom?p('pass','PASS'):p('fail','FAIL')} &nbsp; 相对误差 = ${relErr.toExponential(2)}<br>`+
+    `④ 蓝噪声：最小间距增大：${okBlue?p('pass','PASS'):p('fail','FAIL')} &nbsp; ${md0.toFixed(4)} → ${mdF.toFixed(4)}（${(mdF/md0).toFixed(1)}×）`;
+}
+
+// ---------- boot ----------
+function boot(){
+  resize();
+  initSites(90,1.0);
+  draw();
+  runSelfTest();
+  frame();
+}
+window.addEventListener('resize',()=>{resize();computeAssignEnergy();draw();});
+boot();
+</script>
+</body>
+</html>
