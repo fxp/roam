@@ -22,8 +22,7 @@
   .intro code{background:#0d0f14;padding:1px 5px;border-radius:4px;color:var(--text)}
   header{padding:16px 24px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
   header h2{font-size:14px;margin:0;font-weight:600;color:var(--muted)}
-  .layout{display:grid;grid-template-columns:420px 1fr;gap:16px;padding:16px;max-width:1500px;margin:0 auto;height:80vh;min-height:600px}
-  @media (max-width:1100px){.layout{grid-template-columns:1fr;height:auto}}
+  .layout{display:grid;grid-template-columns:1fr;gap:16px;padding:16px;max-width:700px;margin:0 auto}
   .panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:12px;min-height:0}
   .panel h3{font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:0}
   select,input,button,textarea{font:inherit;background:#0d0f14;color:var(--text);border:1px solid var(--border);border-radius:6px;padding:8px 10px}
@@ -44,7 +43,6 @@
   .badge.loading{color:var(--warn);border-color:var(--warn)}
   .badge.error{color:var(--err);border-color:var(--err)}
   code{background:#0d0f14;padding:1px 5px;border-radius:4px}
-  iframe{width:100%;height:100%;border:0;border-radius:8px;background:#fff}
   .origin-note{font-size:11px;color:var(--muted);line-height:1.5}
   .origin-note b{color:var(--text)}
   footer{max-width:900px;margin:0 auto;padding:8px 24px 40px;font-size:12px;color:var(--muted)}
@@ -57,15 +55,17 @@
 <div class="intro">
   <h1>🌉 跨源 Agent：隔着两个域名操作一篇真实文章</h1>
   <p>
-    这个页面本身就是 <code>roam.xiaopingfeng.com</code>，右边 iframe 里加载的是
+    这个页面本身就是 <code>roam.xiaopingfeng.com</code>，点击下面的按钮会在一个独立的新窗口/标签页里打开
     <code>xiaopingfeng.com/deepdive/</code> 下一篇真实发布的文章。两个不同的域名，
-    浏览器的同源策略决定了这个页面对 iframe 里的 DOM 没有任何直接访问权限——
-    我自己在 devtools 里试过读 <code>iframe.contentWindow.location</code>，直接被拦截报错。
+    浏览器的同源策略决定了这个页面对新窗口里的 DOM 没有任何直接访问权限——
+    我自己在 devtools 里试过读那个窗口的 <code>location</code>，直接被拦截报错。
   </p>
   <p>
     唯一的通道是我在文章页面里加的一小段
     <a href="https://xiaopingfeng.com/deepdive/agent-bridge.js" target="_blank" rel="noopener">接收器脚本</a>，
-    只信任来自 <code>roam.xiaopingfeng.com</code> 的消息，靠 <code>postMessage</code> 收发。
+    只信任来自 <code>roam.xiaopingfeng.com</code> 的消息，靠 <code>postMessage</code> 收发——
+    跟 <code>window.open()</code> 打开的独立窗口通信，和跟 <code>iframe</code> 通信走的是同一套
+    postMessage 机制，这也是几乎所有"第三方登录弹窗"（Google/GitHub OAuth）背后用的手法。
     左边的 Agent 用 <a href="https://github.com/mlc-ai/web-llm" target="_blank" rel="noopener">WebLLM</a>
     在浏览器本地跑一个 1B 参数小模型（WebGPU 推理，不发送任何数据到服务器），
     自己决定该调用哪个工具去读文章、数关键词、找到某一段并高亮——全程没有后端服务器参与协调。
@@ -83,8 +83,13 @@
     <h3>Agent 控制台</h3>
     <div class="origin-note">
       Agent 本身对 <code>xiaopingfeng.com</code> 里的文章 DOM 没有任何直接访问权限，
-      所有操作都通过右侧 iframe 里文章自带的接收器脚本完成，
+      所有操作都通过在独立窗口里打开的文章自带的接收器脚本完成，
       脚本只信任来自 <b>https://roam.xiaopingfeng.com</b> 的消息。
+    </div>
+
+    <div class="row">
+      <button id="open-article-btn">在新窗口打开文章</button>
+      <span id="window-status" class="sub" style="color:var(--muted);font-size:12px">尚未打开</span>
     </div>
 
     <div class="row">
@@ -98,7 +103,7 @@
     <progress id="progress" value="0" max="1" style="display:none"></progress>
     <div id="progress-text" class="sub" style="color:var(--muted);font-size:12px"></div>
 
-    <div id="bridge-status" class="sub" style="color:var(--muted);font-size:12px">桥接状态: 等待 iframe 加载…</div>
+    <div id="bridge-status" class="sub" style="color:var(--muted);font-size:12px">桥接状态: 等待打开文章窗口…</div>
 
     <div class="row">
       <input id="task-input" placeholder="例如：数一下 VendingBench 出现了几次" style="flex:1" disabled>
@@ -111,10 +116,6 @@
 
     <h3 style="margin-top:8px">执行轨迹</h3>
     <div id="log"><div class="sub" style="color:var(--muted)">等待加载模型…</div></div>
-  </div>
-
-  <div class="panel" style="padding:8px">
-    <iframe id="article-frame" src="https://xiaopingfeng.com/deepdive/agent-economy/" title="DeepDive 文章 (跨源)"></iframe>
   </div>
 
 </div>
@@ -137,11 +138,28 @@ const taskInput = $("task-input");
 const runBtn = $("run-btn");
 const logEl = $("log");
 const bridgeStatus = $("bridge-status");
-const frame = $("article-frame");
+const openArticleBtn = $("open-article-btn");
+const windowStatus = $("window-status");
 
+const ARTICLE_URL = "https://xiaopingfeng.com/deepdive/agent-economy/";
 const ARTICLE_ORIGIN = "https://xiaopingfeng.com";
 let engine = null;
 let bridgeReady = false;
+let articleWindow = null;
+
+openArticleBtn.addEventListener("click", () => {
+  articleWindow = window.open(ARTICLE_URL, "_blank");
+  if (!articleWindow) {
+    windowStatus.textContent = "打开失败，可能被浏览器拦截了弹窗，请允许弹窗后重试";
+    windowStatus.style.color = "var(--err)";
+    return;
+  }
+  bridgeReady = false;
+  bridgeStatus.textContent = "桥接状态: 窗口已打开，等待文章页握手…";
+  bridgeStatus.style.color = "var(--warn)";
+  windowStatus.textContent = "已打开新窗口，等待握手…";
+  windowStatus.style.color = "var(--muted)";
+});
 
 function clearLog(){ logEl.innerHTML = ""; }
 function logStep(tag, label, content){
@@ -162,8 +180,10 @@ window.addEventListener("message", (event) => {
   if (!msg) return;
   if (msg.type === "agent-rpc-ready") {
     bridgeReady = true;
-    bridgeStatus.textContent = `桥接状态: 已连接 ${ARTICLE_ORIGIN}（跨源 postMessage 通道就绪）`;
+    bridgeStatus.textContent = `桥接状态: 已连接 ${ARTICLE_ORIGIN}（跨源 postMessage 通道就绪，独立窗口）`;
     bridgeStatus.style.color = "var(--ok)";
+    windowStatus.textContent = "已握手，窗口就绪";
+    windowStatus.style.color = "var(--ok)";
     maybeEnableRun();
     return;
   }
@@ -177,9 +197,13 @@ window.addEventListener("message", (event) => {
 
 function callArticle(action, args){
   return new Promise((resolve, reject) => {
+    if (!articleWindow || articleWindow.closed) {
+      reject(new Error("文章窗口未打开或已被关闭"));
+      return;
+    }
     const id = ++reqCounter;
     pending.set(id, { resolve, reject });
-    frame.contentWindow.postMessage({ type: "agent-rpc-request", id, action, args }, ARTICLE_ORIGIN);
+    articleWindow.postMessage({ type: "agent-rpc-request", id, action, args }, ARTICLE_ORIGIN);
     setTimeout(() => {
       if (pending.has(id)) { pending.delete(id); reject(new Error("跨源调用超时: " + action)); }
     }, 8000);
