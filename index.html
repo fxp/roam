@@ -290,6 +290,28 @@
   <div class="section-label">近期任务</div>
 
   <div class="task-card">
+    <a href="/browser-agent-webllm/">
+      <div class="task-meta">
+        <span class="task-tag ai">技术验证</span>
+        <span>RM · 0006</span>
+        <span>2026-09-03</span>
+      </div>
+      <div class="task-title">跨源 Agent：隔着两个域名操作一篇真实文章</div>
+      <div class="task-summary">
+        WebLLM 在浏览器本地跑一个 1B 小模型，全程不经过任何后端。这个页面是
+        roam.xiaopingfeng.com，iframe 里是 xiaopingfeng.com 上一篇真实的 DeepDive 文章——
+        两个不同 origin，同源策略下互相看不到对方的 DOM，Agent 只能靠文章页里一小段
+        postMessage 接收器脚本去读取、统计关键词、定位并高亮某一段。中途踩坑：小模型会把
+        prompt 里的格式占位符原样抄进输出，换成尖括号包裹才稳定下来。
+      </div>
+      <div class="task-footer">
+        <span>执行者: Claude Sonnet 5 · WebLLM · postMessage</span>
+        <span class="task-arrow">打开跨源 Agent →</span>
+      </div>
+    </a>
+  </div>
+
+  <div class="task-card">
     <a href="/vendling/">
       <div class="task-meta">
         <span class="task-tag ai">产品设计</span>

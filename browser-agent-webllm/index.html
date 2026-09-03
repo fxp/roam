@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>跨源 Agent：本地小模型隔着两个域名操作一篇真实文章 · 问野</title>
+<meta name="description" content="一个跑在浏览器里、用 WebGPU 本地推理的 1B 小模型，隔着 roam.xiaopingfeng.com 和 xiaopingfeng.com 两个不同 origin，只靠 postMessage 去读取、统计、高亮一篇真实的 DeepDive 文章——不依赖任何后端，也不共享 DOM。">
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --border:#262b36; --text:#e6e8ee;
+    --muted:#8a90a2; --accent:#5b8cff; --ok:#3ecf8e; --warn:#ffb454; --err:#ff6b6b;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
+  a{color:var(--accent)}
+  .topbar{padding:14px 24px;border-bottom:1px solid var(--border);font-size:13px}
+  .topbar a{color:var(--muted);text-decoration:none}
+  .topbar a:hover{color:var(--text)}
+  .intro{max-width:900px;margin:0 auto;padding:28px 24px 4px;font-size:14px;line-height:1.7;color:var(--muted)}
+  .intro h1{color:var(--text);font-size:22px;margin:0 0 12px}
+  .intro p{margin:0 0 12px}
+  .intro code{background:#0d0f14;padding:1px 5px;border-radius:4px;color:var(--text)}
+  header{padding:16px 24px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  header h2{font-size:14px;margin:0;font-weight:600;color:var(--muted)}
+  .layout{display:grid;grid-template-columns:420px 1fr;gap:16px;padding:16px;max-width:1500px;margin:0 auto;height:80vh;min-height:600px}
+  @media (max-width:1100px){.layout{grid-template-columns:1fr;height:auto}}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:12px;min-height:0}
+  .panel h3{font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:0}
+  select,input,button,textarea{font:inherit;background:#0d0f14;color:var(--text);border:1px solid var(--border);border-radius:6px;padding:8px 10px}
+  button{cursor:pointer;background:var(--accent);border:none;color:#fff;font-weight:600}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  progress{width:100%;height:8px}
+  #log{flex:1;min-height:200px;overflow-y:auto;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;background:#0d0f14;border:1px solid var(--border);border-radius:8px;padding:10px}
+  .step{margin-bottom:10px;padding-bottom:10px;border-bottom:1px dashed var(--border)}
+  .tag{display:inline-block;font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;margin-right:6px;letter-spacing:.03em}
+  .tag.thought{background:#2a2f3d;color:#a7b0c8}
+  .tag.action{background:#1e3a5f;color:#7ab3ff}
+  .tag.obs{background:#1e3d33;color:var(--ok)}
+  .tag.err{background:#3d1e22;color:var(--err)}
+  .tag.final{background:#3d331e;color:var(--warn)}
+  .badge{font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--border);color:var(--muted)}
+  .badge.ready{color:var(--ok);border-color:var(--ok)}
+  .badge.loading{color:var(--warn);border-color:var(--warn)}
+  .badge.error{color:var(--err);border-color:var(--err)}
+  code{background:#0d0f14;padding:1px 5px;border-radius:4px}
+  iframe{width:100%;height:100%;border:0;border-radius:8px;background:#fff}
+  .origin-note{font-size:11px;color:var(--muted);line-height:1.5}
+  .origin-note b{color:var(--text)}
+  footer{max-width:900px;margin:0 auto;padding:8px 24px 40px;font-size:12px;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<div class="topbar"><a href="/">← 问野</a></div>
+
+<div class="intro">
+  <h1>🌉 跨源 Agent：隔着两个域名操作一篇真实文章</h1>
+  <p>
+    这个页面本身就是 <code>roam.xiaopingfeng.com</code>，右边 iframe 里加载的是
+    <code>xiaopingfeng.com/deepdive/</code> 下一篇真实发布的文章。两个不同的域名，
+    浏览器的同源策略决定了这个页面对 iframe 里的 DOM 没有任何直接访问权限——
+    我自己在 devtools 里试过读 <code>iframe.contentWindow.location</code>，直接被拦截报错。
+  </p>
+  <p>
+    唯一的通道是我在文章页面里加的一小段
+    <a href="https://xiaopingfeng.com/deepdive/agent-bridge.js" target="_blank" rel="noopener">接收器脚本</a>，
+    只信任来自 <code>roam.xiaopingfeng.com</code> 的消息，靠 <code>postMessage</code> 收发。
+    左边的 Agent 用 <a href="https://github.com/mlc-ai/web-llm" target="_blank" rel="noopener">WebLLM</a>
+    在浏览器本地跑一个 1B 参数小模型（WebGPU 推理，不发送任何数据到服务器），
+    自己决定该调用哪个工具去读文章、数关键词、找到某一段并高亮——全程没有后端服务器参与协调。
+  </p>
+</div>
+
+<header>
+  <h2>Agent 跑在 roam.xiaopingfeng.com，文章跑在 xiaopingfeng.com —— 靠 postMessage 通信，不共享 DOM</h2>
+  <span id="engine-badge" class="badge loading" style="margin-left:auto">未加载模型</span>
+</header>
+
+<div class="layout">
+
+  <div class="panel">
+    <h3>Agent 控制台</h3>
+    <div class="origin-note">
+      Agent 本身对 <code>xiaopingfeng.com</code> 里的文章 DOM 没有任何直接访问权限，
+      所有操作都通过右侧 iframe 里文章自带的接收器脚本完成，
+      脚本只信任来自 <b>https://roam.xiaopingfeng.com</b> 的消息。
+    </div>
+
+    <div class="row">
+      <select id="model-select">
+        <option value="Llama-3.2-1B-Instruct-q4f16_1-MLC">Llama-3.2-1B-Instruct (约 0.9GB)</option>
+        <option value="Qwen2.5-0.5B-Instruct-q4f16_1-MLC">Qwen2.5-0.5B-Instruct (约 0.5GB)</option>
+        <option value="SmolLM2-1.7B-Instruct-q4f16_1-MLC">SmolLM2-1.7B-Instruct (约 1.4GB)</option>
+      </select>
+      <button id="load-btn">加载模型</button>
+    </div>
+    <progress id="progress" value="0" max="1" style="display:none"></progress>
+    <div id="progress-text" class="sub" style="color:var(--muted);font-size:12px"></div>
+
+    <div id="bridge-status" class="sub" style="color:var(--muted);font-size:12px">桥接状态: 等待 iframe 加载…</div>
+
+    <div class="row">
+      <input id="task-input" placeholder="例如：数一下 VendingBench 出现了几次" style="flex:1" disabled>
+      <button id="run-btn" disabled>执行任务</button>
+    </div>
+
+    <div class="row" style="font-size:12px;color:var(--muted)">
+      工具：<code>get_title</code> · <code>list_sections</code> · <code>count_keyword</code> · <code>find_and_highlight_section</code>
+    </div>
+
+    <h3 style="margin-top:8px">执行轨迹</h3>
+    <div id="log"><div class="sub" style="color:var(--muted)">等待加载模型…</div></div>
+  </div>
+
+  <div class="panel" style="padding:8px">
+    <iframe id="article-frame" src="https://xiaopingfeng.com/deepdive/agent-economy/" title="DeepDive 文章 (跨源)"></iframe>
+  </div>
+
+</div>
+
+<footer>
+  文章来源：<a href="https://xiaopingfeng.com/deepdive/agent-economy/" target="_blank" rel="noopener">机器经济元年：Agent 如何拿到钱包、身份与第一份工作</a> ·
+  本地推理用 <a href="https://github.com/mlc-ai/web-llm" target="_blank" rel="noopener">WebLLM</a>，需要支持 WebGPU 的浏览器（Chrome / Edge 最新版）。
+</footer>
+
+<script type="module">
+import * as webllm from "https://esm.run/@mlc-ai/web-llm";
+
+const $ = (id) => document.getElementById(id);
+const badge = $("engine-badge");
+const progressEl = $("progress");
+const progressText = $("progress-text");
+const loadBtn = $("load-btn");
+const modelSelect = $("model-select");
+const taskInput = $("task-input");
+const runBtn = $("run-btn");
+const logEl = $("log");
+const bridgeStatus = $("bridge-status");
+const frame = $("article-frame");
+
+const ARTICLE_ORIGIN = "https://xiaopingfeng.com";
+let engine = null;
+let bridgeReady = false;
+
+function clearLog(){ logEl.innerHTML = ""; }
+function logStep(tag, label, content){
+  const div = document.createElement("div");
+  div.className = "step";
+  div.innerHTML = `<span class="tag ${tag}">${label}</span><span></span>`;
+  div.querySelector("span:last-child").textContent = content;
+  logEl.appendChild(div);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+let reqCounter = 0;
+const pending = new Map();
+
+window.addEventListener("message", (event) => {
+  if (event.origin !== ARTICLE_ORIGIN) return;
+  const msg = event.data;
+  if (!msg) return;
+  if (msg.type === "agent-rpc-ready") {
+    bridgeReady = true;
+    bridgeStatus.textContent = `桥接状态: 已连接 ${ARTICLE_ORIGIN}（跨源 postMessage 通道就绪）`;
+    bridgeStatus.style.color = "var(--ok)";
+    maybeEnableRun();
+    return;
+  }
+  if (msg.type === "agent-rpc-response" && pending.has(msg.id)) {
+    const { resolve, reject } = pending.get(msg.id);
+    pending.delete(msg.id);
+    if (msg.error) reject(new Error(msg.error));
+    else resolve(msg.result);
+  }
+});
+
+function callArticle(action, args){
+  return new Promise((resolve, reject) => {
+    const id = ++reqCounter;
+    pending.set(id, { resolve, reject });
+    frame.contentWindow.postMessage({ type: "agent-rpc-request", id, action, args }, ARTICLE_ORIGIN);
+    setTimeout(() => {
+      if (pending.has(id)) { pending.delete(id); reject(new Error("跨源调用超时: " + action)); }
+    }, 8000);
+  });
+}
+
+const TOOLS = {
+  get_title: { fn: () => callArticle("get_title"), desc: "获取文章标题和摘要，无参数" },
+  list_sections: { fn: () => callArticle("list_sections"), desc: "列出文章所有小节的 id 和标题，无参数" },
+  count_keyword: { fn: (args) => callArticle("count_keyword", args), desc: "统计某个关键词在全文中出现的次数，参数: {keyword}" },
+  find_and_highlight_section: { fn: (args) => callArticle("find_and_highlight_section", args), desc: "找到包含某关键词的小节并在文章里高亮显示，参数: {keyword}" },
+};
+
+const SYSTEM_PROMPT = `你是一个通过跨源 postMessage 通道操作一篇网页文章的 Agent。你自己看不到文章内容，只能通过工具查询。
+
+可用工具:
+${Object.entries(TOOLS).map(([name, t]) => `- ${name}: ${t.desc}`).join("\n")}
+
+规则:
+1. 只能返回一个 JSON 对象，绝对不要写代码、不要用 markdown 代码块、不要解释。
+2. 格式二选一(下面 <> 里的内容都要换成你自己的真实内容，不要照抄):
+   {"thought": "<你此刻的推理，一句话>", "action": "<工具名，从上面列表里选一个>", "args": {}}
+   {"thought": "<你此刻的推理，一句话>", "final_answer": "<任务完成后的真实总结>"}
+3. 不能凭空编造文章内容，必须先调用工具拿到真实数据再回答。
+
+示例:
+用户: 任务: 数一下 VendingBench 出现了几次
+你: {"thought": "用 count_keyword 统计", "action": "count_keyword", "args": {"keyword": "VendingBench"}}
+观察结果: {"keyword": "VendingBench", "count": 7}
+你: {"thought": "完成", "final_answer": "VendingBench 在文章里出现了 7 次"}`;
+
+const FORMAT_REMINDER = "(只返回一个 JSON 对象，不要写代码，不要用 markdown)";
+
+function extractJson(text){
+  const start = text.indexOf("{");
+  if (start === -1) throw new Error("模型输出中未找到 JSON: " + text);
+  let depth = 0;
+  for (let i = start; i < text.length; i++){
+    if (text[i] === "{") depth++;
+    if (text[i] === "}") depth--;
+    if (depth === 0) return JSON.parse(text.slice(start, i + 1));
+  }
+  throw new Error("JSON 未闭合: " + text);
+}
+
+async function runAgent(task){
+  const messages = [
+    { role: "system", content: SYSTEM_PROMPT },
+    { role: "user", content: `任务: ${task}` },
+  ];
+  let calledAnyTool = false;
+
+  const MAX_STEPS = 6;
+  for (let step = 0; step < MAX_STEPS; step++){
+    const reply = await engine.chat.completions.create({ messages, temperature: 0.2, max_tokens: 200 });
+    const raw = reply.choices[0].message.content;
+
+    let parsed;
+    try {
+      parsed = extractJson(raw);
+    } catch (e) {
+      logStep("err", "解析失败", raw);
+      messages.push({ role: "assistant", content: raw });
+      messages.push({ role: "user", content: `你的输出不是合法 JSON，请严格按格式重新输出，不要写代码。${FORMAT_REMINDER}` });
+      continue;
+    }
+
+    messages.push({ role: "assistant", content: JSON.stringify(parsed) });
+    if (parsed.thought) logStep("thought", "思考", parsed.thought);
+
+    if (parsed.final_answer) {
+      if (!calledAnyTool) {
+        logStep("err", "拦截", "还没有真正调用过工具就想给 final_answer，已拒绝");
+        messages.push({ role: "user", content: `你还没有调用任何工具拿到真实数据，不能给 final_answer。${FORMAT_REMINDER}` });
+        continue;
+      }
+      logStep("final", "完成", parsed.final_answer);
+      return;
+    }
+
+    const toolName = parsed.action;
+    const tool = TOOLS[toolName];
+    if (!tool) {
+      const obs = { error: toolName ? `未知工具: ${toolName}` : `缺少 action 或 final_answer 字段` };
+      logStep("err", "错误", obs.error);
+      messages.push({ role: "user", content: `观察结果: ${JSON.stringify(obs)} ${FORMAT_REMINDER}` });
+      continue;
+    }
+
+    logStep("action", "调用(跨源)", `${toolName}(${JSON.stringify(parsed.args || {})})`);
+    let obs;
+    try {
+      obs = await tool.fn(parsed.args || {});
+      calledAnyTool = true;
+    } catch (e) {
+      obs = { error: String(e) };
+    }
+    logStep("obs", "观察", JSON.stringify(obs));
+    messages.push({ role: "user", content: `观察结果: ${JSON.stringify(obs)} ${FORMAT_REMINDER}` });
+  }
+  logStep("err", "终止", "已达最大步数，未得到 final_answer");
+}
+
+function maybeEnableRun(){
+  if (bridgeReady && engine) {
+    taskInput.disabled = false;
+    runBtn.disabled = false;
+  }
+}
+
+loadBtn.addEventListener("click", async () => {
+  if (!navigator.gpu) {
+    badge.textContent = "浏览器不支持 WebGPU";
+    badge.className = "badge error";
+    return;
+  }
+  loadBtn.disabled = true;
+  modelSelect.disabled = true;
+  progressEl.style.display = "block";
+  badge.textContent = "加载中…";
+  badge.className = "badge loading";
+  clearLog();
+
+  const modelId = modelSelect.value;
+  try {
+    engine = await webllm.CreateMLCEngine(modelId, {
+      initProgressCallback: (p) => {
+        progressEl.value = p.progress || 0;
+        progressText.textContent = p.text || "";
+      },
+    });
+    badge.textContent = `已就绪: ${modelId}`;
+    badge.className = "badge ready";
+    logStep("obs", "就绪", `模型 ${modelId} 已在本地加载完成。`);
+    maybeEnableRun();
+  } catch (e) {
+    badge.textContent = "加载失败";
+    badge.className = "badge error";
+    logStep("err", "错误", String(e));
+    loadBtn.disabled = false;
+    modelSelect.disabled = false;
+  }
+});
+
+runBtn.addEventListener("click", async () => {
+  const task = taskInput.value.trim();
+  if (!task || !engine) return;
+  runBtn.disabled = true;
+  clearLog();
+  logStep("thought", "任务", task);
+  try {
+    await runAgent(task);
+  } catch (e) {
+    logStep("err", "异常", String(e));
+  }
+  runBtn.disabled = false;
+});
+</script>
+
+</body>
+</html>
