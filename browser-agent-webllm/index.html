@@ -3,183 +3,316 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>跨源 Agent：本地小模型隔着两个域名操作一篇真实文章 · 问野</title>
-<meta name="description" content="一个跑在浏览器里、用 WebGPU 本地推理的 1B 小模型，隔着 roam.xiaopingfeng.com 和 xiaopingfeng.com 两个不同 origin，只靠 postMessage 去读取、统计、高亮一篇真实的 DeepDive 文章——不依赖任何后端，也不共享 DOM。">
+<title>自体观察：一个活在网页里、也在读这张网页的 Agent · 问野</title>
+<meta name="description" content="这张网页里跑着一个 Agent，用一个同样跑在这张网页里的模型（本地 WebLLM / 云端 API / 本机 Ollama 三选一），去读、去数、去高亮它自己所在的这张页面——不操作别的网站，不需要后端，只对自己动手。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400;1,6..72,500&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#0f1115; --panel:#171a21; --border:#262b36; --text:#e6e8ee;
-    --muted:#8a90a2; --accent:#5b8cff; --ok:#3ecf8e; --warn:#ffb454; --err:#ff6b6b;
+    --bg:#070f0a;
+    --bg-2:#0b160f;
+    --bg-panel:#0d1912;
+    --line:#1c2e22;
+    --line-bright:#2d4a37;
+    --fg:#e9f2ec;
+    --fg-dim:#a9c4b3;
+    --fg-mute:#5c7568;
+    --accent:#3df2a0;
+    --accent-dim:rgba(61,242,160,0.14);
+    --accent-glow:rgba(61,242,160,0.35);
+    --warn:#ffcf5c;
+    --err:#ff7a68;
+    --serif:'Newsreader','Noto Serif SC',serif;
+    --display:'Instrument Serif','Noto Serif SC',serif;
+    --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
   }
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
-  a{color:var(--accent)}
-  .topbar{padding:14px 24px;border-bottom:1px solid var(--border);font-size:13px}
-  .topbar a{color:var(--muted);text-decoration:none}
-  .topbar a:hover{color:var(--text)}
-  .intro{max-width:900px;margin:0 auto;padding:28px 24px 4px;font-size:14px;line-height:1.7;color:var(--muted)}
-  .intro h1{color:var(--text);font-size:22px;margin:0 0 12px}
-  .intro p{margin:0 0 12px}
-  .intro code{background:#0d0f14;padding:1px 5px;border-radius:4px;color:var(--text)}
-  header{padding:16px 24px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-  header h2{font-size:14px;margin:0;font-weight:600;color:var(--muted)}
-  .layout{display:grid;grid-template-columns:1fr;gap:16px;padding:16px;max-width:700px;margin:0 auto}
-  .panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:12px;min-height:0}
-  .panel h3{font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:0}
-  select,input,button,textarea{font:inherit;background:#0d0f14;color:var(--text);border:1px solid var(--border);border-radius:6px;padding:8px 10px}
-  button{cursor:pointer;background:var(--accent);border:none;color:#fff;font-weight:600}
-  button:disabled{opacity:.5;cursor:not-allowed}
-  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-  progress{width:100%;height:8px}
-  #log{flex:1;min-height:200px;overflow-y:auto;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;background:#0d0f14;border:1px solid var(--border);border-radius:8px;padding:10px}
-  .step{margin-bottom:10px;padding-bottom:10px;border-bottom:1px dashed var(--border)}
-  .tag{display:inline-block;font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;margin-right:6px;letter-spacing:.03em}
-  .tag.thought{background:#2a2f3d;color:#a7b0c8}
-  .tag.action{background:#1e3a5f;color:#7ab3ff}
-  .tag.obs{background:#1e3d33;color:var(--ok)}
-  .tag.err{background:#3d1e22;color:var(--err)}
-  .tag.final{background:#3d331e;color:var(--warn)}
-  .badge{font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--border);color:var(--muted)}
-  .badge.ready{color:var(--ok);border-color:var(--ok)}
-  .badge.loading{color:var(--warn);border-color:var(--warn)}
-  .badge.error{color:var(--err);border-color:var(--err)}
-  code{background:#0d0f14;padding:1px 5px;border-radius:4px}
-  .origin-note{font-size:11px;color:var(--muted);line-height:1.5}
-  .origin-note b{color:var(--text)}
-  footer{max-width:900px;margin:0 auto;padding:8px 24px 40px;font-size:12px;color:var(--muted)}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;background:var(--bg);color:var(--fg);font-family:var(--serif);
+    position:relative;min-height:100vh;
+  }
+  body::before{
+    content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+    background:
+      radial-gradient(ellipse 80% 50% at 50% -10%, rgba(61,242,160,0.07), transparent 60%),
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.012) 0px, rgba(255,255,255,0.012) 1px, transparent 1px, transparent 3px);
+  }
+  a{color:var(--accent);text-decoration-color:rgba(61,242,160,0.4)}
+  code{font-family:var(--mono);background:#081109;padding:1px 6px;border-radius:4px;color:var(--fg);border:1px solid var(--line);font-size:0.92em}
+
+  /* ---------- vitals bar ---------- */
+  .vitals{
+    position:sticky;top:0;z-index:20;
+    display:flex;align-items:center;gap:14px;
+    padding:10px 24px;background:rgba(7,15,10,0.96);
+    border-bottom:1px solid var(--line);font-family:var(--mono);font-size:11.5px;color:var(--fg-mute);
+  }
+  .vitals a.home{color:var(--fg-mute);text-decoration:none;letter-spacing:.02em}
+  .vitals a.home:hover{color:var(--accent)}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--fg-mute);flex:none;transition:background .3s}
+  .dot.idle{background:var(--fg-mute)}
+  .dot.busy{background:var(--warn);animation:pulse 1.1s ease-in-out infinite}
+  .dot.ready{background:var(--accent);box-shadow:0 0 8px var(--accent-glow)}
+  .dot.error{background:var(--err)}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  .vitals .status-text{color:var(--fg-dim)}
+  .ecg{margin-left:auto;width:120px;height:20px;opacity:.55}
+  .ecg path{fill:none;stroke:var(--accent);stroke-width:1.4;stroke-dasharray:180;stroke-dashoffset:0;animation:ecg-run 2.6s linear infinite}
+  @keyframes ecg-run{to{stroke-dashoffset:-360}}
+
+  /* ---------- hero ---------- */
+  .hero{max-width:920px;margin:0 auto;padding:64px 24px 32px;position:relative;z-index:1}
+  .hero .kicker{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin-bottom:18px;display:flex;align-items:center;gap:8px}
+  .hero .kicker::before{content:'';width:16px;height:1px;background:var(--accent)}
+  .hero h1{
+    font-family:var(--display);font-style:italic;font-weight:400;
+    font-size:clamp(34px,6vw,58px);line-height:1.08;margin:0 0 22px;color:var(--fg);
+    max-width:15ch;
+  }
+  .hero h1 em{color:var(--accent);font-style:italic}
+  .hero .dek{font-size:16.5px;line-height:1.75;color:var(--fg-dim);max-width:62ch;margin:0}
+  .hero .dek code{font-size:0.88em}
+
+  /* ---------- stage layout ---------- */
+  .stage{
+    max-width:1180px;margin:0 auto;padding:20px 24px 100px;
+    display:grid;grid-template-columns:1fr 380px;gap:36px;align-items:start;
+    position:relative;z-index:1;
+  }
+  @media (max-width:920px){ .stage{grid-template-columns:1fr} }
+
+  /* ---------- specimen (content the agent operates on) ---------- */
+  .specimen{min-width:0}
+  .spec-section{
+    padding:34px 0;border-top:1px solid var(--line);
+    transition:background .5s ease, box-shadow .5s ease;
+    scroll-margin-top:90px;
+  }
+  .spec-section:first-child{border-top:none}
+  .spec-section .n{
+    font-family:var(--mono);font-size:11px;color:var(--fg-mute);letter-spacing:.1em;
+    display:block;margin-bottom:10px;
+  }
+  .spec-section h2{
+    font-family:var(--display);font-style:italic;font-weight:400;
+    font-size:clamp(24px,3.4vw,32px);margin:0 0 16px;color:var(--fg);
+  }
+  .spec-section p{font-size:15.5px;line-height:1.85;color:var(--fg-dim);margin:0 0 14px}
+  .spec-section p:last-child{margin-bottom:0}
+  .spec-section strong{color:var(--fg);font-weight:500}
+  .spec-section.agent-highlight{
+    background:linear-gradient(180deg, var(--accent-dim), transparent 70%);
+    box-shadow:inset 3px 0 0 var(--accent);
+    padding-left:20px;margin-left:-20px;
+  }
+
+  /* ---------- console (agent panel) ---------- */
+  .console{
+    position:sticky;top:66px;
+    background:var(--bg-panel);border:1px solid var(--line);border-radius:2px;
+    padding:20px;display:flex;flex-direction:column;gap:14px;
+    box-shadow:0 0 0 1px rgba(0,0,0,0.2), 0 20px 60px -30px rgba(0,0,0,0.6);
+  }
+  .console::before{
+    content:'AGENT';font-family:var(--mono);font-size:10px;letter-spacing:.22em;
+    color:var(--fg-mute);
+  }
+  .source-tabs{display:flex;gap:2px;background:var(--bg);border:1px solid var(--line);border-radius:2px;padding:2px}
+  .source-tabs label{
+    flex:1;text-align:center;font-family:var(--mono);font-size:11px;padding:7px 4px;
+    color:var(--fg-mute);cursor:pointer;border-radius:1px;transition:all .15s;
+  }
+  .source-tabs input{display:none}
+  .source-tabs input:checked + span{color:var(--bg);background:var(--accent);display:block;margin:-7px -4px;padding:7px 4px;border-radius:1px;font-weight:600}
+  .source-tabs label:has(input:checked){background:transparent}
+
+  .field-group{display:flex;flex-direction:column;gap:8px}
+  select,input[type="text"],input[type="password"],input:not([type]){
+    font:inherit;font-family:var(--mono);font-size:12.5px;
+    background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:2px;
+    padding:9px 10px;width:100%;
+  }
+  select:focus,input:focus{outline:none;border-color:var(--accent)}
+  button{
+    cursor:pointer;font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.02em;
+    background:var(--accent);border:none;color:#04140a;border-radius:2px;padding:10px 14px;
+    transition:filter .15s;
+  }
+  button:hover:not(:disabled){filter:brightness(1.1)}
+  button:disabled{opacity:.35;cursor:not-allowed}
+  button.ghost{background:transparent;border:1px solid var(--line-bright);color:var(--fg-dim)}
+  .row{display:flex;gap:8px}
+  .note{font-size:11.5px;line-height:1.6;color:var(--fg-mute)}
+  .note b{color:var(--fg-dim);font-weight:500}
+  progress{width:100%;height:3px;-webkit-appearance:none;appearance:none;border:none}
+  progress::-webkit-progress-bar{background:var(--line)}
+  progress::-webkit-progress-value{background:var(--accent)}
+  .status-line{font-family:var(--mono);font-size:11.5px;color:var(--fg-mute)}
+  .status-line.ok{color:var(--accent)}
+  .status-line.err{color:var(--err)}
+
+  .task-row{display:flex;gap:6px}
+  .task-row input{flex:1}
+
+  .tools-list{font-family:var(--mono);font-size:10.5px;color:var(--fg-mute);line-height:1.8;word-break:break-word}
+  .tools-list code{padding:1px 4px}
+
+  #log{
+    max-height:340px;overflow-y:auto;font-family:var(--mono);font-size:11.5px;
+    background:var(--bg);border:1px solid var(--line);border-radius:2px;padding:12px;
+    display:flex;flex-direction:column;gap:2px;
+  }
+  #log:empty::after{content:'待命中…';color:var(--fg-mute)}
+  .step{padding:6px 0;border-bottom:1px dashed var(--line)}
+  .step:last-child{border-bottom:none}
+  .tag{display:inline-block;font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:2px;margin-right:6px;letter-spacing:.04em;text-transform:uppercase}
+  .tag.thought{background:#152a1e;color:#8fc7a4}
+  .tag.action{background:#0f2a3d;color:#6fc3f2}
+  .tag.obs{background:#123d2c;color:var(--accent)}
+  .tag.err{background:#3d1712;color:var(--err)}
+  .tag.final{background:#3d3312;color:var(--warn)}
+  .step-body{color:var(--fg-dim);white-space:pre-wrap;word-break:break-word}
+
+  footer{max-width:1180px;margin:0 auto;padding:0 24px 60px;font-family:var(--mono);font-size:11px;color:var(--fg-mute);line-height:1.8;position:relative;z-index:1}
+  footer a{color:var(--fg-mute)}
+  footer a:hover{color:var(--accent)}
 </style>
 </head>
 <body>
 
-<div class="topbar"><a href="/">← 问野</a></div>
+<div class="vitals">
+  <a class="home" href="/">← 问野</a>
+  <span class="dot idle" id="vital-dot"></span>
+  <span class="status-text" id="vital-text">待命</span>
+  <svg class="ecg" viewBox="0 0 180 20" preserveAspectRatio="none">
+    <path d="M0,10 L40,10 L48,10 L54,2 L60,18 L66,10 L74,10 L180,10" />
+  </svg>
+</div>
 
-<div class="intro">
-  <h1>🌉 跨源 Agent：隔着两个域名操作一篇真实文章</h1>
-  <p>
-    这个页面本身就是 <code>roam.xiaopingfeng.com</code>，点击下面的按钮会在一个独立的新窗口/标签页里打开
-    <code>xiaopingfeng.com/deepdive/</code> 下一篇真实发布的文章。两个不同的域名，
-    浏览器的同源策略决定了这个页面对新窗口里的 DOM 没有任何直接访问权限——
-    我自己在 devtools 里试过读那个窗口的 <code>location</code>，直接被拦截报错。
-  </p>
-  <p>
-    唯一的通道是我在文章页面里加的一小段
-    <a href="https://xiaopingfeng.com/deepdive/agent-bridge.js" target="_blank" rel="noopener">接收器脚本</a>，
-    只信任来自 <code>roam.xiaopingfeng.com</code> 的消息，靠 <code>postMessage</code> 收发——
-    跟 <code>window.open()</code> 打开的独立窗口通信，和跟 <code>iframe</code> 通信走的是同一套
-    postMessage 机制，这也是几乎所有"第三方登录弹窗"（Google/GitHub OAuth）背后用的手法。
-    左边的 Agent 有三种推理来源可选：本地用 <a href="https://github.com/mlc-ai/web-llm" target="_blank" rel="noopener">WebLLM</a>
-    在浏览器里跑一个小模型（WebGPU 推理，不发送任何数据到服务器）；云端 API 是任意 OpenAI 兼容接口
-    （OpenRouter / 智谱 BigModel 等）；本机 Ollama 则是直接连你自己电脑上跑的模型。后两种的 Key/地址
-    只存在你自己浏览器的 localStorage，请求直接从浏览器发到你填的地址，同样不经过
-    <code>roam.xiaopingfeng.com</code>——Ollama 那条路径亲测下来能明显更稳：本地 1B/1.7B 小模型
-    常选错工具、编造数字，换成本机一个 30B 级别的 Ollama 模型后，同样的多步任务全部一次做对。
-    不管哪种，模型自己决定该调用哪个工具去读文章、
-    数关键词、找到某一段并高亮——协调过程全程没有我的后端服务器参与。
+<div class="hero">
+  <div class="kicker">自体观察 · Self-Operating Page</div>
+  <h1>这张页面里住着一个 <em>Agent</em>，<br>它正在读这张页面。</h1>
+  <p class="dek">
+    模型也跑在这张页面里——本地 <code>WebLLM</code>、你自己的云端 API、或是你电脑上的 <code>Ollama</code>，三选一。
+    它不碰任何别的网站，操作范围就是你现在看到的这些文字：数一个词出现几次，
+    找到某一段并把它点亮，或者告诉你这页一共分几节。往下翻，右边是它的控制台。
   </p>
 </div>
 
-<header>
-  <h2>Agent 跑在 roam.xiaopingfeng.com，文章跑在 xiaopingfeng.com —— 靠 postMessage 通信，不共享 DOM</h2>
-  <span id="engine-badge" class="badge loading" style="margin-left:auto">未加载模型</span>
-</header>
+<div class="stage">
 
-<div class="layout">
+  <article class="specimen">
 
-  <div class="panel">
-    <h3>Agent 控制台</h3>
-    <div class="origin-note">
-      Agent 本身对 <code>xiaopingfeng.com</code> 里的文章 DOM 没有任何直接访问权限，
-      所有操作都通过在独立窗口里打开的文章自带的接收器脚本完成，
-      脚本只信任来自 <b>https://roam.xiaopingfeng.com</b> 的消息。
+    <section class="spec-section" id="sec-origin">
+      <span class="n">01 / 起源</span>
+      <h2>能不能把大脑塞进浏览器</h2>
+      <p>这个页面最早的版本，是想验证一件很直接的事：Agent 的"大脑"能不能完全塞进浏览器里，不依赖任何后端。<strong>WebLLM</strong> 用 WebGPU 在本地跑一个十亿参数量级的小模型，工具调用直接读写页面自己的 DOM——这部分很快就跑通了，模型自己决定该调用哪个工具、拿到真实的页面数据、给出总结，全程没有服务器参与协调。</p>
+    </section>
+
+    <section class="spec-section" id="sec-cage">
+      <span class="n">02 / 越狱</span>
+      <h2>跨过同源策略这道墙</h2>
+      <p>跑通同页操作之后，很自然地想再往前一步：能不能让这个 Agent 跨过浏览器最基本的一道防线——<strong>同源策略</strong>——去操作另一个域名下的真实网页？答案是可以，但要靠 <code>postMessage</code> 搭一座桥：目标页面得自己放一小段"接收器脚本"，只信任来自这边域名的消息。我们真的把它接到了 <code>xiaopingfeng.com</code> 上一篇正式发布的文章，隔着两个域名读它的小节、数它的关键词、高亮它的段落——跟 Google/GitHub 登录弹窗背后用的是同一套 postMessage 手法。</p>
+    </section>
+
+    <section class="spec-section" id="sec-collapse">
+      <span class="n">03 / 折回</span>
+      <h2>把复杂度收回自己身上</h2>
+      <p>但那个版本有它自己的重量：要管理一个独立弹出窗口的生命周期，要在两边分别写握手协议，还要应对 <strong>Cloudflare 边缘缓存</strong>把旧版接收器脚本缓存四小时的意外——修好代码不代表用户能立刻用上新代码。这一版把这些全部拆掉：Agent 现在操作的就是它自己所在的这张页面。少了一次跨域桥接，也少了一整类只有跨域场景才会出现的 bug。</p>
+    </section>
+
+    <section class="spec-section" id="sec-failure">
+      <span class="n">04 / 翻车集</span>
+      <h2>小模型没有那么听话</h2>
+      <p>本地小模型不太守规矩。1B 参数的 Llama 会把系统提示词里当占位符写的"推理"两个字原样抄进输出；1.7B 的 SmolLM2 拿到真实数据后不知道什么时候该停，或者把整个观察对象塞进本该是一句话总结的字段里；两个模型都出现过要求"对比两个词出现次数"，结果<strong>编一个数字应付了事</strong>——跟它之前明明调用工具拿到的真实数字对不上。</p>
+    </section>
+
+    <section class="spec-section" id="sec-fix">
+      <span class="n">05 / 补丁</span>
+      <h2>修的不是模型，是脚手架</h2>
+      <p>真正让任务稳定跑起来的，不是换一套更聪明的措辞，是把容易出错的部分挪出模型的职责范围：数字比较这种事交给一段确定性的代码，而不是指望模型心算；给格式占位符套上尖括号提醒"这是要替换的"，而不是直接给一个容易被原样抄走的样板；在代码里硬性拦截"没有真的调用过工具就想给最终答案"这种半真半假的输出。换成本机跑着的一个三十亿参数级别以上的 <strong>Ollama</strong> 模型后，同样的任务第一次全部一次做对——但这层保险还是留着，因为没人能保证下一个模型不会有自己的新花样。</p>
+    </section>
+
+    <section class="spec-section" id="sec-now">
+      <span class="n">06 / 现在</span>
+      <h2>三种大脑，同一套手脚</h2>
+      <p>现在这个 Agent 可以换三种大脑：浏览器本地跑的小模型（完全离线，WebGPU 推理，不发送任何数据）、任意 OpenAI 兼容的云端接口（自己填 key，只存在你浏览器的 <code>localStorage</code>）、或者你自己电脑上跑着的 <strong>Ollama</strong>。三种背后跑的是完全相同的一套工具和同一个循环——真正变化的，只是"谁在做决定"。右边试试看，比如让它数一下这页提到了几次"数据"。</p>
+    </section>
+
+  </article>
+
+  <aside class="console">
+
+    <div class="source-tabs">
+      <label><input type="radio" name="source" value="local" checked><span>本地 WebLLM</span></label>
+      <label><input type="radio" name="source" value="cloud"><span>云端 API</span></label>
+      <label><input type="radio" name="source" value="ollama"><span>Ollama</span></label>
     </div>
 
-    <div class="row">
-      <button id="open-article-btn">在新窗口打开文章</button>
-      <span id="window-status" class="sub" style="color:var(--muted);font-size:12px">尚未打开</span>
-    </div>
-
-    <div class="row" style="font-size:13px">
-      <label><input type="radio" name="source" value="local" checked> 本地 WebLLM</label>
-      <label><input type="radio" name="source" value="cloud"> 云端 API (OpenAI 兼容)</label>
-      <label><input type="radio" name="source" value="ollama"> 本机 Ollama</label>
-    </div>
-
-    <div id="local-config">
-      <div class="row">
-        <select id="model-select">
-          <option value="Llama-3.2-1B-Instruct-q4f16_1-MLC">Llama-3.2-1B-Instruct (约 0.9GB)</option>
-          <option value="Qwen2.5-0.5B-Instruct-q4f16_1-MLC">Qwen2.5-0.5B-Instruct (约 0.5GB)</option>
-          <option value="SmolLM2-1.7B-Instruct-q4f16_1-MLC">SmolLM2-1.7B-Instruct (约 1.4GB)</option>
-        </select>
-        <button id="load-btn">加载模型</button>
-      </div>
+    <div id="local-config" class="field-group">
+      <select id="model-select">
+        <option value="Llama-3.2-1B-Instruct-q4f16_1-MLC">Llama-3.2-1B-Instruct · 约 0.9GB</option>
+        <option value="Qwen2.5-0.5B-Instruct-q4f16_1-MLC">Qwen2.5-0.5B-Instruct · 约 0.5GB</option>
+        <option value="SmolLM2-1.7B-Instruct-q4f16_1-MLC">SmolLM2-1.7B-Instruct · 约 1.4GB</option>
+      </select>
+      <button id="load-btn">加载模型</button>
       <progress id="progress" value="0" max="1" style="display:none"></progress>
-      <div id="progress-text" class="sub" style="color:var(--muted);font-size:12px"></div>
+      <div id="progress-text" class="status-line"></div>
     </div>
 
-    <div id="cloud-config" style="display:none;flex-direction:column;gap:8px">
-      <div class="origin-note">
-        Key 只存在你自己浏览器的 <code>localStorage</code> 里，请求直接从浏览器发到你填的 Base URL，
-        不经过 <code>roam.xiaopingfeng.com</code> 或任何第三方服务器。刷新页面前建议自己清空。
-      </div>
+    <div id="cloud-config" class="field-group" style="display:none">
+      <div class="note">Key 只存在你浏览器的 <b>localStorage</b>，请求直接从浏览器发到你填的地址，不经过 roam.xiaopingfeng.com。</div>
+      <input id="cloud-base-url" placeholder="Base URL，例如 https://openrouter.ai/api/v1">
+      <input id="cloud-api-key" type="password" placeholder="API Key">
       <div class="row">
-        <input id="cloud-base-url" placeholder="Base URL，例如 https://openrouter.ai/api/v1" style="flex:1">
-      </div>
-      <div class="row">
-        <input id="cloud-api-key" type="password" placeholder="API Key" style="flex:1">
-      </div>
-      <div class="row">
-        <input id="cloud-model" placeholder="模型名，例如 anthropic/claude-3.5-haiku 或 glm-4-flash" style="flex:1">
+        <input id="cloud-model" placeholder="模型名，如 anthropic/claude-3.5-haiku">
         <button id="cloud-save-btn">保存</button>
       </div>
-      <div id="cloud-status" class="sub" style="color:var(--muted);font-size:12px">尚未配置</div>
+      <div id="cloud-status" class="status-line">尚未配置</div>
     </div>
 
-    <div id="ollama-config" style="display:none;flex-direction:column;gap:8px">
-      <div class="origin-note">
-        直接从浏览器 fetch 你本机的 Ollama，不经过任何服务器。Ollama 默认只放行 <code>localhost</code>
-        来源的跨域请求——这个页面是 <code>roam.xiaopingfeng.com</code>，不是 localhost，所以需要先
-        <code>OLLAMA_ORIGINS=https://roam.xiaopingfeng.com ollama serve</code> 重启本机的 Ollama，
-        否则会被 Ollama 自己的 CORS 策略拒绝（403，不是网络问题）。
+    <div id="ollama-config" class="field-group" style="display:none">
+      <div class="note">
+        Ollama 默认只放行 <b>localhost</b> 来源的跨域请求。这个页面是 <code>roam.xiaopingfeng.com</code>，
+        需要先 <code>OLLAMA_ORIGINS=https://roam.xiaopingfeng.com ollama serve</code> 重启，
+        否则会被 403 拒绝（不是网络问题）。
       </div>
+      <input id="ollama-base-url" value="http://localhost:11434/v1">
       <div class="row">
-        <input id="ollama-base-url" placeholder="Base URL" value="http://localhost:11434/v1" style="flex:1">
-      </div>
-      <div class="row">
-        <input id="ollama-model" placeholder="模型名，例如 llama3.2 或 qwen2.5" style="flex:1">
+        <input id="ollama-model" placeholder="模型名，如 llama3.2">
         <button id="ollama-save-btn">保存</button>
       </div>
-      <div id="ollama-status" class="sub" style="color:var(--muted);font-size:12px">尚未配置</div>
+      <div id="ollama-status" class="status-line">尚未配置</div>
     </div>
 
-    <div id="bridge-status" class="sub" style="color:var(--muted);font-size:12px">桥接状态: 等待打开文章窗口…</div>
-
-    <div class="row">
-      <input id="task-input" placeholder="例如：数一下 VendingBench 出现了几次" style="flex:1" disabled>
-      <button id="run-btn" disabled>执行任务</button>
+    <div class="task-row">
+      <input id="task-input" placeholder="例如：数一下“数据”出现了几次" disabled>
+      <button id="run-btn" disabled>执行</button>
     </div>
 
-    <div class="row" style="font-size:12px;color:var(--muted)">
-      工具：<code>get_title</code> · <code>list_sections</code> · <code>count_keyword</code> · <code>find_and_highlight_section</code>
+    <div class="tools-list">
+      <code>get_title</code> <code>list_sections</code> <code>count_keyword</code> <code>find_and_highlight_section</code>
     </div>
 
-    <h3 style="margin-top:8px">执行轨迹</h3>
-    <div id="log"><div class="sub" style="color:var(--muted)">等待加载模型…</div></div>
-  </div>
+    <div id="log"></div>
+
+  </aside>
 
 </div>
 
 <footer>
-  文章来源：<a href="https://xiaopingfeng.com/deepdive/agent-economy/" target="_blank" rel="noopener">机器经济元年：Agent 如何拿到钱包、身份与第一份工作</a> ·
-  本地推理用 <a href="https://github.com/mlc-ai/web-llm" target="_blank" rel="noopener">WebLLM</a>，需要支持 WebGPU 的浏览器（Chrome / Edge 最新版）；
-  云端 API 需要自备 OpenAI 兼容接口的 Base URL / Key / 模型名；
-  本机 Ollama 需要先用 <code>OLLAMA_ORIGINS=https://roam.xiaopingfeng.com ollama serve</code> 重启。
+  本地推理用 <a href="https://github.com/mlc-ai/web-llm" target="_blank" rel="noopener">WebLLM</a>，需要支持 WebGPU 的浏览器（Chrome / Edge 最新版）·
+  Agent 只操作这一张页面自己的 DOM，不发起任何跨站请求 · <a href="/browser-agent-webllm-legacy/">上一版：跨源操作真实文章 →</a>
 </footer>
 
 <script type="module">
 import * as webllm from "https://esm.run/@mlc-ai/web-llm";
 
 const $ = (id) => document.getElementById(id);
-const badge = $("engine-badge");
+const vitalDot = $("vital-dot");
+const vitalText = $("vital-text");
 const progressEl = $("progress");
 const progressText = $("progress-text");
 const loadBtn = $("load-btn");
@@ -187,9 +320,6 @@ const modelSelect = $("model-select");
 const taskInput = $("task-input");
 const runBtn = $("run-btn");
 const logEl = $("log");
-const bridgeStatus = $("bridge-status");
-const openArticleBtn = $("open-article-btn");
-const windowStatus = $("window-status");
 const localConfig = $("local-config");
 const cloudConfig = $("cloud-config");
 const cloudBaseUrl = $("cloud-base-url");
@@ -202,17 +332,19 @@ const ollamaBaseUrl = $("ollama-base-url");
 const ollamaModel = $("ollama-model");
 const ollamaSaveBtn = $("ollama-save-btn");
 const ollamaStatus = $("ollama-status");
+const specimen = document.querySelector(".specimen");
 
-const ARTICLE_URL = "https://xiaopingfeng.com/deepdive/agent-economy/";
-const ARTICLE_ORIGIN = "https://xiaopingfeng.com";
 let engine = null;
-let bridgeReady = false;
-let articleWindow = null;
 let source = "local";
 let cloudReady = false;
 let ollamaReady = false;
 
-const CLOUD_STORAGE_KEY = "agent-demo-cloud-config";
+function setVital(state, text){
+  vitalDot.className = "dot " + state;
+  vitalText.textContent = text;
+}
+
+const CLOUD_STORAGE_KEY = "self-agent-cloud-config";
 (function restoreCloudConfig(){
   try {
     const saved = JSON.parse(localStorage.getItem(CLOUD_STORAGE_KEY) || "null");
@@ -221,13 +353,13 @@ const CLOUD_STORAGE_KEY = "agent-demo-cloud-config";
       cloudApiKey.value = saved.apiKey;
       cloudModel.value = saved.model;
       cloudReady = true;
-      cloudStatus.textContent = `已从上次保存恢复: ${saved.baseUrl} · ${saved.model}`;
-      cloudStatus.style.color = "var(--ok)";
+      cloudStatus.textContent = `已恢复: ${saved.baseUrl} · ${saved.model}`;
+      cloudStatus.className = "status-line ok";
     }
   } catch (e) {}
 })();
 
-const OLLAMA_STORAGE_KEY = "agent-demo-ollama-config";
+const OLLAMA_STORAGE_KEY = "self-agent-ollama-config";
 (function restoreOllamaConfig(){
   try {
     const saved = JSON.parse(localStorage.getItem(OLLAMA_STORAGE_KEY) || "null");
@@ -235,8 +367,8 @@ const OLLAMA_STORAGE_KEY = "agent-demo-ollama-config";
       ollamaBaseUrl.value = saved.baseUrl;
       ollamaModel.value = saved.model;
       ollamaReady = true;
-      ollamaStatus.textContent = `已从上次保存恢复: ${saved.baseUrl} · ${saved.model}`;
-      ollamaStatus.style.color = "var(--ok)";
+      ollamaStatus.textContent = `已恢复: ${saved.baseUrl} · ${saved.model}`;
+      ollamaStatus.className = "status-line ok";
     }
   } catch (e) {}
 })();
@@ -244,7 +376,7 @@ const OLLAMA_STORAGE_KEY = "agent-demo-ollama-config";
 document.querySelectorAll('input[name="source"]').forEach((radio) => {
   radio.addEventListener("change", () => {
     source = radio.value;
-    localConfig.style.display = source === "local" ? "block" : "none";
+    localConfig.style.display = source === "local" ? "flex" : "none";
     cloudConfig.style.display = source === "cloud" ? "flex" : "none";
     ollamaConfig.style.display = source === "ollama" ? "flex" : "none";
     maybeEnableRun();
@@ -257,14 +389,14 @@ cloudSaveBtn.addEventListener("click", () => {
   const model = cloudModel.value.trim();
   if (!baseUrl || !apiKey || !model) {
     cloudStatus.textContent = "Base URL / API Key / 模型名都要填";
-    cloudStatus.style.color = "var(--err)";
+    cloudStatus.className = "status-line err";
     cloudReady = false;
     maybeEnableRun();
     return;
   }
   localStorage.setItem(CLOUD_STORAGE_KEY, JSON.stringify({ baseUrl, apiKey, model }));
-  cloudStatus.textContent = `已保存: ${baseUrl} · ${model}（存在 localStorage，未做任何网络请求验证）`;
-  cloudStatus.style.color = "var(--ok)";
+  cloudStatus.textContent = `已保存: ${baseUrl} · ${model}`;
+  cloudStatus.className = "status-line ok";
   cloudReady = true;
   maybeEnableRun();
 });
@@ -274,89 +406,79 @@ ollamaSaveBtn.addEventListener("click", () => {
   const model = ollamaModel.value.trim();
   if (!baseUrl || !model) {
     ollamaStatus.textContent = "Base URL / 模型名都要填";
-    ollamaStatus.style.color = "var(--err)";
+    ollamaStatus.className = "status-line err";
     ollamaReady = false;
     maybeEnableRun();
     return;
   }
   localStorage.setItem(OLLAMA_STORAGE_KEY, JSON.stringify({ baseUrl, model }));
-  ollamaStatus.textContent = `已保存: ${baseUrl} · ${model}（未做任何网络请求验证）`;
-  ollamaStatus.style.color = "var(--ok)";
+  ollamaStatus.textContent = `已保存: ${baseUrl} · ${model}`;
+  ollamaStatus.className = "status-line ok";
   ollamaReady = true;
   maybeEnableRun();
-});
-
-openArticleBtn.addEventListener("click", () => {
-  articleWindow = window.open(ARTICLE_URL, "_blank");
-  if (!articleWindow) {
-    windowStatus.textContent = "打开失败，可能被浏览器拦截了弹窗，请允许弹窗后重试";
-    windowStatus.style.color = "var(--err)";
-    return;
-  }
-  bridgeReady = false;
-  bridgeStatus.textContent = "桥接状态: 窗口已打开，等待文章页握手…";
-  bridgeStatus.style.color = "var(--warn)";
-  windowStatus.textContent = "已打开新窗口，等待握手…";
-  windowStatus.style.color = "var(--muted)";
 });
 
 function clearLog(){ logEl.innerHTML = ""; }
 function logStep(tag, label, content){
   const div = document.createElement("div");
   div.className = "step";
-  div.innerHTML = `<span class="tag ${tag}">${label}</span><span></span>`;
-  div.querySelector("span:last-child").textContent = content;
+  div.innerHTML = `<span class="tag ${tag}">${label}</span><div class="step-body"></div>`;
+  div.querySelector(".step-body").textContent = content;
   logEl.appendChild(div);
   logEl.scrollTop = logEl.scrollHeight;
 }
 
-let reqCounter = 0;
-const pending = new Map();
+/* ---------- tools: operate on THIS page's own DOM ---------- */
+function getTitle(){
+  const h1 = document.querySelector(".hero h1");
+  const dek = document.querySelector(".hero .dek");
+  return { title: h1 ? h1.innerText.trim() : null, dek: dek ? dek.innerText.trim() : null };
+}
 
-window.addEventListener("message", (event) => {
-  if (event.origin !== ARTICLE_ORIGIN) return;
-  const msg = event.data;
-  if (!msg) return;
-  if (msg.type === "agent-rpc-ready") {
-    bridgeReady = true;
-    bridgeStatus.textContent = `桥接状态: 已连接 ${ARTICLE_ORIGIN}（跨源 postMessage 通道就绪，独立窗口）`;
-    bridgeStatus.style.color = "var(--ok)";
-    windowStatus.textContent = "已握手，窗口就绪";
-    windowStatus.style.color = "var(--ok)";
-    maybeEnableRun();
-    return;
-  }
-  if (msg.type === "agent-rpc-response" && pending.has(msg.id)) {
-    const { resolve, reject } = pending.get(msg.id);
-    pending.delete(msg.id);
-    if (msg.error) reject(new Error(msg.error));
-    else resolve(msg.result);
-  }
-});
-
-function callArticle(action, args){
-  return new Promise((resolve, reject) => {
-    if (!articleWindow || articleWindow.closed) {
-      reject(new Error("文章窗口未打开或已被关闭"));
-      return;
-    }
-    const id = ++reqCounter;
-    pending.set(id, { resolve, reject });
-    articleWindow.postMessage({ type: "agent-rpc-request", id, action, args }, ARTICLE_ORIGIN);
-    setTimeout(() => {
-      if (pending.has(id)) { pending.delete(id); reject(new Error("跨源调用超时: " + action)); }
-    }, 8000);
+function listSections(){
+  return Array.from(document.querySelectorAll(".spec-section")).map((sec) => {
+    const h2 = sec.querySelector("h2");
+    return { id: sec.id, heading: h2 ? h2.innerText.trim() : null };
   });
 }
 
+function countKeyword({ keyword }){
+  if (!keyword) return { error: "缺少 keyword 参数" };
+  const text = specimen.innerText;
+  const re = new RegExp(keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+  const matches = text.match(re);
+  return { keyword, count: matches ? matches.length : 0 };
+}
+
+function findAndHighlightSection({ keyword }){
+  if (!keyword) return { error: "缺少 keyword 参数" };
+  document.querySelectorAll(".agent-highlight").forEach((el) => el.classList.remove("agent-highlight"));
+  const sections = document.querySelectorAll(".spec-section");
+  for (const sec of sections){
+    if (sec.innerText.indexOf(keyword) !== -1){
+      sec.classList.add("agent-highlight");
+      sec.scrollIntoView({ behavior: "smooth", block: "center" });
+      const h2 = sec.querySelector("h2");
+      const idx = sec.innerText.indexOf(keyword);
+      return {
+        found: true,
+        id: sec.id,
+        heading: h2 ? h2.innerText.trim() : null,
+        snippet: sec.innerText.slice(Math.max(0, idx - 20), idx + keyword.length + 20).trim(),
+      };
+    }
+  }
+  return { found: false };
+}
+
 const TOOLS = {
-  get_title: { fn: () => callArticle("get_title"), desc: "获取文章标题和摘要，无参数" },
-  list_sections: { fn: () => callArticle("list_sections"), desc: "列出文章所有小节的 id 和标题，无参数" },
-  count_keyword: { fn: (args) => callArticle("count_keyword", args), desc: "统计某个关键词在全文中出现的次数，参数: {keyword}" },
-  find_and_highlight_section: { fn: (args) => callArticle("find_and_highlight_section", args), desc: "找到包含某关键词的小节并在文章里高亮显示，参数: {keyword}" },
+  get_title: { fn: () => getTitle(), desc: "获取这张页面的标题和摘要，无参数" },
+  list_sections: { fn: () => listSections(), desc: "列出这张页面所有小节的 id 和标题，无参数" },
+  count_keyword: { fn: (args) => countKeyword(args || {}), desc: "统计某个关键词在这张页面正文中出现的次数，参数: {keyword}" },
+  find_and_highlight_section: { fn: (args) => findAndHighlightSection(args || {}), desc: "找到包含某关键词的小节并在页面里高亮显示，参数: {keyword}" },
 };
 
-const SYSTEM_PROMPT = `你是一个通过跨源 postMessage 通道操作一篇网页文章的 Agent。你自己看不到文章内容，只能通过工具查询。
+const SYSTEM_PROMPT = `你是一个运行在这张网页里的 Agent，通过工具直接操作这张页面自己的 DOM。你自己看不到页面内容，只能通过工具查询。
 
 可用工具:
 ${Object.entries(TOOLS).map(([name, t]) => `- ${name}: ${t.desc}`).join("\n")}
@@ -366,13 +488,13 @@ ${Object.entries(TOOLS).map(([name, t]) => `- ${name}: ${t.desc}`).join("\n")}
 2. 格式二选一(下面 <> 里的内容都要换成你自己的真实内容，不要照抄):
    {"thought": "<你此刻的推理，一句话>", "action": "<工具名，从上面列表里选一个>", "args": {}}
    {"thought": "<你此刻的推理，一句话>", "final_answer": "<任务完成后的真实总结>"}
-3. 不能凭空编造文章内容，必须先调用工具拿到真实数据再回答。
+3. 不能凭空编造页面内容，必须先调用工具拿到真实数据再回答。
 
 示例:
-用户: 任务: 数一下 VendingBench 出现了几次
-你: {"thought": "用 count_keyword 统计", "action": "count_keyword", "args": {"keyword": "VendingBench"}}
-观察结果: {"keyword": "VendingBench", "count": 7}
-你: {"thought": "完成", "final_answer": "VendingBench 在文章里出现了 7 次"}`;
+用户: 任务: 数一下"数据"出现了几次
+你: {"thought": "用 count_keyword 统计", "action": "count_keyword", "args": {"keyword": "数据"}}
+观察结果: {"keyword": "数据", "count": 3}
+你: {"thought": "完成", "final_answer": "数据 这个词在页面里出现了 3 次"}`;
 
 const FORMAT_REMINDER = "(只返回一个 JSON 对象，不要写代码，不要用 markdown)";
 
@@ -393,7 +515,7 @@ async function llmChat(messages){
         body: JSON.stringify({ model: saved.model, messages, temperature: 0.2, max_tokens: 200 }),
       });
     } catch (e) {
-      throw new Error(`连不上 Ollama (${saved.baseUrl})：确认本机 Ollama 在跑，并且已经用 OLLAMA_ORIGINS=https://roam.xiaopingfeng.com 允许这个页面的域名后重启 ollama serve。原始错误: ${e}`);
+      throw new Error(`连不上 Ollama (${saved.baseUrl})：确认本机 Ollama 在跑，且已用 OLLAMA_ORIGINS 允许这个页面的域名后重启 ollama serve。原始错误: ${e}`);
     }
     if (!res.ok) {
       const errText = await res.text().catch(() => "");
@@ -407,10 +529,7 @@ async function llmChat(messages){
   if (!saved) throw new Error("云端 API 未配置");
   const res = await fetch(`${saved.baseUrl}/chat/completions`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${saved.apiKey}`,
-    },
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${saved.apiKey}` },
     body: JSON.stringify({ model: saved.model, messages, temperature: 0.2, max_tokens: 200 }),
   });
   if (!res.ok) {
@@ -476,7 +595,7 @@ async function runAgent(task){
       continue;
     }
 
-    logStep("action", "调用(跨源)", `${toolName}(${JSON.stringify(parsed.args || {})})`);
+    logStep("action", "调用", `${toolName}(${JSON.stringify(parsed.args || {})})`);
     let obs;
     try {
       obs = await tool.fn(parsed.args || {});
@@ -492,26 +611,20 @@ async function runAgent(task){
 
 function maybeEnableRun(){
   const inferenceReady = source === "local" ? !!engine : source === "ollama" ? ollamaReady : cloudReady;
-  if (bridgeReady && inferenceReady) {
-    taskInput.disabled = false;
-    runBtn.disabled = false;
-  } else {
-    taskInput.disabled = true;
-    runBtn.disabled = true;
-  }
+  taskInput.disabled = !inferenceReady;
+  runBtn.disabled = !inferenceReady;
+  if (inferenceReady) setVital("ready", "就绪");
 }
 
 loadBtn.addEventListener("click", async () => {
   if (!navigator.gpu) {
-    badge.textContent = "浏览器不支持 WebGPU";
-    badge.className = "badge error";
+    setVital("error", "不支持 WebGPU");
     return;
   }
   loadBtn.disabled = true;
   modelSelect.disabled = true;
   progressEl.style.display = "block";
-  badge.textContent = "加载中…";
-  badge.className = "badge loading";
+  setVital("busy", "加载模型中…");
   clearLog();
 
   const modelId = modelSelect.value;
@@ -522,13 +635,10 @@ loadBtn.addEventListener("click", async () => {
         progressText.textContent = p.text || "";
       },
     });
-    badge.textContent = `已就绪: ${modelId}`;
-    badge.className = "badge ready";
     logStep("obs", "就绪", `模型 ${modelId} 已在本地加载完成。`);
     maybeEnableRun();
   } catch (e) {
-    badge.textContent = "加载失败";
-    badge.className = "badge error";
+    setVital("error", "加载失败");
     logStep("err", "错误", String(e));
     loadBtn.disabled = false;
     modelSelect.disabled = false;
@@ -542,12 +652,15 @@ runBtn.addEventListener("click", async () => {
   if (source === "cloud" && !cloudReady) return;
   if (source === "ollama" && !ollamaReady) return;
   runBtn.disabled = true;
+  setVital("busy", "推理中…");
   clearLog();
   logStep("thought", "任务", task);
   try {
     await runAgent(task);
+    setVital("ready", "就绪");
   } catch (e) {
     logStep("err", "异常", String(e));
+    setVital("error", "出错");
   }
   runBtn.disabled = false;
 });
