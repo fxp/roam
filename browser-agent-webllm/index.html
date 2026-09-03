@@ -66,10 +66,13 @@
     只信任来自 <code>roam.xiaopingfeng.com</code> 的消息，靠 <code>postMessage</code> 收发——
     跟 <code>window.open()</code> 打开的独立窗口通信，和跟 <code>iframe</code> 通信走的是同一套
     postMessage 机制，这也是几乎所有"第三方登录弹窗"（Google/GitHub OAuth）背后用的手法。
-    左边的 Agent 可以选本地推理，也可以切到"云端 API"——本地用 <a href="https://github.com/mlc-ai/web-llm" target="_blank" rel="noopener">WebLLM</a>
-    在浏览器里跑一个小模型（WebGPU 推理，不发送任何数据到服务器）；云端则是任意 OpenAI 兼容接口
-    （OpenRouter / 智谱 BigModel 等），Key 只存在你自己浏览器的 localStorage，请求直接从浏览器发到你填的地址，
-    同样不经过 <code>roam.xiaopingfeng.com</code>。不管哪种，模型自己决定该调用哪个工具去读文章、
+    左边的 Agent 有三种推理来源可选：本地用 <a href="https://github.com/mlc-ai/web-llm" target="_blank" rel="noopener">WebLLM</a>
+    在浏览器里跑一个小模型（WebGPU 推理，不发送任何数据到服务器）；云端 API 是任意 OpenAI 兼容接口
+    （OpenRouter / 智谱 BigModel 等）；本机 Ollama 则是直接连你自己电脑上跑的模型。后两种的 Key/地址
+    只存在你自己浏览器的 localStorage，请求直接从浏览器发到你填的地址，同样不经过
+    <code>roam.xiaopingfeng.com</code>——Ollama 那条路径亲测下来能明显更稳：本地 1B/1.7B 小模型
+    常选错工具、编造数字，换成本机一个 30B 级别的 Ollama 模型后，同样的多步任务全部一次做对。
+    不管哪种，模型自己决定该调用哪个工具去读文章、
     数关键词、找到某一段并高亮——协调过程全程没有我的后端服务器参与。
   </p>
 </div>
@@ -97,6 +100,7 @@
     <div class="row" style="font-size:13px">
       <label><input type="radio" name="source" value="local" checked> 本地 WebLLM</label>
       <label><input type="radio" name="source" value="cloud"> 云端 API (OpenAI 兼容)</label>
+      <label><input type="radio" name="source" value="ollama"> 本机 Ollama</label>
     </div>
 
     <div id="local-config">
@@ -130,6 +134,23 @@
       <div id="cloud-status" class="sub" style="color:var(--muted);font-size:12px">尚未配置</div>
     </div>
 
+    <div id="ollama-config" style="display:none;flex-direction:column;gap:8px">
+      <div class="origin-note">
+        直接从浏览器 fetch 你本机的 Ollama，不经过任何服务器。Ollama 默认只放行 <code>localhost</code>
+        来源的跨域请求——这个页面是 <code>roam.xiaopingfeng.com</code>，不是 localhost，所以需要先
+        <code>OLLAMA_ORIGINS=https://roam.xiaopingfeng.com ollama serve</code> 重启本机的 Ollama，
+        否则会被 Ollama 自己的 CORS 策略拒绝（403，不是网络问题）。
+      </div>
+      <div class="row">
+        <input id="ollama-base-url" placeholder="Base URL" value="http://localhost:11434/v1" style="flex:1">
+      </div>
+      <div class="row">
+        <input id="ollama-model" placeholder="模型名，例如 llama3.2 或 qwen2.5" style="flex:1">
+        <button id="ollama-save-btn">保存</button>
+      </div>
+      <div id="ollama-status" class="sub" style="color:var(--muted);font-size:12px">尚未配置</div>
+    </div>
+
     <div id="bridge-status" class="sub" style="color:var(--muted);font-size:12px">桥接状态: 等待打开文章窗口…</div>
 
     <div class="row">
@@ -150,7 +171,8 @@
 <footer>
   文章来源：<a href="https://xiaopingfeng.com/deepdive/agent-economy/" target="_blank" rel="noopener">机器经济元年：Agent 如何拿到钱包、身份与第一份工作</a> ·
   本地推理用 <a href="https://github.com/mlc-ai/web-llm" target="_blank" rel="noopener">WebLLM</a>，需要支持 WebGPU 的浏览器（Chrome / Edge 最新版）；
-  云端 API 需要自备 OpenAI 兼容接口的 Base URL / Key / 模型名。
+  云端 API 需要自备 OpenAI 兼容接口的 Base URL / Key / 模型名；
+  本机 Ollama 需要先用 <code>OLLAMA_ORIGINS=https://roam.xiaopingfeng.com ollama serve</code> 重启。
 </footer>
 
 <script type="module">
@@ -175,6 +197,11 @@ const cloudApiKey = $("cloud-api-key");
 const cloudModel = $("cloud-model");
 const cloudSaveBtn = $("cloud-save-btn");
 const cloudStatus = $("cloud-status");
+const ollamaConfig = $("ollama-config");
+const ollamaBaseUrl = $("ollama-base-url");
+const ollamaModel = $("ollama-model");
+const ollamaSaveBtn = $("ollama-save-btn");
+const ollamaStatus = $("ollama-status");
 
 const ARTICLE_URL = "https://xiaopingfeng.com/deepdive/agent-economy/";
 const ARTICLE_ORIGIN = "https://xiaopingfeng.com";
@@ -183,6 +210,7 @@ let bridgeReady = false;
 let articleWindow = null;
 let source = "local";
 let cloudReady = false;
+let ollamaReady = false;
 
 const CLOUD_STORAGE_KEY = "agent-demo-cloud-config";
 (function restoreCloudConfig(){
@@ -199,11 +227,26 @@ const CLOUD_STORAGE_KEY = "agent-demo-cloud-config";
   } catch (e) {}
 })();
 
+const OLLAMA_STORAGE_KEY = "agent-demo-ollama-config";
+(function restoreOllamaConfig(){
+  try {
+    const saved = JSON.parse(localStorage.getItem(OLLAMA_STORAGE_KEY) || "null");
+    if (saved && saved.baseUrl && saved.model) {
+      ollamaBaseUrl.value = saved.baseUrl;
+      ollamaModel.value = saved.model;
+      ollamaReady = true;
+      ollamaStatus.textContent = `已从上次保存恢复: ${saved.baseUrl} · ${saved.model}`;
+      ollamaStatus.style.color = "var(--ok)";
+    }
+  } catch (e) {}
+})();
+
 document.querySelectorAll('input[name="source"]').forEach((radio) => {
   radio.addEventListener("change", () => {
     source = radio.value;
     localConfig.style.display = source === "local" ? "block" : "none";
     cloudConfig.style.display = source === "cloud" ? "flex" : "none";
+    ollamaConfig.style.display = source === "ollama" ? "flex" : "none";
     maybeEnableRun();
   });
 });
@@ -223,6 +266,23 @@ cloudSaveBtn.addEventListener("click", () => {
   cloudStatus.textContent = `已保存: ${baseUrl} · ${model}（存在 localStorage，未做任何网络请求验证）`;
   cloudStatus.style.color = "var(--ok)";
   cloudReady = true;
+  maybeEnableRun();
+});
+
+ollamaSaveBtn.addEventListener("click", () => {
+  const baseUrl = ollamaBaseUrl.value.trim().replace(/\/$/, "");
+  const model = ollamaModel.value.trim();
+  if (!baseUrl || !model) {
+    ollamaStatus.textContent = "Base URL / 模型名都要填";
+    ollamaStatus.style.color = "var(--err)";
+    ollamaReady = false;
+    maybeEnableRun();
+    return;
+  }
+  localStorage.setItem(OLLAMA_STORAGE_KEY, JSON.stringify({ baseUrl, model }));
+  ollamaStatus.textContent = `已保存: ${baseUrl} · ${model}（未做任何网络请求验证）`;
+  ollamaStatus.style.color = "var(--ok)";
+  ollamaReady = true;
   maybeEnableRun();
 });
 
@@ -321,6 +381,28 @@ async function llmChat(messages){
     const reply = await engine.chat.completions.create({ messages, temperature: 0.2, max_tokens: 200 });
     return reply.choices[0].message.content;
   }
+
+  if (source === "ollama") {
+    const saved = JSON.parse(localStorage.getItem(OLLAMA_STORAGE_KEY) || "null");
+    if (!saved) throw new Error("Ollama 未配置");
+    let res;
+    try {
+      res = await fetch(`${saved.baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: saved.model, messages, temperature: 0.2, max_tokens: 200 }),
+      });
+    } catch (e) {
+      throw new Error(`连不上 Ollama (${saved.baseUrl})：确认本机 Ollama 在跑，并且已经用 OLLAMA_ORIGINS=https://roam.xiaopingfeng.com 允许这个页面的域名后重启 ollama serve。原始错误: ${e}`);
+    }
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      throw new Error(`Ollama 请求失败 (${res.status}): ${errText.slice(0, 300)}`);
+    }
+    const data = await res.json();
+    return data.choices[0].message.content;
+  }
+
   const saved = JSON.parse(localStorage.getItem(CLOUD_STORAGE_KEY) || "null");
   if (!saved) throw new Error("云端 API 未配置");
   const res = await fetch(`${saved.baseUrl}/chat/completions`, {
@@ -409,7 +491,7 @@ async function runAgent(task){
 }
 
 function maybeEnableRun(){
-  const inferenceReady = source === "local" ? !!engine : cloudReady;
+  const inferenceReady = source === "local" ? !!engine : source === "ollama" ? ollamaReady : cloudReady;
   if (bridgeReady && inferenceReady) {
     taskInput.disabled = false;
     runBtn.disabled = false;
@@ -458,6 +540,7 @@ runBtn.addEventListener("click", async () => {
   if (!task) return;
   if (source === "local" && !engine) return;
   if (source === "cloud" && !cloudReady) return;
+  if (source === "ollama" && !ollamaReady) return;
   runBtn.disabled = true;
   clearLog();
   logStep("thought", "任务", task);
