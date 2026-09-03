@@ -66,9 +66,11 @@
     只信任来自 <code>roam.xiaopingfeng.com</code> 的消息，靠 <code>postMessage</code> 收发——
     跟 <code>window.open()</code> 打开的独立窗口通信，和跟 <code>iframe</code> 通信走的是同一套
     postMessage 机制，这也是几乎所有"第三方登录弹窗"（Google/GitHub OAuth）背后用的手法。
-    左边的 Agent 用 <a href="https://github.com/mlc-ai/web-llm" target="_blank" rel="noopener">WebLLM</a>
-    在浏览器本地跑一个 1B 参数小模型（WebGPU 推理，不发送任何数据到服务器），
-    自己决定该调用哪个工具去读文章、数关键词、找到某一段并高亮——全程没有后端服务器参与协调。
+    左边的 Agent 可以选本地推理，也可以切到"云端 API"——本地用 <a href="https://github.com/mlc-ai/web-llm" target="_blank" rel="noopener">WebLLM</a>
+    在浏览器里跑一个小模型（WebGPU 推理，不发送任何数据到服务器）；云端则是任意 OpenAI 兼容接口
+    （OpenRouter / 智谱 BigModel 等），Key 只存在你自己浏览器的 localStorage，请求直接从浏览器发到你填的地址，
+    同样不经过 <code>roam.xiaopingfeng.com</code>。不管哪种，模型自己决定该调用哪个工具去读文章、
+    数关键词、找到某一段并高亮——协调过程全程没有我的后端服务器参与。
   </p>
 </div>
 
@@ -92,16 +94,41 @@
       <span id="window-status" class="sub" style="color:var(--muted);font-size:12px">尚未打开</span>
     </div>
 
-    <div class="row">
-      <select id="model-select">
-        <option value="Llama-3.2-1B-Instruct-q4f16_1-MLC">Llama-3.2-1B-Instruct (约 0.9GB)</option>
-        <option value="Qwen2.5-0.5B-Instruct-q4f16_1-MLC">Qwen2.5-0.5B-Instruct (约 0.5GB)</option>
-        <option value="SmolLM2-1.7B-Instruct-q4f16_1-MLC">SmolLM2-1.7B-Instruct (约 1.4GB)</option>
-      </select>
-      <button id="load-btn">加载模型</button>
+    <div class="row" style="font-size:13px">
+      <label><input type="radio" name="source" value="local" checked> 本地 WebLLM</label>
+      <label><input type="radio" name="source" value="cloud"> 云端 API (OpenAI 兼容)</label>
     </div>
-    <progress id="progress" value="0" max="1" style="display:none"></progress>
-    <div id="progress-text" class="sub" style="color:var(--muted);font-size:12px"></div>
+
+    <div id="local-config">
+      <div class="row">
+        <select id="model-select">
+          <option value="Llama-3.2-1B-Instruct-q4f16_1-MLC">Llama-3.2-1B-Instruct (约 0.9GB)</option>
+          <option value="Qwen2.5-0.5B-Instruct-q4f16_1-MLC">Qwen2.5-0.5B-Instruct (约 0.5GB)</option>
+          <option value="SmolLM2-1.7B-Instruct-q4f16_1-MLC">SmolLM2-1.7B-Instruct (约 1.4GB)</option>
+        </select>
+        <button id="load-btn">加载模型</button>
+      </div>
+      <progress id="progress" value="0" max="1" style="display:none"></progress>
+      <div id="progress-text" class="sub" style="color:var(--muted);font-size:12px"></div>
+    </div>
+
+    <div id="cloud-config" style="display:none;flex-direction:column;gap:8px">
+      <div class="origin-note">
+        Key 只存在你自己浏览器的 <code>localStorage</code> 里，请求直接从浏览器发到你填的 Base URL，
+        不经过 <code>roam.xiaopingfeng.com</code> 或任何第三方服务器。刷新页面前建议自己清空。
+      </div>
+      <div class="row">
+        <input id="cloud-base-url" placeholder="Base URL，例如 https://openrouter.ai/api/v1" style="flex:1">
+      </div>
+      <div class="row">
+        <input id="cloud-api-key" type="password" placeholder="API Key" style="flex:1">
+      </div>
+      <div class="row">
+        <input id="cloud-model" placeholder="模型名，例如 anthropic/claude-3.5-haiku 或 glm-4-flash" style="flex:1">
+        <button id="cloud-save-btn">保存</button>
+      </div>
+      <div id="cloud-status" class="sub" style="color:var(--muted);font-size:12px">尚未配置</div>
+    </div>
 
     <div id="bridge-status" class="sub" style="color:var(--muted);font-size:12px">桥接状态: 等待打开文章窗口…</div>
 
@@ -122,7 +149,8 @@
 
 <footer>
   文章来源：<a href="https://xiaopingfeng.com/deepdive/agent-economy/" target="_blank" rel="noopener">机器经济元年：Agent 如何拿到钱包、身份与第一份工作</a> ·
-  本地推理用 <a href="https://github.com/mlc-ai/web-llm" target="_blank" rel="noopener">WebLLM</a>，需要支持 WebGPU 的浏览器（Chrome / Edge 最新版）。
+  本地推理用 <a href="https://github.com/mlc-ai/web-llm" target="_blank" rel="noopener">WebLLM</a>，需要支持 WebGPU 的浏览器（Chrome / Edge 最新版）；
+  云端 API 需要自备 OpenAI 兼容接口的 Base URL / Key / 模型名。
 </footer>
 
 <script type="module">
@@ -140,12 +168,63 @@ const logEl = $("log");
 const bridgeStatus = $("bridge-status");
 const openArticleBtn = $("open-article-btn");
 const windowStatus = $("window-status");
+const localConfig = $("local-config");
+const cloudConfig = $("cloud-config");
+const cloudBaseUrl = $("cloud-base-url");
+const cloudApiKey = $("cloud-api-key");
+const cloudModel = $("cloud-model");
+const cloudSaveBtn = $("cloud-save-btn");
+const cloudStatus = $("cloud-status");
 
 const ARTICLE_URL = "https://xiaopingfeng.com/deepdive/agent-economy/";
 const ARTICLE_ORIGIN = "https://xiaopingfeng.com";
 let engine = null;
 let bridgeReady = false;
 let articleWindow = null;
+let source = "local";
+let cloudReady = false;
+
+const CLOUD_STORAGE_KEY = "agent-demo-cloud-config";
+(function restoreCloudConfig(){
+  try {
+    const saved = JSON.parse(localStorage.getItem(CLOUD_STORAGE_KEY) || "null");
+    if (saved && saved.baseUrl && saved.apiKey && saved.model) {
+      cloudBaseUrl.value = saved.baseUrl;
+      cloudApiKey.value = saved.apiKey;
+      cloudModel.value = saved.model;
+      cloudReady = true;
+      cloudStatus.textContent = `已从上次保存恢复: ${saved.baseUrl} · ${saved.model}`;
+      cloudStatus.style.color = "var(--ok)";
+    }
+  } catch (e) {}
+})();
+
+document.querySelectorAll('input[name="source"]').forEach((radio) => {
+  radio.addEventListener("change", () => {
+    source = radio.value;
+    localConfig.style.display = source === "local" ? "block" : "none";
+    cloudConfig.style.display = source === "cloud" ? "flex" : "none";
+    maybeEnableRun();
+  });
+});
+
+cloudSaveBtn.addEventListener("click", () => {
+  const baseUrl = cloudBaseUrl.value.trim().replace(/\/$/, "");
+  const apiKey = cloudApiKey.value.trim();
+  const model = cloudModel.value.trim();
+  if (!baseUrl || !apiKey || !model) {
+    cloudStatus.textContent = "Base URL / API Key / 模型名都要填";
+    cloudStatus.style.color = "var(--err)";
+    cloudReady = false;
+    maybeEnableRun();
+    return;
+  }
+  localStorage.setItem(CLOUD_STORAGE_KEY, JSON.stringify({ baseUrl, apiKey, model }));
+  cloudStatus.textContent = `已保存: ${baseUrl} · ${model}（存在 localStorage，未做任何网络请求验证）`;
+  cloudStatus.style.color = "var(--ok)";
+  cloudReady = true;
+  maybeEnableRun();
+});
 
 openArticleBtn.addEventListener("click", () => {
   articleWindow = window.open(ARTICLE_URL, "_blank");
@@ -237,6 +316,29 @@ ${Object.entries(TOOLS).map(([name, t]) => `- ${name}: ${t.desc}`).join("\n")}
 
 const FORMAT_REMINDER = "(只返回一个 JSON 对象，不要写代码，不要用 markdown)";
 
+async function llmChat(messages){
+  if (source === "local") {
+    const reply = await engine.chat.completions.create({ messages, temperature: 0.2, max_tokens: 200 });
+    return reply.choices[0].message.content;
+  }
+  const saved = JSON.parse(localStorage.getItem(CLOUD_STORAGE_KEY) || "null");
+  if (!saved) throw new Error("云端 API 未配置");
+  const res = await fetch(`${saved.baseUrl}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${saved.apiKey}`,
+    },
+    body: JSON.stringify({ model: saved.model, messages, temperature: 0.2, max_tokens: 200 }),
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`云端 API 请求失败 (${res.status}): ${errText.slice(0, 300)}`);
+  }
+  const data = await res.json();
+  return data.choices[0].message.content;
+}
+
 function extractJson(text){
   const start = text.indexOf("{");
   if (start === -1) throw new Error("模型输出中未找到 JSON: " + text);
@@ -258,8 +360,7 @@ async function runAgent(task){
 
   const MAX_STEPS = 6;
   for (let step = 0; step < MAX_STEPS; step++){
-    const reply = await engine.chat.completions.create({ messages, temperature: 0.2, max_tokens: 200 });
-    const raw = reply.choices[0].message.content;
+    const raw = await llmChat(messages);
 
     let parsed;
     try {
@@ -308,9 +409,13 @@ async function runAgent(task){
 }
 
 function maybeEnableRun(){
-  if (bridgeReady && engine) {
+  const inferenceReady = source === "local" ? !!engine : cloudReady;
+  if (bridgeReady && inferenceReady) {
     taskInput.disabled = false;
     runBtn.disabled = false;
+  } else {
+    taskInput.disabled = true;
+    runBtn.disabled = true;
   }
 }
 
@@ -350,7 +455,9 @@ loadBtn.addEventListener("click", async () => {
 
 runBtn.addEventListener("click", async () => {
   const task = taskInput.value.trim();
-  if (!task || !engine) return;
+  if (!task) return;
+  if (source === "local" && !engine) return;
+  if (source === "cloud" && !cloudReady) return;
   runBtn.disabled = true;
   clearLog();
   logStep("thought", "任务", task);
