@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>文件柜：Agent 读你选的这一个文件夹 · 问野</title>
+<meta name="description" content="用 File System Access API 选一个本地文件夹，浏览器里的 Agent 只能看到这一个文件夹里的文件——只读，不写，不上传，关掉标签页权限就没了。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400;1,6..72,500&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0d10; --bg-panel:#111720; --line:#1e2733; --line-bright:#334255;
+    --fg:#e6ecf2; --fg-dim:#a8b7c4; --fg-mute:#5f7182;
+    --accent:#6fb2ff; --accent-dim:rgba(111,178,255,0.14); --accent-glow:rgba(111,178,255,0.35);
+    --ok:#7ee08a; --warn:#ffcf5c; --err:#ff7a68;
+    --serif:'Newsreader','Noto Serif SC',serif;
+    --display:'Instrument Serif','Noto Serif SC',serif;
+    --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--serif);position:relative;min-height:100vh}
+  body::before{
+    content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+    background:radial-gradient(ellipse 70% 45% at 50% -10%, rgba(111,178,255,0.07), transparent 60%);
+  }
+  a{color:var(--accent)}
+  code{font-family:var(--mono);background:#070a0d;padding:1px 6px;border-radius:4px;border:1px solid var(--line);font-size:0.9em}
+
+  .topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:14px;padding:10px 24px;background:rgba(10,13,16,0.96);border-bottom:1px solid var(--line);font-family:var(--mono);font-size:11.5px;color:var(--fg-mute)}
+  .topbar a{text-decoration:none;color:var(--fg-mute)}
+  .topbar a:hover{color:var(--accent)}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--fg-mute);flex:none}
+  .dot.busy{background:var(--warn);animation:pulse 1.1s ease-in-out infinite}
+  .dot.ready{background:var(--accent);box-shadow:0 0 8px var(--accent-glow)}
+  .dot.error{background:var(--err)}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+  .hero{max-width:920px;margin:0 auto;padding:56px 24px 28px;position:relative;z-index:1}
+  .hero .kicker{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin-bottom:16px;display:flex;align-items:center;gap:8px}
+  .hero .kicker::before{content:'';width:16px;height:1px;background:var(--accent)}
+  .hero h1{font-family:var(--display);font-style:italic;font-weight:400;font-size:clamp(30px,5.4vw,50px);line-height:1.12;margin:0 0 20px;max-width:17ch}
+  .hero h1 em{color:var(--accent);font-style:italic}
+  .hero .dek{font-size:15.5px;line-height:1.75;color:var(--fg-dim);max-width:64ch;margin:0}
+  .hero .dek code{font-size:0.88em}
+
+  .scope-box{max-width:920px;margin:0 auto;padding:0 24px 8px;position:relative;z-index:1}
+  .scope-box .card{background:var(--bg-panel);border:1px solid var(--line-bright);border-left:3px solid var(--accent);padding:16px 18px;font-size:13px;line-height:1.75;color:var(--fg-dim)}
+  .scope-box .card b{color:var(--fg)}
+
+  .stage{max-width:1240px;margin:0 auto;padding:16px 24px 100px;display:grid;grid-template-columns:400px 1fr;gap:24px;align-items:start;position:relative;z-index:1}
+  @media (max-width:960px){.stage{grid-template-columns:1fr}}
+
+  .console{background:var(--bg-panel);border:1px solid var(--line);border-radius:2px;padding:20px;display:flex;flex-direction:column;gap:14px;position:sticky;top:56px}
+  .console::before{content:'AGENT';font-family:var(--mono);font-size:10px;letter-spacing:.22em;color:var(--fg-mute)}
+
+  .folder-picker{display:flex;flex-direction:column;gap:8px}
+  .folder-picker button{width:100%}
+  .folder-status{font-family:var(--mono);font-size:11.5px;color:var(--fg-mute);line-height:1.6}
+  .folder-status.ok{color:var(--accent)}
+  .folder-status.err{color:var(--err)}
+
+  .source-tabs{display:flex;gap:2px;background:var(--bg);border:1px solid var(--line);border-radius:2px;padding:2px}
+  .source-tabs label{flex:1;text-align:center;font-family:var(--mono);font-size:11px;padding:7px 4px;color:var(--fg-mute);cursor:pointer}
+  .source-tabs input{display:none}
+  .source-tabs input:checked + span{color:#04101f;background:var(--accent);display:block;margin:-7px -4px;padding:7px 4px;border-radius:1px;font-weight:600}
+
+  .field-group{display:flex;flex-direction:column;gap:8px}
+  select,input[type="text"],input[type="password"],input:not([type]){
+    font:inherit;font-family:var(--mono);font-size:12.5px;background:var(--bg);color:var(--fg);
+    border:1px solid var(--line);border-radius:2px;padding:9px 10px;width:100%;
+  }
+  select:focus,input:focus{outline:none;border-color:var(--accent)}
+  button{cursor:pointer;font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.02em;background:var(--accent);border:none;color:#04101f;border-radius:2px;padding:10px 14px}
+  button:hover:not(:disabled){filter:brightness(1.1)}
+  button:disabled{opacity:.35;cursor:not-allowed}
+  .row{display:flex;gap:8px}
+  .preset-btn{background:transparent;border:1px solid var(--line-bright);color:var(--fg-dim);font-size:10.5px;padding:5px 10px;width:auto}
+  .preset-btn:hover{border-color:var(--accent);color:var(--accent);filter:none}
+  .note{font-size:11.5px;line-height:1.6;color:var(--fg-mute)}
+  .note b{color:var(--fg-dim);font-weight:500}
+  progress{width:100%;height:3px;-webkit-appearance:none;appearance:none;border:none}
+  progress::-webkit-progress-bar{background:var(--line)}
+  progress::-webkit-progress-value{background:var(--accent)}
+  .status-line{font-family:var(--mono);font-size:11.5px;color:var(--fg-mute)}
+  .status-line.ok{color:var(--accent)}
+  .status-line.err{color:var(--err)}
+
+  .task-row{display:flex;gap:6px}
+  .task-row input{flex:1}
+
+  .tools-list{font-family:var(--mono);font-size:10.5px;color:var(--fg-mute);line-height:1.8;word-break:break-word}
+  .tools-list code{padding:1px 4px}
+
+  #log{max-height:260px;overflow-y:auto;font-family:var(--mono);font-size:11px;background:var(--bg);border:1px solid var(--line);border-radius:2px;padding:10px;display:flex;flex-direction:column;gap:2px}
+  #log:empty::after{content:'待命中…';color:var(--fg-mute)}
+  .step{padding:5px 0;border-bottom:1px dashed var(--line)}
+  .step:last-child{border-bottom:none}
+  .tag{display:inline-block;font-size:9px;font-weight:700;padding:1px 5px;border-radius:2px;margin-right:5px;letter-spacing:.03em;text-transform:uppercase}
+  .tag.thought{background:#152030;color:#8fb3d9}
+  .tag.action{background:#152a1e;color:#8fc7a4}
+  .tag.obs{background:#0f2a3d;color:var(--accent)}
+  .tag.err{background:#3d1712;color:var(--err)}
+  .tag.final{background:#3d3312;color:var(--warn)}
+  .step-body{color:var(--fg-dim);white-space:pre-wrap;word-break:break-word}
+
+  .files-panel{background:var(--bg-panel);border:1px solid var(--line);border-radius:2px;min-height:560px;display:flex;flex-direction:column}
+  .files-bar{padding:10px 14px;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:11px;color:var(--fg-mute)}
+  .files-empty{flex:1;display:flex;align-items:center;justify-content:center;color:var(--fg-mute);font-family:var(--mono);font-size:12px;padding:40px;text-align:center}
+  .file-list{padding:8px}
+  .file-row{display:flex;justify-content:space-between;gap:12px;padding:8px 10px;font-family:var(--mono);font-size:12px;color:var(--fg-dim);border-bottom:1px solid var(--line)}
+  .file-row .name{color:var(--fg)}
+  .file-row .meta{color:var(--fg-mute);flex:none}
+  .file-row.highlight{background:var(--accent-dim);box-shadow:inset 3px 0 0 var(--accent)}
+
+  footer{max-width:1240px;margin:0 auto;padding:0 24px 60px;font-family:var(--mono);font-size:11px;color:var(--fg-mute);line-height:1.8;position:relative;z-index:1}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a href="/">← 问野</a>
+  <span class="dot idle" id="vital-dot"></span>
+  <span id="vital-text">待命</span>
+</div>
+
+<div class="hero">
+  <div class="kicker">文件柜 · Agent Reads A Folder</div>
+  <h1>这次给它一把<em>钥匙</em>，只开一个抽屉。</h1>
+  <p class="dek">
+    用浏览器原生的 <code>File System Access API</code> 选一个文件夹——Agent 能看到的，
+    就是你选的这一个文件夹里的文件，仅此而已。它不能自己去点"选择文件夹"，
+    这一步必须是你在系统弹窗里亲手点的；它也只能读，不能改、不能删、不能新建文件。
+  </p>
+</div>
+
+<div class="scope-box">
+  <div class="card">
+    <b>权限边界，说清楚：</b> 只读、不写；只看你选的这一个文件夹（不含子文件夹）；
+    权限只在这个标签页存在期间有效，关掉标签页或刷新页面就要重新选一次；
+    没有任何内容会被发到 roam.xiaopingfeng.com 或任何服务器——如果你选了云端 API 作为推理来源，
+    文件内容会被发给你自己配置的那个 API 地址（这是模型推理本身需要的，跟本地读取是两回事）。
+  </div>
+</div>
+
+<div class="stage">
+
+  <aside class="console">
+
+    <div class="folder-picker">
+      <button id="pick-folder-btn">选择文件夹</button>
+      <div id="folder-status" class="folder-status">还没有选文件夹</div>
+    </div>
+
+    <div class="source-tabs">
+      <label><input type="radio" name="source" value="local" checked><span>本地 WebLLM</span></label>
+      <label><input type="radio" name="source" value="cloud"><span>云端 API</span></label>
+      <label><input type="radio" name="source" value="ollama"><span>Ollama</span></label>
+    </div>
+
+    <div id="local-config" class="field-group">
+      <select id="model-select">
+        <option value="Llama-3.2-1B-Instruct-q4f16_1-MLC">Llama-3.2-1B-Instruct · 约 0.9GB</option>
+        <option value="Qwen2.5-0.5B-Instruct-q4f16_1-MLC">Qwen2.5-0.5B-Instruct · 约 0.5GB</option>
+        <option value="SmolLM2-1.7B-Instruct-q4f16_1-MLC">SmolLM2-1.7B-Instruct · 约 1.4GB</option>
+      </select>
+      <button id="load-btn">加载模型</button>
+      <progress id="progress" value="0" max="1" style="display:none"></progress>
+      <div id="progress-text" class="status-line"></div>
+    </div>
+
+    <div id="cloud-config" class="field-group" style="display:none">
+      <div class="note">Key 只存在你浏览器的 <b>localStorage</b>，请求直接从浏览器发到你填的地址，不经过 roam.xiaopingfeng.com。</div>
+      <div class="row" style="gap:6px">
+        <button type="button" class="preset-btn" data-preset-base="https://open.bigmodel.cn/api/paas/v4" data-preset-model="glm-4-flash">BigModel 预设</button>
+      </div>
+      <input id="cloud-base-url" placeholder="Base URL，例如 https://open.bigmodel.cn/api/paas/v4">
+      <input id="cloud-api-key" type="password" placeholder="API Key">
+      <div class="row">
+        <input id="cloud-model" placeholder="模型名，如 glm-4-flash">
+        <button id="cloud-save-btn">保存</button>
+      </div>
+      <div id="cloud-status" class="status-line">尚未配置</div>
+    </div>
+
+    <div id="ollama-config" class="field-group" style="display:none">
+      <div class="note">
+        Ollama 默认只放行 <b>localhost</b> 来源的跨域请求。这个页面不是 localhost，
+        需要先 <code>OLLAMA_ORIGINS=https://roam.xiaopingfeng.com ollama serve</code> 重启，否则会被 403 拒绝。
+      </div>
+      <input id="ollama-base-url" value="http://localhost:11434/v1">
+      <div class="row">
+        <input id="ollama-model" placeholder="模型名，如 llama3.2">
+        <button id="ollama-save-btn">保存</button>
+      </div>
+      <div id="ollama-status" class="status-line">尚未配置</div>
+    </div>
+
+    <div class="task-row">
+      <input id="task-input" placeholder="例如：这个文件夹里哪个文件提到了预算" disabled>
+      <button id="run-btn" disabled>执行</button>
+    </div>
+
+    <div class="tools-list">
+      <code>list_files</code> <code>read_file</code> <code>search_files</code>
+    </div>
+
+    <div id="log"></div>
+
+  </aside>
+
+  <div class="files-panel">
+    <div class="files-bar" id="files-bar">还没有选文件夹</div>
+    <div class="files-empty" id="files-empty">点左边"选择文件夹"，挑一个本地目录</div>
+    <div class="file-list" id="file-list" style="display:none"></div>
+  </div>
+
+</div>
+
+<footer>
+  用的是 <a href="https://developer.mozilla.org/docs/Web/API/File_System_API" target="_blank" rel="noopener">File System Access API</a>，
+  目前只有 Chromium 系浏览器（Chrome / Edge）支持，Safari / Firefox 不支持 ·
+  本地推理用 <a href="https://github.com/mlc-ai/web-llm" target="_blank" rel="noopener">WebLLM</a>，需要支持 WebGPU 的浏览器。
+</footer>
+
+<script type="module">
+import * as webllm from "https://esm.run/@mlc-ai/web-llm";
+
+const $ = (id) => document.getElementById(id);
+const vitalDot = $("vital-dot");
+const vitalText = $("vital-text");
+const progressEl = $("progress");
+const progressText = $("progress-text");
+const loadBtn = $("load-btn");
+const modelSelect = $("model-select");
+const taskInput = $("task-input");
+const runBtn = $("run-btn");
+const logEl = $("log");
+const localConfig = $("local-config");
+const cloudConfig = $("cloud-config");
+const cloudBaseUrl = $("cloud-base-url");
+const cloudApiKey = $("cloud-api-key");
+const cloudModel = $("cloud-model");
+const cloudSaveBtn = $("cloud-save-btn");
+const cloudStatus = $("cloud-status");
+const ollamaConfig = $("ollama-config");
+const ollamaBaseUrl = $("ollama-base-url");
+const ollamaModel = $("ollama-model");
+const ollamaSaveBtn = $("ollama-save-btn");
+const ollamaStatus = $("ollama-status");
+const pickFolderBtn = $("pick-folder-btn");
+const folderStatus = $("folder-status");
+const filesBar = $("files-bar");
+const filesEmpty = $("files-empty");
+const fileList = $("file-list");
+
+let engine = null;
+let source = "local";
+let cloudReady = false;
+let ollamaReady = false;
+let dirHandle = null;
+
+const MAX_FILES = 60;
+const MAX_READ_CHARS = 8000;
+const TEXT_EXT = /\.(txt|md|markdown|json|csv|js|ts|jsx|tsx|css|html|htm|xml|yml|yaml|py|java|c|cpp|h|go|rs|sh|log|ini|toml|svg)$/i;
+
+function setVital(state, text){
+  vitalDot.className = "dot " + state;
+  vitalText.textContent = text;
+}
+
+function logStep(tag, label, content){
+  const div = document.createElement("div");
+  div.className = "step";
+  div.innerHTML = `<span class="tag ${tag}">${label}</span><div class="step-body"></div>`;
+  div.querySelector(".step-body").textContent = content;
+  logEl.appendChild(div);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+/* ---------- folder picker ---------- */
+if (!window.showDirectoryPicker) {
+  pickFolderBtn.disabled = true;
+  folderStatus.textContent = "这个浏览器不支持 File System Access API，换 Chrome/Edge 试试";
+  folderStatus.className = "folder-status err";
+}
+
+let cachedEntries = null;
+
+pickFolderBtn.addEventListener("click", async () => {
+  try {
+    dirHandle = await window.showDirectoryPicker({ mode: "read" });
+    cachedEntries = null;
+    folderStatus.textContent = `已选择: ${dirHandle.name}（只读，仅这一个标签页有效）`;
+    folderStatus.className = "folder-status ok";
+    await renderFileList();
+    maybeEnableRun();
+  } catch (e) {
+    if (e.name === "AbortError") return; // user cancelled the picker
+    folderStatus.textContent = "选择失败: " + e.message;
+    folderStatus.className = "folder-status err";
+  }
+});
+
+async function listTopLevelFiles(){
+  if (cachedEntries) return cachedEntries;
+  const entries = [];
+  for await (const [name, handle] of dirHandle.entries()) {
+    if (handle.kind !== "file") continue;
+    if (name.startsWith(".")) continue;
+    let size = 0;
+    try { size = (await handle.getFile()).size; } catch (e) {}
+    entries.push({ name, handle, size });
+    if (entries.length >= MAX_FILES) break;
+  }
+  cachedEntries = entries;
+  return entries;
+}
+
+async function renderFileList(){
+  const entries = await listTopLevelFiles();
+  filesBar.textContent = `${dirHandle.name} · ${entries.length} 个文件${entries.length >= MAX_FILES ? '（已达上限 ' + MAX_FILES + '）' : ''}`;
+  filesEmpty.style.display = "none";
+  fileList.style.display = "block";
+  fileList.innerHTML = "";
+  for (const entry of entries) {
+    const row = document.createElement("div");
+    row.className = "file-row";
+    row.dataset.name = entry.name;
+    row.innerHTML = `<span class="name"></span><span class="meta"></span>`;
+    row.querySelector(".name").textContent = entry.name;
+    row.querySelector(".meta").textContent = formatSize(entry.size);
+    fileList.appendChild(row);
+  }
+}
+
+function formatSize(bytes){
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+  return (bytes / 1024 / 1024).toFixed(1) + " MB";
+}
+
+function highlightFile(name){
+  fileList.querySelectorAll(".file-row").forEach((el) => el.classList.remove("highlight"));
+  const row = fileList.querySelector(`.file-row[data-name="${CSS.escape(name)}"]`);
+  if (row) {
+    row.classList.add("highlight");
+    row.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+}
+
+/* ---------- tools ---------- */
+async function listFiles(){
+  const entries = await listTopLevelFiles();
+  return entries.map((e) => ({ name: e.name, size: e.size }));
+}
+
+async function readFile({ name }){
+  if (!name) return { error: "缺少 name 参数" };
+  const entries = await listTopLevelFiles();
+  const entry = entries.find((e) => e.name === name);
+  if (!entry) return { error: `文件夹里没有叫 ${name} 的文件` };
+  if (!TEXT_EXT.test(name)) return { error: `${name} 看起来不是文本文件，跳过` };
+  try {
+    const file = await entry.handle.getFile();
+    let text = await file.text();
+    let truncated = false;
+    if (text.length > MAX_READ_CHARS) { text = text.slice(0, MAX_READ_CHARS); truncated = true; }
+    highlightFile(name);
+    return { name, size: entry.size, truncated, content: text };
+  } catch (e) {
+    return { error: `读取失败: ${e.message}` };
+  }
+}
+
+async function searchFiles({ keyword }){
+  if (!keyword) return { error: "缺少 keyword 参数" };
+  const entries = await listTopLevelFiles();
+  const results = [];
+  for (const entry of entries) {
+    if (!TEXT_EXT.test(entry.name)) continue;
+    if (entry.size > 500 * 1024) continue;
+    try {
+      const file = await entry.handle.getFile();
+      const text = await file.text();
+      const re = new RegExp(keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+      const matches = text.match(re);
+      if (matches) results.push({ name: entry.name, count: matches.length });
+    } catch (e) {}
+  }
+  results.sort((a, b) => b.count - a.count);
+  return { keyword, matches: results };
+}
+
+const TOOLS = {
+  list_files: { fn: () => listFiles(), desc: "列出文件夹里所有文件的名字和大小，无参数" },
+  read_file: { fn: (args) => readFile(args || {}), desc: "读取一个文件的文本内容，参数: {name}（必须是 list_files 返回过的文件名）" },
+  search_files: { fn: (args) => searchFiles(args || {}), desc: "在文件夹所有文本文件里搜索一个关键词，返回每个文件命中次数，参数: {keyword}" },
+};
+
+const SYSTEM_PROMPT = `你是一个运行在浏览器里的 Agent，通过工具读取用户选择的一个本地文件夹（只读，不能写、不能删）。你自己看不到文件内容，只能通过工具查询。
+
+可用工具:
+${Object.entries(TOOLS).map(([name, t]) => `- ${name}: ${t.desc}`).join("\n")}
+
+规则:
+1. 只能返回一个 JSON 对象，绝对不要写代码、不要用 markdown 代码块、不要解释。
+2. 格式二选一(下面 <> 里的内容都要换成你自己的真实内容，不要照抄):
+   {"thought": "<你此刻的推理，一句话>", "action": "<工具名，从上面列表里选一个>", "args": {}}
+   {"thought": "<你此刻的推理，一句话>", "final_answer": "<任务完成后的真实总结>"}
+3. 不能凭空编造文件内容，必须先调用工具拿到真实数据再回答。
+
+示例:
+用户: 任务: 这个文件夹里有几个文件
+你: {"thought": "用 list_files 查看", "action": "list_files", "args": {}}
+观察结果: [{"name":"a.txt","size":120},{"name":"b.md","size":340}]
+你: {"thought": "完成", "final_answer": "这个文件夹里有 2 个文件：a.txt 和 b.md"}`;
+
+const FORMAT_REMINDER = "(只返回一个 JSON 对象，不要写代码，不要用 markdown)";
+
+const CLOUD_STORAGE_KEY = "local-folder-cloud-config";
+(function restoreCloudConfig(){
+  try {
+    const saved = JSON.parse(localStorage.getItem(CLOUD_STORAGE_KEY) || "null");
+    if (saved && saved.baseUrl && saved.apiKey && saved.model) {
+      cloudBaseUrl.value = saved.baseUrl;
+      cloudApiKey.value = saved.apiKey;
+      cloudModel.value = saved.model;
+      cloudReady = true;
+      cloudStatus.textContent = `已恢复: ${saved.baseUrl} · ${saved.model}`;
+      cloudStatus.className = "status-line ok";
+    }
+  } catch (e) {}
+})();
+
+const OLLAMA_STORAGE_KEY = "local-folder-ollama-config";
+(function restoreOllamaConfig(){
+  try {
+    const saved = JSON.parse(localStorage.getItem(OLLAMA_STORAGE_KEY) || "null");
+    if (saved && saved.baseUrl && saved.model) {
+      ollamaBaseUrl.value = saved.baseUrl;
+      ollamaModel.value = saved.model;
+      ollamaReady = true;
+      ollamaStatus.textContent = `已恢复: ${saved.baseUrl} · ${saved.model}`;
+      ollamaStatus.className = "status-line ok";
+    }
+  } catch (e) {}
+})();
+
+document.querySelectorAll('input[name="source"]').forEach((radio) => {
+  radio.addEventListener("change", () => {
+    source = radio.value;
+    localConfig.style.display = source === "local" ? "flex" : "none";
+    cloudConfig.style.display = source === "cloud" ? "flex" : "none";
+    ollamaConfig.style.display = source === "ollama" ? "flex" : "none";
+    maybeEnableRun();
+  });
+});
+
+document.querySelectorAll(".preset-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    cloudBaseUrl.value = btn.dataset.presetBase;
+    if (!cloudModel.value.trim()) cloudModel.value = btn.dataset.presetModel;
+    cloudApiKey.focus();
+  });
+});
+
+cloudSaveBtn.addEventListener("click", () => {
+  const baseUrl = cloudBaseUrl.value.trim().replace(/\/$/, "");
+  const apiKey = cloudApiKey.value.trim();
+  const model = cloudModel.value.trim();
+  if (!baseUrl || !apiKey || !model) {
+    cloudStatus.textContent = "Base URL / API Key / 模型名都要填";
+    cloudStatus.className = "status-line err";
+    cloudReady = false;
+    maybeEnableRun();
+    return;
+  }
+  localStorage.setItem(CLOUD_STORAGE_KEY, JSON.stringify({ baseUrl, apiKey, model }));
+  cloudStatus.textContent = `已保存: ${baseUrl} · ${model}`;
+  cloudStatus.className = "status-line ok";
+  cloudReady = true;
+  maybeEnableRun();
+});
+
+ollamaSaveBtn.addEventListener("click", () => {
+  const baseUrl = ollamaBaseUrl.value.trim().replace(/\/$/, "");
+  const model = ollamaModel.value.trim();
+  if (!baseUrl || !model) {
+    ollamaStatus.textContent = "Base URL / 模型名都要填";
+    ollamaStatus.className = "status-line err";
+    ollamaReady = false;
+    maybeEnableRun();
+    return;
+  }
+  localStorage.setItem(OLLAMA_STORAGE_KEY, JSON.stringify({ baseUrl, model }));
+  ollamaStatus.textContent = `已保存: ${baseUrl} · ${model}`;
+  ollamaStatus.className = "status-line ok";
+  ollamaReady = true;
+  maybeEnableRun();
+});
+
+function extractJson(text){
+  const start = text.indexOf("{");
+  if (start === -1) throw new Error("模型输出中未找到 JSON: " + text);
+  let depth = 0;
+  for (let i = start; i < text.length; i++){
+    if (text[i] === "{") depth++;
+    if (text[i] === "}") depth--;
+    if (depth === 0) return JSON.parse(text.slice(start, i + 1));
+  }
+  throw new Error("JSON 未闭合: " + text);
+}
+
+async function llmChat(messages){
+  if (source === "local") {
+    const reply = await engine.chat.completions.create({ messages, temperature: 0.2, max_tokens: 400 });
+    return reply.choices[0].message.content;
+  }
+
+  if (source === "ollama") {
+    const saved = JSON.parse(localStorage.getItem(OLLAMA_STORAGE_KEY) || "null");
+    if (!saved) throw new Error("Ollama 未配置");
+    let res;
+    try {
+      res = await fetch(`${saved.baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: saved.model, messages, temperature: 0.2, max_tokens: 400 }),
+      });
+    } catch (e) {
+      throw new Error(`连不上 Ollama (${saved.baseUrl})：确认本机 Ollama 在跑，且已用 OLLAMA_ORIGINS 允许这个页面的域名后重启 ollama serve。原始错误: ${e}`);
+    }
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      throw new Error(`Ollama 请求失败 (${res.status}): ${errText.slice(0, 300)}`);
+    }
+    const data = await res.json();
+    return data.choices[0].message.content;
+  }
+
+  const saved = JSON.parse(localStorage.getItem(CLOUD_STORAGE_KEY) || "null");
+  if (!saved) throw new Error("云端 API 未配置");
+  const res = await fetch(`${saved.baseUrl}/chat/completions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${saved.apiKey}` },
+    body: JSON.stringify({ model: saved.model, messages, temperature: 0.2, max_tokens: 400 }),
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`云端 API 请求失败 (${res.status}): ${errText.slice(0, 300)}`);
+  }
+  const data = await res.json();
+  const content = data.choices[0].message.content;
+  if (!content || !content.trim()) {
+    throw new Error("模型返回了空内容——如果这是思考型模型，可能是 token 预算全花在内部推理上了，换个模型或加大预算试试。");
+  }
+  return content;
+}
+
+async function runAgent(task){
+  const messages = [
+    { role: "system", content: SYSTEM_PROMPT },
+    { role: "user", content: `任务: ${task}` },
+  ];
+  let calledAnyTool = false;
+
+  const MAX_STEPS = 8;
+  for (let step = 0; step < MAX_STEPS; step++){
+    let raw;
+    try {
+      raw = await llmChat(messages);
+    } catch (e) {
+      logStep("err", "推理出错", String(e));
+      return;
+    }
+
+    let parsed;
+    try {
+      parsed = extractJson(raw);
+    } catch (e) {
+      logStep("err", "解析失败", raw);
+      messages.push({ role: "assistant", content: raw });
+      messages.push({ role: "user", content: `你的输出不是合法 JSON，请严格按格式重新输出，不要写代码。${FORMAT_REMINDER}` });
+      continue;
+    }
+
+    messages.push({ role: "assistant", content: JSON.stringify(parsed) });
+    if (parsed.thought) logStep("thought", "思考", parsed.thought);
+
+    if (parsed.final_answer) {
+      if (!calledAnyTool) {
+        logStep("err", "拦截", "还没有真正调用过工具就想给 final_answer，已拒绝");
+        messages.push({ role: "user", content: `你还没有调用任何工具拿到真实数据，不能给 final_answer。${FORMAT_REMINDER}` });
+        continue;
+      }
+      logStep("final", "完成", parsed.final_answer);
+      return;
+    }
+
+    const toolName = parsed.action;
+    const tool = TOOLS[toolName];
+    if (!tool) {
+      const obs = { error: toolName ? `未知工具: ${toolName}` : `缺少 action 或 final_answer 字段` };
+      logStep("err", "错误", obs.error);
+      messages.push({ role: "user", content: `观察结果: ${JSON.stringify(obs)} ${FORMAT_REMINDER}` });
+      continue;
+    }
+
+    logStep("action", "调用", `${toolName}(${JSON.stringify(parsed.args || {})})`);
+    let obs;
+    try {
+      obs = await tool.fn(parsed.args || {});
+      calledAnyTool = true;
+    } catch (e) {
+      obs = { error: String(e) };
+    }
+    logStep("obs", "观察", JSON.stringify(obs).slice(0, 800));
+    messages.push({ role: "user", content: `观察结果: ${JSON.stringify(obs)} ${FORMAT_REMINDER}` });
+  }
+  logStep("err", "终止", "已达最大步数，未得到 final_answer");
+}
+
+function maybeEnableRun(){
+  const inferenceReady = source === "local" ? !!engine : source === "ollama" ? ollamaReady : cloudReady;
+  const ready = inferenceReady && !!dirHandle;
+  taskInput.disabled = !ready;
+  runBtn.disabled = !ready;
+  if (ready) setVital("ready", "就绪");
+}
+
+loadBtn.addEventListener("click", async () => {
+  if (!navigator.gpu) {
+    setVital("error", "不支持 WebGPU");
+    return;
+  }
+  loadBtn.disabled = true;
+  modelSelect.disabled = true;
+  progressEl.style.display = "block";
+  setVital("busy", "加载模型中…");
+
+  const modelId = modelSelect.value;
+  try {
+    engine = await webllm.CreateMLCEngine(modelId, {
+      initProgressCallback: (p) => {
+        progressEl.value = p.progress || 0;
+        progressText.textContent = p.text || "";
+      },
+    });
+    logStep("obs", "就绪", `模型 ${modelId} 已在本地加载完成。`);
+    maybeEnableRun();
+  } catch (e) {
+    setVital("error", "加载失败");
+    logStep("err", "错误", String(e));
+    loadBtn.disabled = false;
+    modelSelect.disabled = false;
+  }
+});
+
+runBtn.addEventListener("click", async () => {
+  const task = taskInput.value.trim();
+  if (!task || !dirHandle) return;
+  if (source === "local" && !engine) return;
+  if (source === "cloud" && !cloudReady) return;
+  if (source === "ollama" && !ollamaReady) return;
+  runBtn.disabled = true;
+  setVital("busy", "推理中…");
+  logEl.innerHTML = "";
+  logStep("thought", "任务", task);
+  try {
+    await runAgent(task);
+    setVital("ready", "就绪");
+  } catch (e) {
+    logStep("err", "异常", String(e));
+    setVital("error", "出错");
+  }
+  runBtn.disabled = false;
+});
+</script>
+
+</body>
+</html>

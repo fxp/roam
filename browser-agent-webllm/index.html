@@ -144,6 +144,8 @@
   button:disabled{opacity:.35;cursor:not-allowed}
   button.ghost{background:transparent;border:1px solid var(--line-bright);color:var(--fg-dim)}
   .row{display:flex;gap:8px}
+  .preset-btn{background:transparent;border:1px solid var(--line-bright);color:var(--fg-dim);font-size:10.5px;padding:5px 10px;width:auto}
+  .preset-btn:hover{border-color:var(--accent);color:var(--accent);filter:none}
   .note{font-size:11.5px;line-height:1.6;color:var(--fg-mute)}
   .note b{color:var(--fg-dim);font-weight:500}
   progress{width:100%;height:3px;-webkit-appearance:none;appearance:none;border:none}
@@ -264,6 +266,9 @@
 
     <div id="cloud-config" class="field-group" style="display:none">
       <div class="note">Key 只存在你浏览器的 <b>localStorage</b>，请求直接从浏览器发到你填的地址，不经过 roam.xiaopingfeng.com。</div>
+      <div class="row" style="gap:6px">
+        <button type="button" class="preset-btn" data-preset-base="https://open.bigmodel.cn/api/paas/v4" data-preset-model="glm-4-flash">BigModel 预设</button>
+      </div>
       <input id="cloud-base-url" placeholder="Base URL，例如 https://openrouter.ai/api/v1">
       <input id="cloud-api-key" type="password" placeholder="API Key">
       <div class="row">
@@ -304,7 +309,7 @@
 
 <footer>
   本地推理用 <a href="https://github.com/mlc-ai/web-llm" target="_blank" rel="noopener">WebLLM</a>，需要支持 WebGPU 的浏览器（Chrome / Edge 最新版）·
-  Agent 只操作这一张页面自己的 DOM，不发起任何跨站请求
+  Agent 只操作这一张页面自己的 DOM，不发起任何跨站请求 · <a href="/browser-agent-webllm-legacy/">上一版：跨源操作真实文章 →</a>
 </footer>
 
 <script type="module">
@@ -380,6 +385,14 @@ document.querySelectorAll('input[name="source"]').forEach((radio) => {
     cloudConfig.style.display = source === "cloud" ? "flex" : "none";
     ollamaConfig.style.display = source === "ollama" ? "flex" : "none";
     maybeEnableRun();
+  });
+});
+
+document.querySelectorAll(".preset-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    cloudBaseUrl.value = btn.dataset.presetBase;
+    if (!cloudModel.value.trim()) cloudModel.value = btn.dataset.presetModel;
+    cloudApiKey.focus();
   });
 });
 

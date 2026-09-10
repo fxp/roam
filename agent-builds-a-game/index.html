@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>游戏工坊：Agent 在浏览器里现场写一个能玩的游戏 · 问野</title>
+<meta name="description" content="你描述一个小游戏，一个跑在浏览器里的 Agent（本地 WebLLM / 云端 API / 本机 Ollama 三选一）直接写出完整的 HTML/CSS/JS，放进一个沙箱 iframe 里立刻能玩。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400;1,6..72,500&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0f0a07; --bg-panel:#1a120c; --line:#2e2015; --line-bright:#4a3520;
+    --fg:#f2e9e0; --fg-dim:#c4b3a0; --fg-mute:#786553;
+    --accent:#ff9d3d; --accent-dim:rgba(255,157,61,0.14); --accent-glow:rgba(255,157,61,0.35);
+    --ok:#7ee08a; --warn:#ffcf5c; --err:#ff7a68;
+    --serif:'Newsreader','Noto Serif SC',serif;
+    --display:'Instrument Serif','Noto Serif SC',serif;
+    --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--serif);position:relative;min-height:100vh}
+  body::before{
+    content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+    background:radial-gradient(ellipse 70% 45% at 50% -10%, rgba(255,157,61,0.08), transparent 60%);
+  }
+  a{color:var(--accent)}
+  code{font-family:var(--mono);background:#0a0705;padding:1px 6px;border-radius:4px;border:1px solid var(--line);font-size:0.9em}
+
+  .topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:14px;padding:10px 24px;background:rgba(15,10,7,0.96);border-bottom:1px solid var(--line);font-family:var(--mono);font-size:11.5px;color:var(--fg-mute)}
+  .topbar a{text-decoration:none;color:var(--fg-mute)}
+  .topbar a:hover{color:var(--accent)}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--fg-mute);flex:none}
+  .dot.busy{background:var(--warn);animation:pulse 1.1s ease-in-out infinite}
+  .dot.ready{background:var(--accent);box-shadow:0 0 8px var(--accent-glow)}
+  .dot.error{background:var(--err)}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+  .hero{max-width:920px;margin:0 auto;padding:56px 24px 28px;position:relative;z-index:1}
+  .hero .kicker{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin-bottom:16px;display:flex;align-items:center;gap:8px}
+  .hero .kicker::before{content:'';width:16px;height:1px;background:var(--accent)}
+  .hero h1{font-family:var(--display);font-style:italic;font-weight:400;font-size:clamp(30px,5.4vw,50px);line-height:1.12;margin:0 0 20px;max-width:17ch}
+  .hero h1 em{color:var(--accent);font-style:italic}
+  .hero .dek{font-size:15.5px;line-height:1.75;color:var(--fg-dim);max-width:64ch;margin:0}
+
+  .stage{max-width:1240px;margin:0 auto;padding:16px 24px 100px;display:grid;grid-template-columns:400px 1fr;gap:24px;align-items:start;position:relative;z-index:1}
+  @media (max-width:960px){.stage{grid-template-columns:1fr}}
+
+  .console{background:var(--bg-panel);border:1px solid var(--line);border-radius:2px;padding:20px;display:flex;flex-direction:column;gap:14px;position:sticky;top:56px}
+  .console::before{content:'GAME BUILDER';font-family:var(--mono);font-size:10px;letter-spacing:.22em;color:var(--fg-mute)}
+
+  .source-tabs{display:flex;gap:2px;background:var(--bg);border:1px solid var(--line);border-radius:2px;padding:2px}
+  .source-tabs label{flex:1;text-align:center;font-family:var(--mono);font-size:11px;padding:7px 4px;color:var(--fg-mute);cursor:pointer}
+  .source-tabs input{display:none}
+  .source-tabs input:checked + span{color:#1a0e00;background:var(--accent);display:block;margin:-7px -4px;padding:7px 4px;border-radius:1px;font-weight:600}
+
+  .field-group{display:flex;flex-direction:column;gap:8px}
+  select,textarea,input[type="text"],input[type="password"],input:not([type]){
+    font:inherit;font-family:var(--mono);font-size:12.5px;background:var(--bg);color:var(--fg);
+    border:1px solid var(--line);border-radius:2px;padding:9px 10px;width:100%;
+  }
+  textarea{resize:vertical;min-height:64px;line-height:1.5}
+  select:focus,input:focus,textarea:focus{outline:none;border-color:var(--accent)}
+  button{cursor:pointer;font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.02em;background:var(--accent);border:none;color:#1a0e00;border-radius:2px;padding:10px 14px}
+  button:hover:not(:disabled){filter:brightness(1.1)}
+  button:disabled{opacity:.35;cursor:not-allowed}
+  .row{display:flex;gap:8px}
+  .preset-btn{background:transparent;border:1px solid var(--line-bright);color:var(--fg-dim);font-size:10.5px;padding:5px 10px;width:auto}
+  .preset-btn:hover{border-color:var(--accent);color:var(--accent);filter:none}
+  .note{font-size:11.5px;line-height:1.6;color:var(--fg-mute)}
+  .note b{color:var(--fg-dim);font-weight:500}
+  progress{width:100%;height:3px;-webkit-appearance:none;appearance:none;border:none}
+  progress::-webkit-progress-bar{background:var(--line)}
+  progress::-webkit-progress-value{background:var(--accent)}
+  .status-line{font-family:var(--mono);font-size:11.5px;color:var(--fg-mute)}
+  .status-line.ok{color:var(--accent)}
+  .status-line.err{color:var(--err)}
+
+  #log{max-height:220px;overflow-y:auto;font-family:var(--mono);font-size:11px;background:var(--bg);border:1px solid var(--line);border-radius:2px;padding:10px;display:flex;flex-direction:column;gap:2px}
+  #log:empty::after{content:'待命中…';color:var(--fg-mute)}
+  .step{padding:5px 0;border-bottom:1px dashed var(--line)}
+  .step:last-child{border-bottom:none}
+  .tag{display:inline-block;font-size:9px;font-weight:700;padding:1px 5px;border-radius:2px;margin-right:5px;letter-spacing:.03em;text-transform:uppercase}
+  .tag.info{background:#152a1e;color:#8fc7a4}
+  .tag.err{background:#3d1712;color:var(--err)}
+  .tag.ok{background:#3d3312;color:var(--accent)}
+  .step-body{color:var(--fg-dim);white-space:pre-wrap;word-break:break-word}
+
+  .playfield{background:var(--bg-panel);border:1px solid var(--line);border-radius:2px;min-height:560px;display:flex;flex-direction:column}
+  .playfield-bar{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:11px;color:var(--fg-mute)}
+  .playfield-bar button.ghost{background:transparent;border:1px solid var(--line-bright);color:var(--fg-dim);padding:5px 10px;font-size:10.5px}
+  #game-frame{flex:1;width:100%;border:0;background:#fff;min-height:520px}
+  .playfield-empty{flex:1;display:flex;align-items:center;justify-content:center;color:var(--fg-mute);font-family:var(--mono);font-size:12px;padding:40px;text-align:center}
+
+  footer{max-width:1240px;margin:0 auto;padding:0 24px 60px;font-family:var(--mono);font-size:11px;color:var(--fg-mute);line-height:1.8;position:relative;z-index:1}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a href="/">← 问野</a>
+  <span class="dot idle" id="vital-dot"></span>
+  <span id="vital-text">待命</span>
+</div>
+
+<div class="hero">
+  <div class="kicker">游戏工坊 · Agent Writes A Game</div>
+  <h1>这次不是读页面，是<em>写</em>一个能玩的游戏。</h1>
+  <p class="dek">
+    在左边描述一个你想玩的小游戏，跑在浏览器里的 Agent 会直接生成一份完整、自包含的 HTML/CSS/JS，
+    放进右边的沙箱 iframe 里现场运行——不经过任何后端，代码全部在你自己的浏览器里生成和执行。
+    生成之后还能继续对话式地提要求，比如"加个计分板"或"难度调高一点"。
+  </p>
+</div>
+
+<div class="stage">
+
+  <aside class="console">
+
+    <div class="source-tabs">
+      <label><input type="radio" name="source" value="local" checked><span>本地 WebLLM</span></label>
+      <label><input type="radio" name="source" value="cloud"><span>云端 API</span></label>
+      <label><input type="radio" name="source" value="ollama"><span>Ollama</span></label>
+    </div>
+
+    <div id="local-config" class="field-group">
+      <select id="model-select">
+        <option value="Llama-3.2-1B-Instruct-q4f16_1-MLC">Llama-3.2-1B-Instruct · 约 0.9GB</option>
+        <option value="Qwen2.5-0.5B-Instruct-q4f16_1-MLC">Qwen2.5-0.5B-Instruct · 约 0.5GB</option>
+        <option value="SmolLM2-1.7B-Instruct-q4f16_1-MLC">SmolLM2-1.7B-Instruct · 约 1.4GB</option>
+      </select>
+      <button id="load-btn">加载模型</button>
+      <progress id="progress" value="0" max="1" style="display:none"></progress>
+      <div id="progress-text" class="status-line"></div>
+      <div class="note">写一整个游戏比读页面难得多，需要一次性输出几百到上千 token 且格式不能错。这几个本地小模型大概率写不出能跑的完整游戏——这也是要测的地方。</div>
+    </div>
+
+    <div id="cloud-config" class="field-group" style="display:none">
+      <div class="note">Key 只存在你浏览器的 <b>localStorage</b>，请求直接从浏览器发到你填的地址，不经过 roam.xiaopingfeng.com。实测智谱的 Coding Plan（<code>/api/coding/paas/v4</code>）是思考模型，容易把 token 预算全烧在看不见的推理上、正式输出是空的——写游戏这种一次性大段输出的任务，建议用下面这个非思考的常规接口。</div>
+      <div class="row" style="gap:6px">
+        <button type="button" class="preset-btn" data-preset-base="https://open.bigmodel.cn/api/paas/v4" data-preset-model="glm-4-flash">BigModel 预设</button>
+      </div>
+      <input id="cloud-base-url" placeholder="Base URL，例如 https://open.bigmodel.cn/api/paas/v4">
+      <input id="cloud-api-key" type="password" placeholder="API Key">
+      <div class="row">
+        <input id="cloud-model" placeholder="模型名，如 glm-4-flash">
+        <button id="cloud-save-btn">保存</button>
+      </div>
+      <div id="cloud-status" class="status-line">尚未配置</div>
+    </div>
+
+    <div id="ollama-config" class="field-group" style="display:none">
+      <div class="note">
+        Ollama 默认只放行 <b>localhost</b> 来源的跨域请求。这个页面不是 localhost，
+        需要先 <code>OLLAMA_ORIGINS=https://roam.xiaopingfeng.com ollama serve</code> 重启，否则会被 403 拒绝。
+      </div>
+      <input id="ollama-base-url" value="http://localhost:11434/v1">
+      <div class="row">
+        <input id="ollama-model" placeholder="模型名，如 llama3.2">
+        <button id="ollama-save-btn">保存</button>
+      </div>
+      <div id="ollama-status" class="status-line">尚未配置</div>
+    </div>
+
+    <div class="field-group">
+      <textarea id="task-input" placeholder="例如：做一个井字棋，两个人轮流点格子，赢了要有提示" disabled></textarea>
+      <div class="row">
+        <button id="run-btn" disabled style="flex:1">生成游戏</button>
+        <button id="reset-btn" class="ghost" style="background:transparent;border:1px solid var(--line-bright);color:var(--fg-dim)">重新开始</button>
+      </div>
+    </div>
+
+    <div id="log"></div>
+
+  </aside>
+
+  <div class="playfield">
+    <div class="playfield-bar">
+      <span id="game-title">还没有游戏</span>
+      <button class="ghost" id="view-source-btn" style="display:none">查看源码</button>
+    </div>
+    <div class="playfield-empty" id="playfield-empty">生成的游戏会显示在这里</div>
+    <iframe id="game-frame" sandbox="allow-scripts" style="display:none"></iframe>
+  </div>
+
+</div>
+
+<footer>
+  生成的代码运行在带 <code>sandbox="allow-scripts"</code> 的 iframe 里，没有 same-origin 权限，拿不到父页面的 DOM/Cookie/localStorage ·
+  本地推理用 <a href="https://github.com/mlc-ai/web-llm" target="_blank" rel="noopener">WebLLM</a>，需要支持 WebGPU 的浏览器。
+</footer>
+
+<script type="module">
+import * as webllm from "https://esm.run/@mlc-ai/web-llm";
+
+const $ = (id) => document.getElementById(id);
+const vitalDot = $("vital-dot");
+const vitalText = $("vital-text");
+const progressEl = $("progress");
+const progressText = $("progress-text");
+const loadBtn = $("load-btn");
+const modelSelect = $("model-select");
+const taskInput = $("task-input");
+const runBtn = $("run-btn");
+const resetBtn = $("reset-btn");
+const logEl = $("log");
+const localConfig = $("local-config");
+const cloudConfig = $("cloud-config");
+const cloudBaseUrl = $("cloud-base-url");
+const cloudApiKey = $("cloud-api-key");
+const cloudModel = $("cloud-model");
+const cloudSaveBtn = $("cloud-save-btn");
+const cloudStatus = $("cloud-status");
+const ollamaConfig = $("ollama-config");
+const ollamaBaseUrl = $("ollama-base-url");
+const ollamaModel = $("ollama-model");
+const ollamaSaveBtn = $("ollama-save-btn");
+const ollamaStatus = $("ollama-status");
+const gameFrame = $("game-frame");
+const gameTitle = $("game-title");
+const playfieldEmpty = $("playfield-empty");
+const viewSourceBtn = $("view-source-btn");
+
+let engine = null;
+let source = "local";
+let cloudReady = false;
+let ollamaReady = false;
+let history = [];
+let lastCode = "";
+
+function setVital(state, text){
+  vitalDot.className = "dot " + state;
+  vitalText.textContent = text;
+}
+
+const CLOUD_STORAGE_KEY = "game-builder-cloud-config";
+(function restoreCloudConfig(){
+  try {
+    const saved = JSON.parse(localStorage.getItem(CLOUD_STORAGE_KEY) || "null");
+    if (saved && saved.baseUrl && saved.apiKey && saved.model) {
+      cloudBaseUrl.value = saved.baseUrl;
+      cloudApiKey.value = saved.apiKey;
+      cloudModel.value = saved.model;
+      cloudReady = true;
+      cloudStatus.textContent = `已恢复: ${saved.baseUrl} · ${saved.model}`;
+      cloudStatus.className = "status-line ok";
+    }
+  } catch (e) {}
+})();
+
+const OLLAMA_STORAGE_KEY = "game-builder-ollama-config";
+(function restoreOllamaConfig(){
+  try {
+    const saved = JSON.parse(localStorage.getItem(OLLAMA_STORAGE_KEY) || "null");
+    if (saved && saved.baseUrl && saved.model) {
+      ollamaBaseUrl.value = saved.baseUrl;
+      ollamaModel.value = saved.model;
+      ollamaReady = true;
+      ollamaStatus.textContent = `已恢复: ${saved.baseUrl} · ${saved.model}`;
+      ollamaStatus.className = "status-line ok";
+    }
+  } catch (e) {}
+})();
+
+document.querySelectorAll('input[name="source"]').forEach((radio) => {
+  radio.addEventListener("change", () => {
+    source = radio.value;
+    localConfig.style.display = source === "local" ? "flex" : "none";
+    cloudConfig.style.display = source === "cloud" ? "flex" : "none";
+    ollamaConfig.style.display = source === "ollama" ? "flex" : "none";
+    maybeEnableRun();
+  });
+});
+
+document.querySelectorAll(".preset-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    cloudBaseUrl.value = btn.dataset.presetBase;
+    if (!cloudModel.value.trim()) cloudModel.value = btn.dataset.presetModel;
+    cloudApiKey.focus();
+  });
+});
+
+cloudSaveBtn.addEventListener("click", () => {
+  const baseUrl = cloudBaseUrl.value.trim().replace(/\/$/, "");
+  const apiKey = cloudApiKey.value.trim();
+  const model = cloudModel.value.trim();
+  if (!baseUrl || !apiKey || !model) {
+    cloudStatus.textContent = "Base URL / API Key / 模型名都要填";
+    cloudStatus.className = "status-line err";
+    cloudReady = false;
+    maybeEnableRun();
+    return;
+  }
+  localStorage.setItem(CLOUD_STORAGE_KEY, JSON.stringify({ baseUrl, apiKey, model }));
+  cloudStatus.textContent = `已保存: ${baseUrl} · ${model}`;
+  cloudStatus.className = "status-line ok";
+  cloudReady = true;
+  maybeEnableRun();
+});
+
+ollamaSaveBtn.addEventListener("click", () => {
+  const baseUrl = ollamaBaseUrl.value.trim().replace(/\/$/, "");
+  const model = ollamaModel.value.trim();
+  if (!baseUrl || !model) {
+    ollamaStatus.textContent = "Base URL / 模型名都要填";
+    ollamaStatus.className = "status-line err";
+    ollamaReady = false;
+    maybeEnableRun();
+    return;
+  }
+  localStorage.setItem(OLLAMA_STORAGE_KEY, JSON.stringify({ baseUrl, model }));
+  ollamaStatus.textContent = `已保存: ${baseUrl} · ${model}`;
+  ollamaStatus.className = "status-line ok";
+  ollamaReady = true;
+  maybeEnableRun();
+});
+
+function logStep(tag, label, content){
+  const div = document.createElement("div");
+  div.className = "step";
+  div.innerHTML = `<span class="tag ${tag}">${label}</span><div class="step-body"></div>`;
+  div.querySelector(".step-body").textContent = content;
+  logEl.appendChild(div);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+const SYSTEM_PROMPT = `你是一个网页游戏生成器，运行在浏览器里。用户会描述一个想玩的小游戏，或者对已有游戏提出修改要求。
+
+规则:
+1. 只输出一个完整、自包含、可以独立运行的单一 HTML 文档，用 \`\`\`html 和 \`\`\` 包裹，不要输出任何其他解释文字。
+2. HTML 文档里必须包含 <style> 和 <script>（如果需要），不能引用任何外部资源、CDN、图片链接——所有东西都写在这一个文件里。
+3. 游戏要能用鼠标点击或键盘操作，要有清晰的规则说明、分数或胜负反馈。界面配色用深色背景。
+4. 如果用户是在要求"修改"已有游戏（对话历史里有上一版代码），在上一版基础上修改，保留没被要求改动的部分，重新输出完整文档，不要只输出 diff。
+5. 不确定的地方自己做合理决定，不要反问用户。`;
+
+function extractHtml(text){
+  const fence = text.match(/```(?:html)?\s*([\s\S]*?)```/i);
+  if (fence) return fence[1].trim();
+  const start = text.indexOf("<!DOCTYPE");
+  const startAlt = text.indexOf("<html");
+  const s = start !== -1 ? start : startAlt;
+  if (s !== -1) return text.slice(s).trim();
+  throw new Error("模型输出里没找到可识别的 HTML");
+}
+
+async function llmChat(messages, maxTokens){
+  if (source === "local") {
+    const reply = await engine.chat.completions.create({ messages, temperature: 0.4, max_tokens: maxTokens });
+    return reply.choices[0].message.content;
+  }
+
+  if (source === "ollama") {
+    const saved = JSON.parse(localStorage.getItem(OLLAMA_STORAGE_KEY) || "null");
+    if (!saved) throw new Error("Ollama 未配置");
+    let res;
+    try {
+      res = await fetch(`${saved.baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: saved.model, messages, temperature: 0.4, max_tokens: maxTokens }),
+      });
+    } catch (e) {
+      throw new Error(`连不上 Ollama (${saved.baseUrl})：确认本机 Ollama 在跑，且已用 OLLAMA_ORIGINS 允许这个页面的域名后重启 ollama serve。原始错误: ${e}`);
+    }
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      throw new Error(`Ollama 请求失败 (${res.status}): ${errText.slice(0, 300)}`);
+    }
+    const data = await res.json();
+    return data.choices[0].message.content;
+  }
+
+  const saved = JSON.parse(localStorage.getItem(CLOUD_STORAGE_KEY) || "null");
+  if (!saved) throw new Error("云端 API 未配置");
+  const res = await fetch(`${saved.baseUrl}/chat/completions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${saved.apiKey}` },
+    body: JSON.stringify({ model: saved.model, messages, temperature: 0.4, max_tokens: maxTokens }),
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`云端 API 请求失败 (${res.status}): ${errText.slice(0, 300)}`);
+  }
+  const data = await res.json();
+  return data.choices[0].message.content;
+}
+
+function renderGame(html){
+  lastCode = html;
+  gameFrame.srcdoc = html;
+  gameFrame.style.display = "block";
+  playfieldEmpty.style.display = "none";
+  viewSourceBtn.style.display = "inline-block";
+}
+
+viewSourceBtn.addEventListener("click", () => {
+  const w = window.open("", "_blank");
+  w.document.write(`<pre style="white-space:pre-wrap;font-family:monospace;padding:20px;">${lastCode.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}</pre>`);
+});
+
+async function buildGame(task){
+  if (history.length === 0) {
+    history.push({ role: "system", content: SYSTEM_PROMPT });
+  }
+  history.push({ role: "user", content: task });
+
+  logStep("info", "任务", task);
+  setVital("busy", "生成中…");
+
+  try {
+    const raw = await llmChat(history, 3500);
+    if (!raw || !raw.trim()) {
+      logStep("err", "空输出", "模型返回了空内容。常见原因：这是一个「思考/推理」型模型，把整个 max_tokens 预算都花在了看不见的内部推理上，还没写到正式输出就被截断了——这不是网络问题，换一个非思考模型，或者大幅提高 token 上限才能解决。");
+      history.pop();
+      setVital("error", "空输出");
+      return;
+    }
+    let html;
+    try {
+      html = extractHtml(raw);
+    } catch (e) {
+      logStep("err", "解析失败", raw.slice(0, 500));
+      history.pop();
+      setVital("error", "解析失败");
+      return;
+    }
+    history.push({ role: "assistant", content: "```html\n" + html + "\n```" });
+    logStep("ok", "生成完成", `${html.length} 字符`);
+    gameTitle.textContent = task.length > 30 ? task.slice(0, 30) + "…" : task;
+    renderGame(html);
+    setVital("ready", "就绪");
+  } catch (e) {
+    logStep("err", "异常", String(e));
+    history.pop();
+    setVital("error", "出错");
+  }
+}
+
+function maybeEnableRun(){
+  const inferenceReady = source === "local" ? !!engine : source === "ollama" ? ollamaReady : cloudReady;
+  taskInput.disabled = !inferenceReady;
+  runBtn.disabled = !inferenceReady;
+  if (inferenceReady) setVital("ready", "就绪");
+}
+
+loadBtn.addEventListener("click", async () => {
+  if (!navigator.gpu) {
+    setVital("error", "不支持 WebGPU");
+    return;
+  }
+  loadBtn.disabled = true;
+  modelSelect.disabled = true;
+  progressEl.style.display = "block";
+  setVital("busy", "加载模型中…");
+
+  const modelId = modelSelect.value;
+  try {
+    engine = await webllm.CreateMLCEngine(modelId, {
+      initProgressCallback: (p) => {
+        progressEl.value = p.progress || 0;
+        progressText.textContent = p.text || "";
+      },
+    });
+    logStep("ok", "就绪", `模型 ${modelId} 已在本地加载完成。`);
+    maybeEnableRun();
+  } catch (e) {
+    setVital("error", "加载失败");
+    logStep("err", "错误", String(e));
+    loadBtn.disabled = false;
+    modelSelect.disabled = false;
+  }
+});
+
+runBtn.addEventListener("click", async () => {
+  const task = taskInput.value.trim();
+  if (!task) return;
+  if (source === "local" && !engine) return;
+  if (source === "cloud" && !cloudReady) return;
+  if (source === "ollama" && !ollamaReady) return;
+  runBtn.disabled = true;
+  await buildGame(task);
+  taskInput.value = "";
+  runBtn.disabled = false;
+});
+
+resetBtn.addEventListener("click", () => {
+  history = [];
+  lastCode = "";
+  logEl.innerHTML = "";
+  gameFrame.style.display = "none";
+  gameFrame.srcdoc = "";
+  playfieldEmpty.style.display = "flex";
+  gameTitle.textContent = "还没有游戏";
+  viewSourceBtn.style.display = "none";
+  setVital(engine || cloudReady || ollamaReady ? "ready" : "idle", engine || cloudReady || ollamaReady ? "就绪" : "待命");
+});
+</script>
+
+</body>
+</html>

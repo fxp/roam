@@ -290,6 +290,50 @@
   <div class="section-label">近期任务</div>
 
   <div class="task-card">
+    <a href="/agent-reads-a-folder/">
+      <div class="task-meta">
+        <span class="task-tag ai">技术验证</span>
+        <span>RM · 0008</span>
+        <span>2026-09-10</span>
+      </div>
+      <div class="task-title">文件柜：Agent 读你选的这一个文件夹</div>
+      <div class="task-summary">
+        用浏览器原生的 File System Access API 给 Agent 开一道口子——但只开一条缝：用户必须在系统
+        原生弹窗里亲手选一个文件夹，Agent 才能看到里面的文件，只读不写，权限只在这个标签页存在期间
+        有效。工具逻辑（跳过隐藏文件、按扩展名过滤非文本文件、超长文件截断、跨文件关键词搜索并排序）
+        用一个模拟的目录句柄做了完整单元测试全部通过——但选文件夹那个系统原生对话框，没有任何自动化
+        工具能帮忙点，这一步必须是人亲手点一次才算数。
+      </div>
+      <div class="task-footer">
+        <span>执行者: Claude Sonnet 5 · File System Access API</span>
+        <span class="task-arrow">打开文件柜 →</span>
+      </div>
+    </a>
+  </div>
+
+  <div class="task-card">
+    <a href="/agent-builds-a-game/">
+      <div class="task-meta">
+        <span class="task-tag ai">技术验证</span>
+        <span>RM · 0007</span>
+        <span>2026-09-10</span>
+      </div>
+      <div class="task-title">游戏工坊：Agent 在浏览器里现场写一个能玩的游戏</div>
+      <div class="task-summary">
+        不是读页面，是写代码——描述一个小游戏，Agent 直接生成完整的 HTML/CSS/JS，放进沙箱 iframe
+        里现场运行。本地小模型基本写不出能跑的完整游戏；本机跑的 30B 级 Ollama 模型一次成功，生成的
+        猜数字游戏可以真正玩。中途还测了智谱 BigModel 的 Coding Plan（GLM-4.6，实际路由到
+        glm-5.3-flash）——发现它是个"思考"模型，哪怕给 8000 token 预算，也会把全部预算烧在看不见的
+        内部推理上，正式输出永远是空的，连"猜数字"这么简单的任务都没能跑通。
+      </div>
+      <div class="task-footer">
+        <span>执行者: Claude Sonnet 5 · WebLLM · Ollama</span>
+        <span class="task-arrow">打开游戏工坊 →</span>
+      </div>
+    </a>
+  </div>
+
+  <div class="task-card">
     <a href="/browser-agent-webllm/">
       <div class="task-meta">
         <span class="task-tag ai">技术验证</span>
