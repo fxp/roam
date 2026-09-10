@@ -103,6 +103,10 @@
   .tag.err{background:#3d1712;color:var(--err)}
   .tag.final{background:#3d3312;color:var(--warn)}
   .step-body{color:var(--fg-dim);white-space:pre-wrap;word-break:break-word}
+  .step-body .reasoning-text{color:var(--fg-mute);font-style:italic}
+  .step-body .content-text{color:var(--fg-dim)}
+  .step-body.live::after{content:'▍';color:var(--accent);margin-left:1px;animation:blink 1s step-start infinite}
+  @keyframes blink{50%{opacity:0}}
 
   .files-panel{background:var(--bg-panel);border:1px solid var(--line);border-radius:2px;min-height:560px;display:flex;flex-direction:column}
   .files-bar{padding:10px 14px;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:11px;color:var(--fg-mute)}
@@ -276,6 +280,25 @@ function logStep(tag, label, content){
   div.querySelector(".step-body").textContent = content;
   logEl.appendChild(div);
   logEl.scrollTop = logEl.scrollHeight;
+}
+
+function createLiveStep(tag, label){
+  const div = document.createElement("div");
+  div.className = "step";
+  div.innerHTML = `<span class="tag ${tag}">${label}</span><div class="step-body live"></div>`;
+  const body = div.querySelector(".step-body");
+  logEl.appendChild(div);
+  logEl.scrollTop = logEl.scrollHeight;
+  return {
+    append(text, kind){
+      const span = document.createElement("span");
+      span.className = kind === "reasoning" ? "reasoning-text" : "content-text";
+      span.textContent = text;
+      body.appendChild(span);
+      logEl.scrollTop = logEl.scrollHeight;
+    },
+    finish(){ body.classList.remove("live"); },
+  };
 }
 
 /* ---------- folder picker ---------- */
@@ -512,50 +535,77 @@ function extractJson(text){
   throw new Error("JSON 未闭合: " + text);
 }
 
-async function llmChat(messages){
+async function streamSSE(url, headers, body, onDelta){
+  let res;
+  try {
+    res = await fetch(url, { method: "POST", headers, body: JSON.stringify({ ...body, stream: true }) });
+  } catch (e) {
+    throw new Error(`连不上 ${url}：${e}`);
+  }
+  if (!res.ok || !res.body) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`请求失败 (${res.status}): ${errText.slice(0, 300)}`);
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  let content = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    const lines = buf.split("\n");
+    buf = lines.pop();
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("data:")) continue;
+      const data = trimmed.slice(5).trim();
+      if (!data || data === "[DONE]") continue;
+      let json;
+      try { json = JSON.parse(data); } catch (e) { continue; }
+      const delta = json.choices?.[0]?.delta;
+      if (!delta) continue;
+      if (delta.reasoning_content) onDelta && onDelta(delta.reasoning_content, "reasoning");
+      if (delta.content) { content += delta.content; onDelta && onDelta(delta.content, "content"); }
+    }
+  }
+  return content;
+}
+
+async function llmChat(messages, onDelta){
   if (source === "local") {
-    const reply = await engine.chat.completions.create({ messages, temperature: 0.2, max_tokens: 400 });
-    return reply.choices[0].message.content;
+    const stream = await engine.chat.completions.create({ messages, temperature: 0.2, max_tokens: 400, stream: true });
+    let content = "";
+    for await (const chunk of stream) {
+      const delta = chunk.choices?.[0]?.delta?.content || "";
+      if (delta) { content += delta; onDelta && onDelta(delta, "content"); }
+    }
+    return content;
   }
 
   if (source === "ollama") {
     const saved = JSON.parse(localStorage.getItem(OLLAMA_STORAGE_KEY) || "null");
     if (!saved) throw new Error("Ollama 未配置");
-    let res;
     try {
-      res = await fetch(`${saved.baseUrl}/chat/completions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model: saved.model, messages, temperature: 0.2, max_tokens: 400 }),
-      });
+      return await streamSSE(
+        `${saved.baseUrl}/chat/completions`,
+        { "Content-Type": "application/json" },
+        { model: saved.model, messages, temperature: 0.2, max_tokens: 400 },
+        onDelta
+      );
     } catch (e) {
       throw new Error(`连不上 Ollama (${saved.baseUrl})：确认本机 Ollama 在跑，且已用 OLLAMA_ORIGINS 允许这个页面的域名后重启 ollama serve。原始错误: ${e}`);
     }
-    if (!res.ok) {
-      const errText = await res.text().catch(() => "");
-      throw new Error(`Ollama 请求失败 (${res.status}): ${errText.slice(0, 300)}`);
-    }
-    const data = await res.json();
-    return data.choices[0].message.content;
   }
 
   const saved = JSON.parse(localStorage.getItem(CLOUD_STORAGE_KEY) || "null");
   if (!saved) throw new Error("云端 API 未配置");
-  const res = await fetch(`${saved.baseUrl}/chat/completions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${saved.apiKey}` },
-    body: JSON.stringify({ model: saved.model, messages, temperature: 0.2, max_tokens: 400 }),
-  });
-  if (!res.ok) {
-    const errText = await res.text().catch(() => "");
-    throw new Error(`云端 API 请求失败 (${res.status}): ${errText.slice(0, 300)}`);
-  }
-  const data = await res.json();
-  const content = data.choices[0].message.content;
-  if (!content || !content.trim()) {
-    throw new Error("模型返回了空内容——如果这是思考型模型，可能是 token 预算全花在内部推理上了，换个模型或加大预算试试。");
-  }
-  return content;
+  return await streamSSE(
+    `${saved.baseUrl}/chat/completions`,
+    { "Content-Type": "application/json", "Authorization": `Bearer ${saved.apiKey}` },
+    { model: saved.model, messages, temperature: 0.2, max_tokens: 400 },
+    onDelta
+  );
 }
 
 async function runAgent(task){
@@ -567,11 +617,19 @@ async function runAgent(task){
 
   const MAX_STEPS = 8;
   for (let step = 0; step < MAX_STEPS; step++){
+    const live = createLiveStep("thought", "生成中");
     let raw;
     try {
-      raw = await llmChat(messages);
+      raw = await llmChat(messages, (text, kind) => live.append(text, kind));
     } catch (e) {
+      live.finish();
       logStep("err", "推理出错", String(e));
+      return;
+    }
+    live.finish();
+
+    if (!raw || !raw.trim()) {
+      logStep("err", "空输出", "模型没有输出正式内容——如果这是思考型模型，可能是 token 预算全花在上面看到的那段推理上了，还没写到正式输出就被截断。换个模型或加大预算试试。");
       return;
     }
 
