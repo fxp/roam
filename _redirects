@@ -2,3 +2,10 @@
 # whichever book is currently airing, not tied to one title)
 /city-signal/*  /agent-serial/:splat  301
 /city-signal    /agent-serial/        301
+
+# /vendling/ 下线 2026-09-16（owner 决定）。xiaopingfeng.com 整体退出
+# Vendling 的域名版图，这是最后一块还挂在这个域名下的。
+# 它是那次产品设计任务当天产出的三语落地页；真正的站点在 vendling.ai，
+# 301 过去比留一个死页面对点进来的人更有用。
+/vendling/*  https://vendling.ai/  301
+/vendling    https://vendling.ai/  301
