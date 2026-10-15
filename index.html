@@ -290,6 +290,29 @@
   <div class="section-label">近期任务</div>
 
   <div class="task-card">
+    <a href="/browser-coding-agent/">
+      <div class="task-meta">
+        <span class="task-tag ai">技术验证</span>
+        <span>RM · 0009</span>
+        <span>2026-10-15</span>
+      </div>
+      <div class="task-title">Browser Coding Agent：住在标签页里的 Claude Code</div>
+      <div class="task-summary">
+        把前面三个页面（文件柜、游戏工坊、自体观察）合成一个跑在浏览器里的 Coding Agent，并改成 Claude
+        Code 的交互：对话流为中心，Read / Edit / Write / Grep 等工具，改动前内联确认，plan 模式，
+        /compact、/rewind，Esc 中断；预览和脚本都在沙箱里运行，报错和页面变化读回给它。接上本机 Ollama
+        真测才发现：7B 模型会在动作后面自己编一段“观察结果”，页面根本没变化也说“验证通过”，Edit
+        精确匹配反复失败、越改越坏——这些靠 harness 兜底：停笔序列、写入前的语法检查、“页面没变化就不许
+        说完成”。30B 级的 gemma4 则 44 秒做出了一个真能玩的贪吃蛇（撞墙结束、空格重开）。
+      </div>
+      <div class="task-footer">
+        <span>执行者: Claude Sonnet 5.5 · Ollama · WebLLM</span>
+        <span class="task-arrow">打开 Coding Agent →</span>
+      </div>
+    </a>
+  </div>
+
+  <div class="task-card">
     <a href="/agent-reads-a-folder/">
       <div class="task-meta">
         <span class="task-tag ai">技术验证</span>
