@@ -295,7 +295,7 @@
           <button class="ghost small" id="clear-console-btn">清空 console</button>
         </div>
         <div class="preview-empty" id="preview-empty">工作区里有 .html 文件后，点「运行预览」，或让 Agent 调用 Preview。</div>
-        <iframe id="game-frame" sandbox="allow-scripts" hidden></iframe>
+        <iframe id="game-frame" sandbox="allow-scripts allow-forms" hidden></iframe>
         <div class="console-box" id="console-box"></div>
       </div>
 
@@ -328,11 +328,13 @@
     <div id="cloud-config" class="field-group" style="display:none">
       <div class="note">任意 OpenAI 兼容接口（<code>/chat/completions</code>）。Key 只存在你浏览器的 <b>localStorage</b>，请求直接从浏览器发到你填的地址，不经过本站。思考型模型容易把 token 预算烧在看不见的推理上、正式输出为空，写代码建议用非思考的常规接口。</div>
       <div class="row" style="gap:6px;flex-wrap:wrap">
-        <button type="button" class="ghost small preset-btn" data-preset-base="https://open.bigmodel.cn/api/paas/v4" data-preset-model="glm-4-flash">BigModel 预设</button>
+        <button type="button" class="ghost small preset-btn" data-preset-base="https://open.bigmodel.cn/api/paas/v4" data-preset-model="glm-4-flash" data-preset-extra='{"thinking":{"type":"disabled"}}'>BigModel 预设</button>
         <button type="button" class="ghost small preset-btn" data-preset-base="https://openrouter.ai/api/v1" data-preset-model="">OpenRouter 预设</button>
       </div>
       <input id="cloud-base-url" placeholder="Base URL，例如 https://open.bigmodel.cn/api/paas/v4">
       <input id="cloud-api-key" type="password" placeholder="API Key">
+      <textarea id="cloud-extra" rows="2" spellcheck="false" placeholder='额外请求参数（JSON，可选），原样并进每次请求，例如 {"thinking":{"type":"disabled"}}'></textarea>
+      <div class="note">思考型模型会把 token 先花在看不见的推理上，难的轮次里正文可能为空、也很慢。<b>BigModel：</b>GLM-4.x 可用 <code>{"thinking":{"type":"disabled"}}</code> 关掉思考；<b>GLM-5.3 强制思考、不能关</b>，用 <code>{"reasoning_effort":"low"}</code> 调轻（low / high / max，默认 max 最慢）。别的厂商写法不同。这一栏单独保存，和 Key 无关。</div>
       <div class="row">
         <input id="cloud-model" placeholder="模型名，如 glm-4-flash">
         <button id="cloud-save-btn">保存</button>
@@ -380,6 +382,7 @@ const LS = {
   source: "coding-agent-source",
   model: "coding-agent-local-model",
   scratch: "coding-agent-scratch",
+  cloudExtra: "coding-agent-cloud-extra",      // deliberately NOT inside the cloud config that holds the API key
 };
 // 三个旧页面各存过一份配置，同域名下直接借用，省得重新填 Key。
 const LEGACY_CLOUD = ["self-agent-cloud-config", "game-builder-cloud-config", "local-folder-cloud-config"];
@@ -405,7 +408,7 @@ const ollamaSaveBtn = $("ollama-save-btn"), ollamaStatus = $("ollama-status");
 let webllm = null;
 let engine = null;
 let source = "local";
-const cfg = { cloud: null, ollama: null };
+const cfg = { cloud: null, ollama: null, cloudExtra: null };
 let convo = [];
 let running = false;
 let abortCtl = null;
@@ -444,6 +447,8 @@ $("ollama-origin-cmd").textContent = `OLLAMA_ORIGINS=${location.origin} ollama s
     ollamaStatus.textContent = `已恢复: ${oll.baseUrl} · ${oll.model}`;
     ollamaStatus.className = "status-line ok";
   }
+  const extraRaw = localStorage.getItem(LS.cloudExtra);
+  if (extraRaw) { $("cloud-extra").value = extraRaw; try { cfg.cloudExtra = JSON.parse(extraRaw); } catch (e) { /* shown as invalid on edit */ } }
   const savedModel = localStorage.getItem(LS.model);
   if (savedModel && LOCAL_MODELS.some(([id]) => id === savedModel)) modelSelect.value = savedModel;
 })();
@@ -475,8 +480,21 @@ function maybeEnableRun() {
 }
 
 document.querySelectorAll('input[name="source"]').forEach((r) => r.addEventListener("change", () => setSource(r.value)));
+function syncCloudExtra() {
+  const box = $("cloud-extra"), raw = box.value.trim();
+  box.style.borderColor = "";
+  if (!raw) { cfg.cloudExtra = null; try { localStorage.removeItem(LS.cloudExtra); } catch (e) {} return; }
+  try {
+    const v = JSON.parse(raw);
+    if (!v || typeof v !== "object" || Array.isArray(v)) throw new Error("must be an object");
+    cfg.cloudExtra = v;
+    try { localStorage.setItem(LS.cloudExtra, raw); } catch (e) {}
+  } catch (e) { box.style.borderColor = "var(--err)"; }          // keep the last valid value until this one parses
+}
+$("cloud-extra").addEventListener("input", syncCloudExtra);
 document.querySelectorAll(".preset-btn").forEach((btn) => btn.addEventListener("click", () => {
   cloudBaseUrl.value = btn.dataset.presetBase;
+  if (btn.dataset.presetExtra && !$("cloud-extra").value.trim()) { $("cloud-extra").value = btn.dataset.presetExtra; syncCloudExtra(); }
   if (btn.dataset.presetModel && !cloudModel.value.trim()) cloudModel.value = btn.dataset.presetModel;
   cloudApiKey.focus();
 }));
@@ -618,7 +636,12 @@ async function llmChat(messages, { maxTokens, onDelta, signal }) {
   }
   const s = cfg.cloud;
   if (!s) throw new Error("云端 API 未配置");
-  return await streamSSE(`${s.baseUrl}/chat/completions`, { "Content-Type": "application/json", Authorization: `Bearer ${s.apiKey}` }, body(s.model), onDelta, signal);
+  try {
+    return await streamSSE(`${s.baseUrl}/chat/completions`, { "Content-Type": "application/json", Authorization: `Bearer ${s.apiKey}` }, { ...body(s.model), ...(cfg.cloudExtra || {}) }, onDelta, signal);
+  } catch (e) {
+    if (/always engages in thinking|cannot be disabled/i.test(String(e))) throw new Error(`${s.model} 强制思考，不能关闭。把模型对话框里「额外请求参数」改成 {"reasoning_effort":"low"}（BigModel：low / high / max，默认 max 最慢）。原始错误: ${e}`);
+    throw e;
+  }
 }
 /* =====================================================================
    Workspace: an in-memory file set. Agent edits land here first;
@@ -644,12 +667,14 @@ function normPath(p) {
 }
 
 function setFile(path, content) {
+  ws.ver = (ws.ver || 0) + 1;                       // lets the agent loop tell "same call, nothing changed" from real progress
   if (!ws.base.has(path)) ws.base.set(path, ws.files.has(path) ? ws.files.get(path) : null);
   ws.files.set(path, content);
   ws.deleted.delete(path);
 }
 function removeFile(path) {
   if (!ws.files.has(path)) return false;
+  ws.ver = (ws.ver || 0) + 1;
   if (!ws.base.has(path)) ws.base.set(path, ws.files.get(path));
   ws.files.delete(path);
   if (ws.base.get(path) === null) ws.base.delete(path); else ws.deleted.add(path);
@@ -1183,7 +1208,7 @@ function askChoice({ title, subtitle, body, question, options, signal }) {
       if (!o.feedback) return finish({ index: i, value: o.value });
       list.hidden = true; foot.hidden = true;
       const inp = mk("input", "fb");
-      inp.placeholder = "告诉 Agent 该怎么做（Enter 提交，Esc 直接拒绝）";
+      inp.placeholder = o.placeholder || "告诉 Agent 该怎么做（Enter 提交，Esc 直接拒绝）";
       box.appendChild(inp);
       inp.focus();
       inp.addEventListener("keydown", (e) => {
@@ -1275,6 +1300,125 @@ function renderWelcome() {
   if (!inferenceReady()) T.note("还没有配置模型。输入 /model 选一个（本地 WebLLM / 云端 API / Ollama）。", "warn");
 }
 /* =====================================================================
+   A tiny module system, shared by Run / Test (inside a Worker) and Preview (inside the iframe).
+   - esmTransform turns import / export into CommonJS, line for line, so error positions still match.
+   - moduleRuntime resolves relative paths against the workspace, handles .json, and shims `assert`.
+   Both are stringified into the sandbox, so they must stay self-contained (ES5-ish, no outer references).
+   ===================================================================== */
+function esmTransform(src) {
+  if (!/^[ \t]*(import|export)\b/m.test(src)) return src;
+  var tail = [], n = 0, has = false;
+  function cnt(t) { return (t.match(/\n/g) || []).length; }
+  function pad(m, out) { return out + new Array(Math.max(0, cnt(m) - cnt(out)) + 1).join("\n"); }   // keep the line count
+  src = src.replace(/^[ \t]*import\s+([\s\S]*?)\s+from\s+(['"])([^'"\n]+)\2[ \t]*;?/gm, function (m, what, q, p) {
+    what = what.trim();
+    var t = "__i" + (n++), mm;
+    if ((mm = what.match(/^\*\s+as\s+([\w$]+)$/))) return pad(m, "const " + mm[1] + " = require(" + JSON.stringify(p) + ");");
+    var def = null, named = null;
+    if ((mm = what.match(/^([\w$]+)\s*(?:,\s*(\{[\s\S]*\}))?$/))) { def = mm[1]; named = mm[2] || null; }
+    else if (/^\{[\s\S]*\}$/.test(what)) named = what;
+    else return m;
+    var out = "const " + t + " = require(" + JSON.stringify(p) + ");";
+    if (def) out += " const " + def + " = " + t + " && " + t + ".__esModule ? " + t + ".default : " + t + ";";
+    if (named) out += " const " + named.replace(/([\w$]+)\s+as\s+([\w$]+)/g, "$1: $2") + " = " + t + ";";
+    return pad(m, out);
+  });
+  src = src.replace(/^[ \t]*import\s+(['"])([^'"\n]+)\1[ \t]*;?/gm, function (m, q, p) { return "require(" + JSON.stringify(p) + ");"; });
+  src = src.replace(/^[ \t]*export\s+default\s+(async\s+function\*?|function\*?|class)\s+([\w$]+)/gm, function (m, kind, name) { has = true; tail.push("exports.default = " + name + ";"); return kind + " " + name; });
+  src = src.replace(/^[ \t]*export\s+default\s+/gm, function () { has = true; return "exports.default = "; });
+  src = src.replace(/^[ \t]*export\s+((?:async\s+)?function\*?|class)\s+([\w$]+)/gm, function (m, kind, name) { has = true; tail.push("exports." + name + " = " + name + ";"); return kind + " " + name; });
+  src = src.replace(/^[ \t]*export\s+(const|let|var)\s+([\w$]+)/gm, function (m, kw, name) { has = true; tail.push("exports." + name + " = " + name + ";"); return kw + " " + name; });
+  src = src.replace(/^[ \t]*export\s*\{([^}]*)\}[ \t]*;?/gm, function (m, list) {
+    has = true;
+    list.split(",").forEach(function (x) { var mm = x.trim().match(/^([\w$]+)(?:\s+as\s+([\w$]+))?$/); if (mm) tail.push("exports." + (mm[2] || mm[1]) + " = " + mm[1] + ";"); });
+    return "";
+  });
+  return (has ? 'Object.defineProperty(exports,"__esModule",{value:true});' : "") + src + (tail.length ? "\n" + tail.join("\n") : "");
+}
+
+/** mode: "run" | "test" (inside a Worker: reports through postMessage) | "page" (inside the preview: errors just propagate) */
+function moduleRuntime(mods, entry, mode) {
+  var cache = {}, has = Object.prototype.hasOwnProperty;
+  function dirname(p) { var i = p.lastIndexOf("/"); return i < 0 ? "" : p.slice(0, i); }
+  function norm(p) { var o = []; p.split("/").forEach(function (s) { if (!s || s === ".") return; if (s === "..") o.pop(); else o.push(s); }); return o.join("/"); }
+  function resolve(from, req) {
+    var base = req.charAt(0) === "/" ? norm(req) : norm(dirname(from) + "/" + req);
+    var c = [base, base + ".js", base + ".mjs", base + ".cjs", base + ".json", base + "/index.js"];
+    for (var i = 0; i < c.length; i++) if (has.call(mods, c[i])) return c[i];
+    return null;
+  }
+  function assertShim() {
+    function fail(m, d) { throw new Error(m || d); }
+    function j(v) { try { return JSON.stringify(v); } catch (e) { return String(v); } }
+    var a = function (v, m) { if (!v) fail(m, "assert：期望为真值，实际 " + j(v)); };
+    a.ok = a;
+    a.equal = function (x, y, m) { if (x != y) fail(m, "assert：" + j(x) + " != " + j(y)); };
+    a.notEqual = function (x, y, m) { if (x == y) fail(m, "assert：" + j(x) + " == " + j(y)); };
+    a.strictEqual = function (x, y, m) { if (!Object.is(x, y)) fail(m, "assert：期望 " + j(x) + " 严格等于 " + j(y)); };
+    a.notStrictEqual = function (x, y, m) { if (Object.is(x, y)) fail(m, "assert：不应严格等于 " + j(x)); };
+    a.deepEqual = a.deepStrictEqual = function (x, y, m) { if (j(x) !== j(y)) fail(m, "assert：期望 " + j(x) + " 深度等于 " + j(y)); };
+    a.throws = function (fn, e, m) { var t = false; try { fn(); } catch (err) { t = true; } if (!t) fail(typeof e === "string" ? e : m, "assert：期望函数抛出异常"); };
+    return a;
+  }
+  function makeRequire(from) {
+    return function require(req) {
+      if (req === "assert" || req === "node:assert" || req === "assert/strict") return assertShim();
+      if (/^(vitest|@jest\/globals|node:test)$/.test(req)) {
+        if (mode === "test") return { describe: self.describe, it: self.it, test: self.test, expect: self.expect, beforeEach: self.beforeEach };
+        throw new Error("'" + req + "' 只在 Test 工具里可用（describe / it / expect 是内置的）。请用 Test 运行测试文件，不是 Run");
+      }
+      if (/^(jest|mocha|chai|jasmine)$/.test(req)) throw new Error("测试框架已内置：describe / it / test / expect 是全局函数，直接用，不要 import；并且要用 Test 工具运行（不是 Run）");
+      if (req.charAt(0) !== "." && req.charAt(0) !== "/") throw new Error("模块 '" + req + "' 不可用：沙箱里只有工作区里的文件（用 ./ 相对路径）和 assert，没有 npm 包和 Node 内置模块");
+      var p = resolve(from, req);
+      if (p === null) throw new Error("找不到模块 '" + req + "'（从 " + from + " 引用）。工作区里有这个文件吗？");
+      return load(p);
+    };
+  }
+  function load(p) {
+    if (has.call(cache, p)) return cache[p].exports;
+    var m = { exports: {} };
+    cache[p] = m;
+    if (/\.json$/i.test(p)) { m.exports = JSON.parse(mods[p]); return m.exports; }
+    var fn = (0, eval)("(function (require, module, exports, __filename, __dirname) {" + esmTransform(mods[p]) + "\n})\n//# sourceURL=" + p);
+    fn(makeRequire(p), m, m.exports, p, dirname(p));
+    return m.exports;
+  }
+  function where(e) {
+    var s = String((e && e.stack) || ""), re = /([^\s()@:]+\.(?:js|cjs|mjs|json)):(\d+):(\d+)/g, m;
+    while ((m = re.exec(s))) if (has.call(mods, m[1])) return { file: m[1], line: +m[2], col: +m[3] };
+    return {};
+  }
+  if (mode === "page") { load(entry); return; }
+  try { load(entry); }
+  catch (e) {
+    var w = where(e);
+    postMessage({ type: "error", message: String((e && e.name) || "Error") + ": " + String((e && e.message) || e), file: w.file, line: w.line, col: w.col });
+    return;
+  }
+  if (mode === "test") self.__runTests(); else postMessage({ type: "main-done" });
+}
+
+/** Resolve a relative import the same way the runtime does (used by Check and by bundling). */
+function resolveModule(from, req, has) {
+  const dir = from.includes("/") ? from.slice(0, from.lastIndexOf("/")) : "";
+  const o = [];
+  for (const s of (req.startsWith("/") ? req : dir + "/" + req).split("/")) { if (!s || s === ".") continue; if (s === "..") o.pop(); else o.push(s); }
+  const base = o.join("/");
+  return [base, base + ".js", base + ".mjs", base + ".cjs", base + ".json", base + "/index.js"].find((c) => has(c)) || null;
+}
+/** Every workspace script the sandbox may need to `require` (capped; Workers can't read the workspace themselves). */
+function collectModules() {
+  const mods = {};
+  let total = 0;
+  for (const [p, c] of ws.files) {
+    if (!/\.(m?js|cjs|json)$/i.test(p)) continue;
+    total += c.length;
+    if (total > 900000) break;
+    mods[p] = c;
+  }
+  return mods;
+}
+/* =====================================================================
    Preview: workspace HTML runs in a sandboxed iframe (no same-origin).
    A bootstrap script injected ahead of the page's own code reports
    console output / errors back, and answers inspect / click requests.
@@ -1295,7 +1439,7 @@ function previewBootstrap() {
     };
   });
   window.addEventListener("error", function (e) {
-    post("error", { message: e.message || "error", line: e.lineno || 0, col: e.colno || 0 });
+    post("error", { message: e.message || "error", line: e.lineno || 0, col: e.colno || 0, file: e.filename || "" });
   });
   window.addEventListener("unhandledrejection", function (e) {
     post("error", { message: "未处理的 Promise 拒绝: " + fmt(e.reason).slice(0, 300) });
@@ -1319,6 +1463,22 @@ function previewBootstrap() {
     marked.forEach(function (n) { n.style.outline = "2px solid #3df2a0"; n.style.outlineOffset = "2px"; });
     if (marked[0] && marked[0].scrollIntoView) marked[0].scrollIntoView({ block: "center" });
   }
+  function ser(v) {
+    var seen = [];
+    function rep(k, x) {
+      if (typeof x === "function") return "[function " + (x.name || "") + "]";
+      if (typeof x === "undefined") return "[undefined]";
+      if (typeof x === "symbol") return String(x);
+      if (typeof x === "bigint") return String(x) + "n";
+      if (x instanceof Node) return "<" + x.nodeName.toLowerCase() + (x.id ? "#" + x.id : "") + ">";
+      if (x instanceof Map) return { "[Map]": Array.from(x.entries()) };
+      if (x instanceof Set) return { "[Set]": Array.from(x.values()) };
+      if (x && typeof x === "object") { if (seen.indexOf(x) >= 0) return "[Circular]"; seen.push(x); }
+      return x;
+    }
+    try { var s = typeof v === "string" ? v : JSON.stringify(v, rep, 1); return s === undefined ? String(v) : String(s).slice(0, 2000); }
+    catch (e) { return String(v).slice(0, 2000); }
+  }
   function state() {
     var cs = Array.prototype.slice.call(document.querySelectorAll("canvas")).map(function (c) {
       try { var u = c.toDataURL(), h = 0; for (var i = 0; i < u.length; i += 7) h = (h * 31 + u.charCodeAt(i)) | 0; return h; } catch (e) { return -1; }
@@ -1328,6 +1488,33 @@ function previewBootstrap() {
   var KC = { ArrowLeft: 37, ArrowUp: 38, ArrowRight: 39, ArrowDown: 40, " ": 32, Enter: 13, Escape: 27, Tab: 9, Backspace: 8 };
   function handle(op, a) {
     if (op === "state") return state();
+    if (op === "eval") {
+      var fn, code = String(a.code || "");
+      try { fn = new Function("return (" + code + "\n);"); }
+      catch (e1) { try { fn = new Function(code); } catch (e2) { return { error: "语法错误: " + e2.message }; } }
+      var out;
+      try { out = fn(); } catch (e3) { return { error: String((e3 && e3.message) || e3) }; }
+      if (out && typeof out.then === "function") return out.then(function (v) { return { result: ser(v) }; }, function (er) { return { error: "Promise 拒绝: " + String((er && er.message) || er) }; });
+      return { result: ser(out) };
+    }
+    if (op === "type") {
+      var el = document.querySelector(a.selector);
+      if (!el) return { error: "找不到元素: " + a.selector };
+      var b0 = state(), tag = el.tagName.toLowerCase(), val = String(a.text == null ? "" : a.text);
+      if (el.focus) el.focus();
+      function fire(t) { el.dispatchEvent(new Event(t, { bubbles: true })); }
+      if (tag === "input" || tag === "textarea") {
+        var setter = Object.getOwnPropertyDescriptor(tag === "input" ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype, "value").set;
+        setter.call(el, val); fire("input"); fire("change");
+      } else if (tag === "select") { el.value = val; fire("input"); fire("change"); }
+      else if (el.isContentEditable) { el.textContent = val; fire("input"); }
+      else return { error: "这个元素不能输入: <" + tag + ">" };
+      if (a.submit) {
+        ["keydown", "keyup"].forEach(function (t) { el.dispatchEvent(new KeyboardEvent(t, { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true, cancelable: true })); });
+        if (el.form && el.form.requestSubmit) { try { el.form.requestSubmit(); } catch (e4) {} }
+      }
+      return { typed: true, element: describe(el), value: String(el.value !== undefined ? el.value : el.textContent).slice(0, 200), before: b0 };
+    }
     if (op === "click") {
       var n = document.querySelector(a.selector);
       if (!n) return { error: "找不到元素: " + a.selector };
@@ -1355,7 +1542,18 @@ function previewBootstrap() {
     if (a.selector) {
       var arr = Array.prototype.slice.call(document.querySelectorAll(a.selector));
       if (a.highlight) mark(arr);
-      return { selector: a.selector, count: arr.length, items: arr.slice(0, 8).map(describe), highlighted: !!a.highlight };
+      var res = { selector: a.selector, count: arr.length, items: arr.slice(0, 8).map(describe), highlighted: !!a.highlight };
+      var f = arr[0];
+      if (f) {
+        var cs = getComputedStyle(f), r = f.getBoundingClientRect();
+        res.visible = r.width > 0 && r.height > 0 && cs.visibility !== "hidden" && cs.display !== "none";
+        res.rect = { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) };
+        if ("value" in f) res.value = String(f.value).slice(0, 200);
+        if (a.html) res.html = f.outerHTML.slice(0, 1500);
+        if (a.styles) { res.styles = {}; [].concat(a.styles).slice(0, 20).forEach(function (k) { res.styles[k] = cs.getPropertyValue(k) || cs[k]; }); }
+        if (a.attrs) { res.attrs = {}; [].concat(a.attrs).slice(0, 20).forEach(function (k) { res.attrs[k] = f.getAttribute(k); }); }
+      }
+      return res;
     }
     var heads = Array.prototype.slice.call(document.querySelectorAll("h1,h2,h3")).slice(0, 12).map(function (h) { return { tag: h.tagName.toLowerCase(), text: txt(h, 60) }; });
     function cnt(s) { return document.querySelectorAll(s).length; }
@@ -1370,7 +1568,9 @@ function previewBootstrap() {
     if (e.source !== P || !m || m.__ca !== 1 || m.type !== "rpc") return;
     var res;
     try { res = handle(m.op, m.args || {}); } catch (err) { res = { error: String(err) }; }
-    post("rpc-result", { id: m.id, result: res });
+    Promise.resolve(res).then(
+      function (v) { post("rpc-result", { id: m.id, result: v }); },
+      function (err) { post("rpc-result", { id: m.id, result: { error: String(err) } }); });
   });
 }
 
@@ -1402,7 +1602,7 @@ window.addEventListener("message", (e) => {
   } else if (m.type === "error") {
     let msg = cleanLoc(String(d.message).slice(0, 400));
     if (d.line && !msg.includes("出错的代码")) {
-      const where = errorSnippet(d.line, d.col);
+      const where = errorSnippet(d.line, d.col, d.file);
       if (where) msg += ` — 出错的代码: ${where}`;
     }
     msg = msg.slice(0, 400);
@@ -1425,11 +1625,13 @@ function cleanLoc(text) {
   const snip = m ? errorSnippet(+m[1], +m[2]) : "";
   return snip ? `${kept} — 出错的代码: ${snip}` : kept;
 }
-function errorSnippet(line, col) {
-  const l = pv.srcLines && line > 0 ? pv.srcLines[line - 1] : "";
+function errorSnippet(line, col, file) {
+  const fromModule = file && pv.mods && Object.prototype.hasOwnProperty.call(pv.mods, file);
+  const l = fromModule ? pv.mods[file].split("\n")[line - 1] : (pv.srcLines && line > 0 ? pv.srcLines[line - 1] : "");
   if (!l || !l.trim()) return "";
   const c = Math.max(0, (col || 1) - 1);
-  return JSON.stringify((l.length > 140 ? l.slice(Math.max(0, c - 50), c + 70) : l).trim());
+  const name = fromModule ? file.replace(/^.*__inline(\d+)\.js$/, "内联 <script type=module> #$1") : "";
+  return (fromModule ? `${name} 第 ${line} 行 ` : "") + JSON.stringify((l.length > 140 ? l.slice(Math.max(0, c - 50), c + 70) : l).trim());
 }
 function resolveLocal(entry, href) {
   if (!href || /^([a-z][a-z0-9+.-]*:|\/\/|#)/i.test(href)) return null;
@@ -1444,8 +1646,33 @@ function resolveLocal(entry, href) {
   const key = stack.join("/");
   return ws.files.has(key) ? key : null;
 }
+let lastBuildMods = null;
 function buildSrcdoc(entry) {
   const doc = new DOMParser().parseFromString(ws.files.get(entry), "text/html");
+  // <script type="module"> → bundle the workspace's scripts and run the entry through the module runtime
+  lastBuildMods = null;
+  const modTags = [...doc.querySelectorAll('script[type="module"]')];
+  if (modTags.length) {
+    const mods = collectModules();
+    lastBuildMods = mods;
+    const dir = entry.includes("/") ? entry.slice(0, entry.lastIndexOf("/") + 1) : "";
+    const rt = esmTransform.toString() + "\n(" + moduleRuntime.toString() + ")";
+    let k = 0;
+    for (const sc of modTags) {
+      const src = sc.getAttribute("src");
+      let entryPath = null;
+      if (src) entryPath = resolveLocal(entry, src);
+      else { entryPath = dir + "__inline" + k++ + ".js"; mods[entryPath] = sc.textContent; }
+      if (!entryPath) continue;
+      if (mods[entryPath] === undefined) mods[entryPath] = ws.files.get(entryPath);
+      const s = doc.createElement("script");
+      s.textContent = `(function(){var go=function(){${rt}(window.__camods,${JSON.stringify(entryPath)},"page");};if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",go);else go();})();`.replace(/<\//g, "<\\/");
+      sc.replaceWith(s);
+    }
+    const holder = doc.createElement("script");
+    holder.textContent = "window.__camods=" + JSON.stringify(mods).replace(/<\//g, "<\\/") + ";";
+    doc.head.insertBefore(holder, doc.head.firstChild);
+  }
   doc.querySelectorAll('link[rel~="stylesheet"][href]').forEach((l) => {
     const key = resolveLocal(entry, l.getAttribute("href"));
     if (!key) return;
@@ -1479,7 +1706,7 @@ async function runPreview(entryArg) {
     if (!entry) return { error: "工作区里没有 .html 文件，先用 Write 写一个 index.html" };
   }
   const src = buildSrcdoc(entry);
-  pv = { errors: [], logs: [], loaded: false, title: "", textLength: 0, entry, ran: true, srcLines: src.split("\n") };
+  pv = { errors: [], logs: [], loaded: false, title: "", textLength: 0, entry, ran: true, srcLines: src.split("\n"), mods: lastBuildMods };
   consoleBox.innerHTML = "";
   const loaded = new Promise((res) => { onLoaded = res; });
   $("preview-empty").hidden = true;
@@ -1553,12 +1780,11 @@ function afterWrite(p) {
 }
 
 
-/** Parse-only check (never runs the code). ES modules can't be checked this way, so they are skipped. */
+/** Parse-only check (never runs the code). */
 function jsSyntaxError(code) {
-  if (/^\s*(import|export)\s/m.test(code)) return null;
-  try { new Function(code); return null; } catch (e) { return e instanceof SyntaxError ? e.message : null; }
+  try { new Function(esmTransform(code)); return null; } catch (e) { return e instanceof SyntaxError ? e.message : null; }   // ES modules are checked through the same transform the sandbox uses
 }
-const isPlainJs = (p) => /\.(js|cjs)$/i.test(p);
+const isPlainJs = (p) => /\.(m?js|cjs)$/i.test(p);
 /** When old_string isn't found, point at the line that looks most like it. */
 function nearestLine(cur, needle) {
   const first = needle.split("\n").map((l) => l.trim()).find(Boolean);
@@ -1578,12 +1804,12 @@ function nearestLine(cur, needle) {
 /** Ask before changing anything (unless the mode says to just do it). Returns {ok} or {ok:false, feedback}. */
 async function requestEdit(ctx, ch) {
   if (mode === "acceptEdits") return { ok: true };
-  const title = ch.kind === "delete" ? "删除文件" : ch.kind === "create" ? "新建文件" : "修改文件";
-  const question = ch.kind === "delete" ? `要删除 ${ch.path} 吗？` : ch.kind === "create" ? `要新建 ${ch.path} 吗？` : `要对 ${ch.path} 做这处修改吗？`;
+  const title = ch.title || (ch.kind === "delete" ? "删除文件" : ch.kind === "create" ? "新建文件" : "修改文件");
+  const question = ch.question || (ch.kind === "delete" ? `要删除 ${ch.path} 吗？` : ch.kind === "create" ? `要新建 ${ch.path} 吗？` : `要对 ${ch.path} 做这处修改吗？`);
   ctx.tb.state("wait");
   const r = await askChoice({
     title, subtitle: ch.path, question, signal: ctx.signal,
-    body: renderDiff({ status: ch.status, base: ch.base, cur: ch.cur }),
+    body: ch.body || renderDiff({ status: ch.status, base: ch.base, cur: ch.cur }),
     options: [
       { label: "是", value: "yes" },
       { label: "是，本次会话内自动接受所有修改（shift+tab）", value: "all" },
@@ -1604,11 +1830,16 @@ const denied = (r) => ({
 /* ---------- the sandboxed script runner (the browser's "Bash") ---------- */
 const RUN_PRELUDE = '(function(){function P(t,d){d.type=t;postMessage(d)}["log","info","warn","error"].forEach(function(k){console[k]=function(){P("console",{level:k,text:Array.prototype.map.call(arguments,function(v){if(v instanceof Error)return v.name+": "+v.message;if(v&&typeof v==="object"){try{return JSON.stringify(v)}catch(e){}}return String(v)}).join(" ").slice(0,500)})}});self.addEventListener("unhandledrejection",function(e){P("error",{message:"未处理的 Promise 拒绝: "+(e.reason&&e.reason.message||e.reason)})});})();';
 let runSeq = 0;
-function runInSandbox(code, timeoutMs) {
+function runInSandbox(code, timeoutMs, opts = {}) {
   const id = ++runSeq;
-  const full = RUN_PRELUDE + "\n" + code + "\n;postMessage({type:'main-done'});";
+  const modSrc = opts.modules ? opts.modules.mods : null;
+  const full = opts.modules
+    ? RUN_PRELUDE + "\n" + (opts.tests ? "(" + testHarness.toString() + ")();\n" : "") + esmTransform.toString() + "\n(" + moduleRuntime.toString() + ")(" + JSON.stringify(opts.modules.mods) + "," + JSON.stringify(opts.modules.entry) + "," + JSON.stringify(opts.tests ? "test" : "run") + ");"
+    : opts.tests
+    ? RUN_PRELUDE + "\n(" + testHarness.toString() + ")();\n" + code + "\n;__runTests();"
+    : RUN_PRELUDE + "\n" + code + "\n;postMessage({type:'main-done'});";
   const srcLines = full.split("\n");
-  const out = { logs: [], errors: [], timeout: false };
+  const out = { logs: [], errors: [], timeout: false, tests: [] };
   const iframe = document.createElement("iframe");
   iframe.setAttribute("sandbox", "allow-scripts");
   iframe.style.cssText = "position:fixed;width:0;height:0;border:0;opacity:0;pointer-events:none";
@@ -1637,11 +1868,14 @@ setTimeout(function(){post("timeout",{});try{w.terminate()}catch(e){}},${timeout
         if (d.type === "console" && out.logs.length < 200) out.logs.push(d.level === "log" ? d.text : `${d.level}: ${d.text}`);
         else if (d.type === "error") {
           let msg = String(d.message || "error").slice(0, 300);
-          const l = d.line > 0 ? srcLines[d.line - 1] : "";
-          if (l && l.trim() && d.line > 1) msg += ` — 出错的代码: ${JSON.stringify(l.trim().slice(0, 140))}`;
+          const inMod = d.file && modSrc && Object.prototype.hasOwnProperty.call(modSrc, d.file);
+          const l = inMod ? modSrc[d.file].split("\n")[d.line - 1] : d.line > 0 ? srcLines[d.line - 1] : "";
+          if (l && l.trim() && (inMod || d.line > 1)) msg += ` — 出错的代码: ${inMod ? d.file + " 第 " + d.line + " 行 " : ""}${JSON.stringify(l.trim().slice(0, 140))}`;
           if (out.errors.length < 20) out.errors.push(msg);
           later(300);
-        } else if (d.type === "main-done") later(400);
+        } else if (d.type === "test") { if (out.tests.length < 300) out.tests.push({ name: String(d.name).slice(0, 160), ok: !!d.ok, message: String(d.message || "").slice(0, 300) }); }
+        else if (d.type === "tests-done") later(150);
+        else if (d.type === "main-done") later(400);
       }
     }
     window.addEventListener("message", onMsg);
@@ -1655,10 +1889,15 @@ const fail = (obs) => (obs.denied ? { text: "已拒绝", cls: "dim", extra: obs.
 const TOOLS = {
   LS: {
     disp: "List", cat: "files", ro: true,
-    desc: "列出一个目录下的文件和子目录，参数: {path?}（默认工作区根目录）",
+    desc: "列出一个目录下的文件和子目录，参数: {path?, recursive?}（默认工作区根目录；recursive 列出所有层级的文件）",
     label: (a) => a.path || ".",
     run(a) {
       const pre = dirPrefix(a.path);
+      if (a.recursive) {
+        const all = [...ws.files].filter(([p]) => p.startsWith(pre)).sort((x, y) => x[0].localeCompare(y[0]));
+        if (!all.length && pre) return { error: `没有这个目录: ${pre.slice(0, -1)}` };
+        return { path: pre ? pre.slice(0, -1) : ".", count: all.length, entries: all.slice(0, 300).map(([p, c]) => `${p.slice(pre.length)}  (${c.length} B)`) };
+      }
       const entries = new Map();
       for (const [p, c] of ws.files) {
         if (!p.startsWith(pre)) continue;
@@ -1830,33 +2069,40 @@ const TOOLS = {
   },
   Inspect: {
     disp: "Inspect", cat: "inspect", ro: true,
-    desc: "检查预览页的 DOM：不带参数=页面概况；{selector, highlight?}=查元素(可高亮)；{keyword}=数关键词出现次数",
+    desc: "检查预览页的 DOM：不带参数=页面概况；{selector, highlight?, html?, styles?: [\"color\",\"display\"…], attrs?: [...]}=查元素(返回是否可见、位置、value，可高亮/看 HTML/计算样式)；{keyword}=数关键词出现次数",
     label: (a) => (a.selector ? `selector: ${a.selector}` : a.keyword ? `keyword: ${a.keyword}` : "页面概况"),
     run: (a) => inspectPreview(a),
     view(a, o) {
       if (o.error) return { text: "Error: " + o.error, cls: "err" };
       if (a.keyword) return { text: `“${a.keyword}” 出现 ${o.count} 次` };
-      if (a.selector) return { text: `匹配 ${o.count} 个元素${o.highlighted ? "，已高亮" : ""}` };
+      if (a.selector) return { text: `匹配 ${o.count} 个元素${o.count ? (o.visible ? "，可见" : "，不可见") : ""}${o.highlighted ? "，已高亮" : ""}`, extra: o.html ? o.html.slice(0, 300) : o.styles ? JSON.stringify(o.styles) : "" };
       return { text: `${o.title || "（无标题）"} · ${Object.entries(o.counts).filter(([, v]) => v).map(([k, v]) => k + " " + v).join(", ") || "空页面"}` };
     },
   },
   Run: {
     disp: "Run", cat: "preview",
-    desc: "在隔离的沙箱 Worker 里运行一个 JS 文件并返回 console 输出和报错（类似 Bash）。不支持 import/require；依赖别的文件用 include 列出，按顺序拼接在前面，参数: {file_path, include?: [路径], timeout_ms?}",
+    desc: "在隔离的沙箱 Worker 里运行一个 JS 文件并返回 console 输出和报错（类似 node file.js）。文件里可以 import / require 工作区里的其他文件（./ 相对路径，含 .json）和 assert；没有 DOM，没有 npm 包和 Node 内置模块，参数: {file_path, timeout_ms?}",
     label: (a) => argPath(a) || "",
     async run(a) {
       const p = normPath(argPath(a));
       if (!ws.files.has(p)) return { error: `工作区里没有 ${p}` };
       if (/\.(html?|css|md|json|txt)$/i.test(p)) return { error: `Run 只能运行 JS 文件；${p} 不是脚本。网页请用 Preview` };
+      if (/\.(test|spec)\.m?js$/i.test(p) || /(^|\/)test_[^/]+\.js$/i.test(p)) {          // a test file: Run has no describe / it / expect
+        const r = await TOOLS.Test.run(a, ctx);
+        return r.error ? r : { ...r, redirected: "这是测试文件，已自动改用 Test 运行（下次直接用 Test）" };
+      }
       const refd = htmlEntries().find((h) => new RegExp(`<script[^>]+src=["'][^"']*${escRe(p.split("/").pop())}["']`, "i").test(ws.files.get(h)));
       if (refd) return { error: `${p} 是被 ${refd} 引用的网页脚本，要用到 document / canvas 等浏览器环境，Run 里没有这些。请用 Preview 运行网页（再用 Click / Press 操作）` };
       const inc = [...new Set(Array.isArray(a.include) ? a.include.map(normPath) : [])].filter((i) => i !== p);
       for (const i of inc) if (!ws.files.has(i)) return { error: `include 里的 ${i} 不存在` };
       const t = Math.min(15000, Math.max(500, parseInt(a.timeout_ms, 10) || 5000));
-      const r = await runInSandbox([...inc, p].map((f) => ws.files.get(f)).join("\n;\n"), t);
+      const r = inc.length
+        ? await runInSandbox([...inc, p].map((f) => ws.files.get(f)).join("\n;\n"), t)
+        : await runInSandbox("", t, { modules: { mods: collectModules(), entry: p } });
       const status = r.timeout ? "timeout" : r.errors.length ? "error" : "ok";
       const dom = r.errors.some((e) => /(document|window|localStorage|navigator|alert) is not defined/.test(e));
-      return { file_path: p, status, output: r.logs.slice(0, 60).map((l) => l.slice(0, 300)), errors: r.errors, ...(dom ? { hint: "Run 在 Worker 里跑，没有 DOM / window。这是网页脚本：请用 Preview 运行网页，不要删掉对 document 的引用。" } : {}), ...(r.timeout ? { warning: `超过 ${t}ms 仍未结束，已强制终止（可能有死循环）` } : {}) };
+      const noTest = r.errors.some((e) => /\b(describe|it|test|expect|beforeEach) is not defined/.test(e));
+      return { file_path: p, status, output: r.logs.slice(0, 60).map((l) => l.slice(0, 300)), errors: r.errors, ...(dom ? { hint: "Run 在 Worker 里跑，没有 DOM / window。这是网页脚本：请用 Preview 运行网页，不要删掉对 document 的引用。" } : noTest ? { hint: "describe / it / expect 只在 Test 工具里可用：请用 Test 运行这个文件，不要 import 任何测试框架。" } : {}), ...(r.timeout ? { warning: `超过 ${t}ms 仍未结束，已强制终止（可能有死循环）` } : {}) };
     },
     view(a, o) {
       if (o.error) return { text: "Error: " + o.error, cls: "err" };
@@ -1939,8 +2185,556 @@ function interactView(verb) {
   };
 }
 async function inspectPreview(args) {
-  return previewRpc("inspect", { selector: args.selector, keyword: args.keyword, highlight: !!args.highlight });
+  return previewRpc("inspect", { selector: args.selector, keyword: args.keyword, highlight: !!args.highlight, html: !!args.html, styles: args.styles, attrs: args.attrs });
 }
+/* =====================================================================
+   More tools, batch 1 — files: MultiEdit / Move / Copy / Replace / Diff / Outline
+   ===================================================================== */
+const pathPair = (a) => [normPath(a.from ?? a.src ?? a.source ?? a.old_path), normPath(a.to ?? a.dest ?? a.destination ?? a.new_path)];
+
+/** Symbol outline by regex — good enough to navigate a big file without reading all of it. */
+function outlineOf(p, text) {
+  const ext = (p.split(".").pop() || "").toLowerCase();
+  const out = [];
+  const push = (i, kind, name) => out.push(`${i + 1}\t${kind}\t${name}`);
+  text.split("\n").forEach((l, i) => {
+    let m;
+    if (/^(js|mjs|cjs|ts|jsx|tsx)$/.test(ext)) {
+      if ((m = l.match(/^\s*(?:export\s+)?(?:default\s+)?(?:async\s+)?function\*?\s+([\w$]+)/))) push(i, "function", m[1]);
+      else if ((m = l.match(/^\s*(?:export\s+)?(?:abstract\s+)?class\s+([\w$]+)/))) push(i, "class", m[1]);
+      else if ((m = l.match(/^\s*(?:export\s+)?(?:const|let|var)\s+([\w$]+)\s*=\s*(?:async\s*)?(?:\([^)]*\)|[\w$]+)\s*=>/))) push(i, "function", m[1]);
+      else if (!/^\s{2,}/.test(l) && (m = l.match(/^\s*(?:export\s+)?(?:const|let|var)\s+([\w$]+)\s*=/))) push(i, "var", m[1]);
+      else if ((m = l.match(/^\s{2,4}(?:static\s+|async\s+|get\s+|set\s+)*([\w$]+)\s*\([^)]*\)\s*\{/)) && !/^(if|for|while|switch|catch|function|return|else)$/.test(m[1])) push(i, "method", m[1]);
+    } else if (ext === "py") {
+      if ((m = l.match(/^\s*(def|class)\s+(\w+)/))) push(i, m[1] === "def" ? "function" : "class", m[2]);
+    } else if (ext === "css") {
+      if ((m = l.match(/^([.#@a-zA-Z:\[][^{};]*)\{\s*$/))) push(i, "rule", m[1].trim());
+    } else if (ext === "md" || ext === "markdown") {
+      if ((m = l.match(/^(#{1,4})\s+(.*)$/))) push(i, "h" + m[1].length, m[2].trim());
+    } else if (/^html?$/.test(ext)) {
+      if ((m = l.match(/<(script|style)\b[^>]*?(?:src=["']([^"']+)["'])?[^>]*>/i))) push(i, m[1].toLowerCase(), m[2] || "(inline)");
+      for (const idm of l.matchAll(/\bid=["']([^"']+)["']/g)) push(i, "id", "#" + idm[1]);
+      if ((m = l.match(/<(h[1-3])\b[^>]*>(.*?)<\/h[1-3]>/i))) push(i, m[1].toLowerCase(), m[2].replace(/<[^>]+>/g, "").trim());
+    }
+  });
+  return out.slice(0, 150);
+}
+
+Object.assign(TOOLS, {
+  MultiEdit: {
+    disp: "Update", cat: "files",
+    desc: "对同一个文件一次做多处修改（要么全部成功，要么都不改），参数: {file_path, edits: [{old_string, new_string, replace_all?}…]}。必须先 Read；比连续多次 Edit 更稳更省",
+    label: (a) => `${argPath(a) || ""}（${Array.isArray(a.edits) ? a.edits.length : 0} 处）`,
+    async run(a, ctx) {
+      const p = normPath(argPath(a));
+      if (!ws.files.has(p)) return { error: `工作区里没有 ${p}` };
+      if (!readSet.has(p)) return { error: `你还没有 Read 过 ${p}。先 Read 再 MultiEdit` };
+      if (!Array.isArray(a.edits) || !a.edits.length) return { error: "edits 必须是非空数组：[{old_string, new_string}, …]" };
+      const orig = ws.files.get(p);
+      let cur = orig;
+      const counts = [];
+      for (let i = 0; i < a.edits.length; i++) {
+        const e = a.edits[i] || {};
+        const oldS = e.old_string ?? e.old, newS = e.new_string ?? e.new, tag = `第 ${i + 1} 处编辑`;
+        if (typeof oldS !== "string" || !oldS) return { error: `${tag}缺少 old_string，整体没有应用` };
+        if (typeof newS !== "string") return { error: `${tag}缺少 new_string，整体没有应用` };
+        if (oldS === newS) return { error: `${tag}的 old_string 和 new_string 相同，整体没有应用` };
+        const n = cur.split(oldS).length - 1;
+        if (n === 0) { const near = nearestLine(cur, oldS); return { error: `${tag}找不到 old_string（它要匹配的是前面编辑之后的内容）。${near ? near + "。" : ""}整体没有应用` }; }
+        if (n > 1 && !e.replace_all) return { error: `${tag}的 old_string 出现了 ${n} 次，加长上下文或设置 replace_all。整体没有应用` };
+        cur = cur.split(oldS).join(newS);
+        counts.push(n);
+      }
+      if (isPlainJs(p)) { const bad = jsSyntaxError(cur); if (bad && !jsSyntaxError(orig)) return { error: `这些修改会让 ${p} 出现语法错误：${bad}。整体没有应用` }; }
+      const ok = await requestEdit(ctx, { kind: "edit", path: p, status: "modified", base: orig, cur, title: `修改文件（${a.edits.length} 处）` });
+      if (!ok.ok) return denied(ok);
+      setFile(p, cur); afterWrite(p);
+      return { ok: true, file_path: p, edits: a.edits.length, replaced: counts, _diff: { status: "modified", base: orig, cur } };
+    },
+    view(a, o) {
+      if (o.error) return fail(o);
+      const d = diffLines(o._diff.base, o._diff.cur);
+      return { text: `已修改 ${o.file_path}：${o.edits} 处编辑，+${d.add} −${d.del} 行`, diff: renderDiff(o._diff) };
+    },
+  },
+
+  Move: {
+    disp: "Move", cat: "files",
+    desc: "移动 / 重命名一个文件，参数: {from, to, overwrite?}",
+    label: (a) => { try { const [f, t] = pathPair(a); return `${f} → ${t}`; } catch (e) { return ""; } },
+    async run(a, ctx) {
+      const [from, to] = pathPair(a);
+      if (!ws.files.has(from)) return { error: `工作区里没有 ${from}` };
+      if (from === to) return { error: "from 和 to 相同" };
+      if (ws.files.has(to) && !a.overwrite) return { error: `${to} 已存在。要覆盖请设置 overwrite: true` };
+      const body = mk("div", "plan-body"); body.textContent = `${from}\n  → ${to}${ws.files.has(to) ? "\n（会覆盖已有的 " + to + "）" : ""}`;
+      const ok = await requestEdit(ctx, { kind: "edit", path: `${from} → ${to}`, title: "移动文件", question: `要把 ${from} 移动到 ${to} 吗？`, body });
+      if (!ok.ok) return denied(ok);
+      const content = ws.files.get(from);
+      setFile(to, content); removeFile(from);
+      readSet.delete(from); readSet.add(to);
+      if (activePath === from) activePath = to;
+      refreshEditor(); renderTree(); updateChrome(); persistScratch();
+      return { ok: true, from, to };
+    },
+    view: (a, o) => (o.error ? fail(o) : { text: `已移动 ${o.from} → ${o.to}` }),
+  },
+
+  Copy: {
+    disp: "Copy", cat: "files",
+    desc: "复制一个文件，参数: {from, to, overwrite?}",
+    label: (a) => { try { const [f, t] = pathPair(a); return `${f} → ${t}`; } catch (e) { return ""; } },
+    async run(a, ctx) {
+      const [from, to] = pathPair(a);
+      if (!ws.files.has(from)) return { error: `工作区里没有 ${from}` };
+      if (from === to) return { error: "from 和 to 相同" };
+      if (ws.files.has(to) && !a.overwrite) return { error: `${to} 已存在。要覆盖请设置 overwrite: true` };
+      const content = ws.files.get(from);
+      const ok = await requestEdit(ctx, { kind: "create", path: to, status: "added", base: null, cur: content, title: "复制文件", question: `要把 ${from} 复制为 ${to} 吗？` });
+      if (!ok.ok) return denied(ok);
+      setFile(to, content); readSet.add(to); afterWrite(to);
+      return { ok: true, from, to, lines: nLines(content) };
+    },
+    view: (a, o) => (o.error ? fail(o) : { text: `已复制 ${o.from} → ${o.to}（${o.lines} 行）` }),
+  },
+
+  Replace: {
+    disp: "Replace", cat: "files",
+    desc: "跨文件批量替换（重命名变量 / 改文案），参数: {pattern, replacement, path?, glob?, regex?: true, \"-i\"?: true}。默认按字面量匹配；regex 为 true 时 replacement 里可用 $1。会先列出涉及的文件让用户确认",
+    label: (a) => `${JSON.stringify(a.pattern || "")} → ${JSON.stringify(a.replacement ?? "")}`,
+    async run(a, ctx) {
+      if (typeof a.pattern !== "string" || !a.pattern) return { error: "缺少 pattern" };
+      const repl = a.replacement ?? a.new_string ?? a.to;
+      if (typeof repl !== "string") return { error: "缺少 replacement（可以是空字符串）" };
+      const flags = "g" + (a["-i"] || a.case_insensitive ? "i" : "");
+      let re;
+      try { re = a.regex ? new RegExp(a.pattern, flags) : new RegExp(escRe(a.pattern), flags); } catch (e) { return { error: `正则不合法: ${e.message}` }; }
+      const pre = dirPrefix(a.path), gre = a.glob ? globRe(a.glob) : null;
+      const changes = []; let total = 0;
+      for (const [p, c] of [...ws.files].sort((x, y) => x[0].localeCompare(y[0]))) {
+        if (!p.startsWith(pre) || (gre && !gre.test(a.glob.includes("/") ? p : p.split("/").pop()))) continue;
+        const m = c.match(re);
+        if (!m) continue;
+        const next = c.replace(re, a.regex ? repl : () => repl);
+        if (next === c) continue;
+        if (isPlainJs(p)) { const bad = jsSyntaxError(next); if (bad && !jsSyntaxError(c)) return { error: `替换会让 ${p} 出现语法错误：${bad}。整体没有应用` }; }
+        changes.push({ p, n: m.length, base: c, next }); total += m.length;
+      }
+      if (!changes.length) return { error: "没有任何文件匹配这个 pattern" };
+      if (changes.length > 60) return { error: `会影响 ${changes.length} 个文件，范围太大。用 path / glob 缩小范围` };
+      const body = mk("div");
+      const sum = mk("div", "plan-body");
+      sum.textContent = changes.map((c) => `${c.p}  ×${c.n}`).join("\n");
+      body.append(sum, renderDiff({ status: "modified", base: changes[0].base, cur: changes[0].next }));
+      const ok = await requestEdit(ctx, { kind: "edit", path: `${changes.length} 个文件`, title: "批量替换", question: `要把 ${changes.length} 个文件里的 ${total} 处 ${JSON.stringify(a.pattern)} 替换成 ${JSON.stringify(repl)} 吗？`, body });
+      if (!ok.ok) return denied(ok);
+      for (const c of changes) { setFile(c.p, c.next); readSet.add(c.p); }
+      afterWrite(changes[changes.length - 1].p);
+      return { ok: true, replacements: total, files: changes.map((c) => ({ path: c.p, count: c.n })), _diff: { status: "modified", base: changes[0].base, cur: changes[0].next } };
+    },
+    view: (a, o) => (o.error ? fail(o) : { text: `替换了 ${o.replacements} 处，涉及 ${o.files.length} 个文件`, extra: o.files.slice(0, 6).map((f) => `${f.path} ×${f.count}`).join("\n"), diff: renderDiff(o._diff) }),
+  },
+
+  Diff: {
+    disp: "Diff", cat: "files", ro: true,
+    desc: "查看你（和用户）在内存里改了什么：相对打开时的原样的差异，参数: {file_path?}（不填=所有有改动的文件）。改完想自查时用",
+    label: (a) => argPath(a) || "全部改动",
+    run(a) {
+      const only = argPath(a) ? normPath(argPath(a)) : null;
+      const ch = listChanges().filter((c) => !only || c.path === only);
+      if (!ch.length) return { changes: 0, note: only ? `${only} 没有未写回磁盘的改动` : "没有未写回磁盘的改动" };
+      const parts = ch.slice(0, 8).map((c) => {
+        if (c.status === "added") return `新增 ${c.path}（${nLines(c.cur)} 行）`;
+        if (c.status === "deleted") return `删除 ${c.path}`;
+        const d = diffLines(c.base, c.cur);
+        const body = d.lines ? d.lines.filter(([k]) => k !== " ").map(([k, l]) => `${k} ${l}`).slice(0, 60).join("\n") : "（改动较大，不逐行列出）";
+        return `修改 ${c.path}（+${d.add} −${d.del}）\n${body}`;
+      });
+      return { changes: ch.length, files: ch.map((c) => `${c.status} ${c.path}`), diff: clip(parts.join("\n\n"), caps().read) };
+    },
+    view: (a, o) => (o.error ? fail(o) : { text: o.changes ? `${o.changes} 个文件有改动` : o.note, cls: o.changes ? "" : "dim", extra: o.files ? o.files.slice(0, 6).join("\n") : "" }),
+  },
+
+  Outline: {
+    disp: "Outline", cat: "files", ro: true,
+    desc: "列出一个文件里的函数 / 类 / 变量 / 标题 / id 及其行号（JS、Python、CSS、Markdown、HTML），大文件先看这个再用 Read 的 offset / limit 读需要的部分，参数: {file_path}",
+    label: (a) => argPath(a) || "",
+    run(a) {
+      const p = normPath(argPath(a));
+      if (!ws.files.has(p)) return { error: `工作区里没有 ${p}` };
+      const syms = outlineOf(p, ws.files.get(p));
+      return { file_path: p, total_lines: nLines(ws.files.get(p)), count: syms.length, symbols: syms, note: syms.length ? "格式：行号⇥种类⇥名字" : "没识别出符号（这种文件类型可能不支持）" };
+    },
+    view: (a, o) => (o.error ? fail(o) : { text: `${o.count} 个符号（共 ${o.total_lines} 行）`, extra: o.symbols.slice(0, 6).map((s) => s.replace(/\t/g, " ")).join("\n") + (o.count > 6 ? `\n… +${o.count - 6}` : "") }),
+  },
+});
+/* =====================================================================
+   More tools, batch 2 — the page, code checks, the web, and working with the user:
+   Type / Wait / Eval / Console · Check / Test · WebFetch · AskUser / Task
+   ===================================================================== */
+
+/* ---------- Test: a tiny describe / it / expect that runs inside the sandbox Worker ---------- */
+function testHarness() {
+  var tests = [], stack = [], befores = [];
+  self.describe = function (name, fn) { stack.push(name); try { fn(); } finally { stack.pop(); } };
+  self.it = self.test = function (name, fn) { tests.push({ name: stack.concat(name).join(" › "), fn: fn, before: befores.slice() }); };
+  self.beforeEach = function (fn) { befores.push(fn); };
+  function norm(v) {
+    if (Array.isArray(v)) return v.map(norm);
+    if (v && typeof v === "object") { var o = {}; Object.keys(v).sort().forEach(function (k) { o[k] = norm(v[k]); }); return o; }
+    if (typeof v === "undefined") return "__undefined__";
+    if (typeof v === "number" && isNaN(v)) return "__NaN__";
+    return v;
+  }
+  function eq(a, b) { return JSON.stringify(norm(a)) === JSON.stringify(norm(b)); }
+  function show(v) { try { var s = JSON.stringify(v); return s === undefined ? String(v) : s.slice(0, 120); } catch (e) { return String(v); } }
+  self.expect = function (actual) {
+    function make(neg) {
+      function chk(ok, msg) { if (neg ? ok : !ok) throw new Error((neg ? "不应该：" : "") + msg); }
+      return {
+        toBe: function (e) { chk(Object.is(actual, e), "期望 " + show(actual) + " 等于 " + show(e)); },
+        toEqual: function (e) { chk(eq(actual, e), "期望 " + show(actual) + " 深度等于 " + show(e)); },
+        toBeTruthy: function () { chk(!!actual, "期望 " + show(actual) + " 为真值"); },
+        toBeFalsy: function () { chk(!actual, "期望 " + show(actual) + " 为假值"); },
+        toBeNull: function () { chk(actual === null, "期望 " + show(actual) + " 为 null"); },
+        toBeUndefined: function () { chk(actual === undefined, "期望 " + show(actual) + " 为 undefined"); },
+        toBeDefined: function () { chk(actual !== undefined, "期望值已定义"); },
+        toContain: function (e) { chk(actual != null && actual.indexOf(e) >= 0, "期望 " + show(actual) + " 包含 " + show(e)); },
+        toHaveLength: function (n) { chk(actual != null && actual.length === n, "期望长度 " + n + "，实际 " + (actual == null ? "无" : actual.length)); },
+        toBeGreaterThan: function (n) { chk(actual > n, "期望 " + show(actual) + " > " + n); },
+        toBeLessThan: function (n) { chk(actual < n, "期望 " + show(actual) + " < " + n); },
+        toBeGreaterThanOrEqual: function (n) { chk(actual >= n, "期望 " + show(actual) + " >= " + n); },
+        toBeLessThanOrEqual: function (n) { chk(actual <= n, "期望 " + show(actual) + " <= " + n); },
+        toBeCloseTo: function (n, d) { chk(Math.abs(actual - n) < Math.pow(10, -(d == null ? 2 : d)) / 2, "期望 " + show(actual) + " 约等于 " + n); },
+        toMatch: function (re) { chk(new RegExp(re).test(String(actual)), "期望 " + show(actual) + " 匹配 " + re); },
+        toBeInstanceOf: function (C) { chk(actual instanceof C, "期望是 " + (C && C.name) + " 的实例"); },
+        toThrow: function (msg) {
+          var threw = false, m = "";
+          try { actual(); } catch (e) { threw = true; m = String((e && e.message) || e); }
+          chk(threw && (msg == null || m.indexOf(msg) >= 0), threw ? "抛出了 “" + m + "”，不含 “" + msg + "”" : "期望函数抛出异常，但没有");
+        },
+      };
+    }
+    var o = make(false); o.not = make(true); return o;
+  };
+  self.__runTests = async function () {
+    for (var i = 0; i < tests.length; i++) {
+      var t = tests[i], ok = true, msg = "";
+      try {
+        for (var j = 0; j < t.before.length; j++) await t.before[j]();
+        await Promise.race([Promise.resolve(t.fn()), new Promise(function (_, rej) { setTimeout(function () { rej(new Error("测试超过 2 秒没结束")); }, 2000); })]);
+      } catch (e) { ok = false; msg = String((e && e.message) || e); }
+      postMessage({ type: "test", name: t.name, ok: ok, message: msg });
+    }
+    postMessage({ type: "tests-done", total: tests.length });
+  };
+}
+
+/* ---------- WebFetch helpers ---------- */
+const webAllowed = new Set();                                   // hosts the user allowed for this session
+let webProxy = localStorage.getItem("coding-agent-webproxy") === "1";
+function setWebProxy(on) { webProxy = on; try { localStorage.setItem("coding-agent-webproxy", on ? "1" : "0"); } catch (e) {} }
+function isPrivateHost(h) {
+  h = h.toLowerCase();
+  if (h === "localhost" || h.endsWith(".localhost") || h.endsWith(".local") || h.endsWith(".internal") || h === "0.0.0.0" || h.startsWith("[")) return true;
+  if (/^\d+$/.test(h) || /^0x/i.test(h)) return true;           // decimal / hex IP tricks
+  const m = h.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+  if (m) { const a = +m[1], b = +m[2]; return a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127); }
+  return false;
+}
+function htmlToText(html) {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  doc.querySelectorAll("script,style,noscript,svg,iframe,nav,footer").forEach((n) => n.remove());
+  const out = [];
+  const walk = (n) => {
+    if (n.nodeType === 3) { out.push(n.nodeValue.replace(/\s+/g, " ")); return; }
+    if (n.nodeType !== 1) return;
+    const t = n.tagName.toLowerCase();
+    if (/^h[1-6]$/.test(t)) { out.push("\n\n" + "#".repeat(+t[1]) + " "); n.childNodes.forEach(walk); out.push("\n"); return; }
+    if (t === "pre") { out.push("\n```\n" + n.textContent + "\n```\n"); return; }
+    if (t === "li") { out.push("\n- "); n.childNodes.forEach(walk); return; }
+    if (t === "a") { n.childNodes.forEach(walk); const h = n.getAttribute("href"); if (h && /^https?:/i.test(h) && h.length < 120) out.push(` (${h})`); return; }
+    const block = /^(p|div|section|article|tr|br|ul|ol|table|blockquote|main)$/.test(t);
+    if (block) out.push("\n");
+    n.childNodes.forEach(walk);
+    if (block) out.push("\n");
+  };
+  walk(doc.body || doc.documentElement);
+  return ((doc.title ? `# ${doc.title}\n` : "") + out.join("")).replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+async function fetchText(url, signal) {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 15000);
+  const onAbort = () => ctl.abort();
+  signal && signal.addEventListener("abort", onAbort, { once: true });
+  try {
+    const res = await fetch(url, { credentials: "omit", redirect: "follow", signal: ctl.signal });
+    const text = await res.text();
+    return { status: res.status, ok: res.ok, ct: res.headers.get("content-type") || "", text: text.slice(0, 2000000) };
+  } finally { clearTimeout(timer); signal && signal.removeEventListener("abort", onAbort); }
+}
+
+/* ---------- Task: a read-only sub-agent with its own context ---------- */
+const SUB_TOOLS = ["LS", "Glob", "Grep", "Read", "Outline", "Inspect", "Console", "Check", "Diff", "WebFetch"];
+async function runSubAgent(prompt, ctx) {
+  const local = source === "local";
+  const names = SUB_TOOLS.filter((n) => TOOLS[n]);
+  const sys = `你是一个只读的调研子 Agent，在用户的工作区里查资料，再把结论交给主 Agent。
+
+可用工具:
+${names.map((n) => `- ${n}: ${TOOLS[n].desc}`).join("\n")}
+
+规则:
+1. 每一轮只返回一个 JSON 对象（不要用代码块包裹），格式二选一（<> 里的内容换成真实内容）:
+   {"thought": "<一句话>", "action": "<工具名>", "args": {}}
+   {"thought": "", "final_answer": "<调研结论：具体、简洁，带文件路径和行号，不要编造>"}
+2. 只能读，不能改任何东西。最多 12 步，拿到足够的信息就给出 final_answer。
+3. 不能凭空回答，必须先用工具拿到真实内容。`;
+  const msgs = [{ role: "system", content: sys }, { role: "user", content: prompt }];
+  let calls = 0;
+  for (let step = 0; step < 12; step++) {
+    if (ctx.signal.aborted) throw Object.assign(new Error("aborted"), { name: "AbortError" });
+    spinnerVerb("子任务", 0);
+    const res = await llmChat(compactMessages(msgs, local ? 5000 : 40000), { maxTokens: local ? 1024 : 2048, signal: ctx.signal, onDelta: (t) => { spin.chars += t.length; } });
+    let raw = res.content;
+    const fake = raw.search(/\s*观察结果[:：]\s*(?=[\{\[]|$)/);
+    if (fake > 0) raw = raw.slice(0, fake);
+    let acts;
+    try { acts = extractActions(raw); }
+    catch (e) {
+      if (!raw.includes("{")) return { report: raw.trim(), calls };
+      msgs.push({ role: "assistant", content: raw }, { role: "user", content: "你的输出不是合法的 JSON 动作。只返回一个 JSON 对象。" });
+      continue;
+    }
+    const { obj } = acts[0];
+    const name = findTool(obj.action);
+    let obs;
+    if (!name) {
+      if (obj.final_answer !== undefined) return { report: typeof obj.final_answer === "string" ? obj.final_answer : JSON.stringify(obj.final_answer), calls };
+      obs = { error: obj.action ? `未知工具: ${obj.action}` : "缺少 action 或 final_answer" };
+    } else if (!SUB_TOOLS.includes(name)) obs = { error: `子任务里不能用 ${name}（只读）` };
+    else {
+      const tool = TOOLS[name];
+      const args = obj.args && typeof obj.args === "object" && !Array.isArray(obj.args) ? { ...obj.args } : {};
+      let label = ""; try { label = tool.label(args); } catch (e) { /* ignore */ }
+      ctx.tb.attach(mk("div", "extra", `· ${tool.disp}(${label})`));
+      spinnerVerb("子任务·" + tool.disp);
+      try { obs = await tool.run(args, ctx); } catch (e) { obs = { error: String(e.message || e) }; }
+      calls++;
+    }
+    msgs.push({ role: "assistant", content: raw }, { role: "user", content: `观察结果: ${clip(JSON.stringify(obs, (k, v) => (k[0] === "_" ? undefined : v)), caps().obs)} (只返回一个 JSON 对象)` });
+  }
+  return { report: "（子任务用完 12 步仍没给出结论，请主 Agent 自己处理。）", calls };
+}
+
+Object.assign(TOOLS, {
+  /* ---------- the page ---------- */
+  Type: {
+    disp: "Type", cat: "preview",
+    desc: "在预览页的输入框 / 文本域 / 下拉框里输入内容（会触发 input / change 事件），返回页面有没有变化，参数: {selector, text, submit?: true（再按回车 / 提交表单）}",
+    label: (a) => `${a.selector || ""}${a.submit ? " ⏎" : ""}`,
+    run: (a) => (a.selector ? interactPreview("type", { selector: a.selector, text: a.text, submit: !!a.submit }, 350) : { error: "缺少 selector 参数" }),
+    view(a, o) { const v = interactView("输入")(a, o); return o.value !== undefined && !o.error ? { ...v, text: v.text + `，当前值 ${JSON.stringify(String(o.value).slice(0, 40))}` } : v; },
+  },
+  Wait: {
+    disp: "Wait", cat: "preview", ro: true,
+    desc: "等一会儿再看页面有没有变化（动画 / 自动运行的游戏 / 定时器），参数: {ms?: 100–5000，默认 500}",
+    label: (a) => `${a.ms || 500} ms`,
+    async run(a) {
+      if (!pv.ran) return { error: "还没有运行预览，请先调用 Preview" };
+      const ms = Math.min(5000, Math.max(100, parseInt(a.ms, 10) || 500));
+      const b = await previewRpc("state", {});
+      if (b.error) return b;
+      await sleep(ms);
+      const f = await previewRpc("state", {});
+      if (f.error) return f;
+      const textChanged = b.text !== f.text, canvasChanged = f.canvases.length ? JSON.stringify(b.canvases) !== JSON.stringify(f.canvases) : undefined;
+      return { waited_ms: ms, text_before: b.text, text_after: f.text, text_changed: textChanged, ...(canvasChanged === undefined ? {} : { canvas_changed: canvasChanged }), page_changed: textChanged || !!canvasChanged };
+    },
+    view: (a, o) => (o.error ? { text: "Error: " + o.error, cls: "err" } : { text: `等了 ${o.waited_ms}ms：${o.page_changed ? (o.text_changed ? `页面文字 ${JSON.stringify(o.text_before.slice(0, 30))} → ${JSON.stringify(o.text_after.slice(0, 30))}` : "画面（canvas）有变化") : "页面文字和画面都没有变化"}` }),
+  },
+  Eval: {
+    disp: "Eval", cat: "inspect",
+    desc: "在预览页里执行一段 JS 并返回结果（像浏览器开发者工具的 console）。能直接读游戏 / 应用的全局变量和状态，如 {code: \"snake.length\"}；多条语句要用 return 返回结果；返回 Promise 会等它完成。代码较长或含引号时，args 里省略 code，把代码放在 JSON 之后的代码块里",
+    label: (a) => String(a.code || "").replace(/\s+/g, " ").slice(0, 60),
+    async run(a) {
+      if (typeof a.code !== "string" || !a.code.trim()) return { error: "缺少 code" };
+      const before = pv.errors.length;
+      const r = await previewRpc("eval", { code: a.code });
+      if (!r.error) await sleep(60);
+      return { ...r, new_errors: pv.errors.slice(before, before + 5) };
+    },
+    view: (a, o) => (o.error ? { text: "Error: " + o.error, cls: "err" } : { text: `= ${String(o.result).replace(/\s+/g, " ").slice(0, 120)}`, ...(o.new_errors && o.new_errors.length ? { extra: o.new_errors.join("\n"), cls: "err" } : {}) }),
+  },
+  Console: {
+    disp: "Console", cat: "inspect", ro: true,
+    desc: "读取预览页最近的 console 输出和报错（游戏 / 应用自己 console.log 的状态），参数: {clear?: true 读完后清空}",
+    label: (a) => (a.clear ? "clear" : ""),
+    run(a) {
+      if (!pv.ran) return { error: "还没有运行预览，请先调用 Preview" };
+      const out = { errors: pv.errors.slice(-20), console: pv.logs.slice(-40) };
+      if (a.clear) { pv.errors = []; pv.logs = []; consoleBox.innerHTML = ""; }
+      return out;
+    },
+    view: (a, o) => (o.error ? { text: "Error: " + o.error, cls: "err" } : { text: `${o.errors.length} 个报错，${o.console.length} 行输出`, cls: o.errors.length ? "err" : "", extra: [...o.errors, ...o.console.slice(-4)].join("\n") }),
+  },
+
+  /* ---------- code ---------- */
+  Check: {
+    disp: "Check", cat: "preview", ro: true,
+    desc: "静态检查（不运行代码）：JS 语法、JSON 是否合法、HTML 里引用了不存在的本地文件（script / link / img）、重复的 id、CSS 花括号是否配对，参数: {file_path?}（不填=检查整个工作区）",
+    label: (a) => argPath(a) || "整个工作区",
+    run(a) {
+      const targets = argPath(a) ? [normPath(argPath(a))] : [...ws.files.keys()].sort();
+      const problems = [];
+      for (const p of targets) {
+        const c = ws.files.get(p);
+        if (c == null) { problems.push(`${p}：文件不存在`); continue; }
+        if (isPlainJs(p)) {
+          const e = jsSyntaxError(c);
+          if (e) problems.push(`${p}：JS 语法错误 — ${e}`);
+          const specs = new Set();
+          for (const m of c.matchAll(/(?:\bfrom\s+|\bimport\s+|\brequire\s*\(\s*)['"](\.{1,2}\/[^'"\n]*|\/[^'"\n]*)['"]/g)) specs.add(m[1]);
+          for (const sp of specs) if (!resolveModule(p, sp, (x) => ws.files.has(x))) problems.push(`${p}：import / require 了不存在的文件 ${sp}`);
+        }
+        else if (/\.json$/i.test(p)) { try { JSON.parse(c); } catch (e) { problems.push(`${p}：JSON 不合法 — ${e.message}`); } }
+        else if (/\.css$/i.test(p)) {
+          const body = c.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(["'])(?:\\.|(?!\1).)*\1/g, "");
+          const o = (body.match(/\{/g) || []).length, cl = (body.match(/\}/g) || []).length;
+          if (o !== cl) problems.push(`${p}：花括号不配对（{ ${o} 个，} ${cl} 个）`);
+        } else if (/\.html?$/i.test(p)) {
+          const doc = new DOMParser().parseFromString(c, "text/html");
+          doc.querySelectorAll("script:not([src])").forEach((s, i) => {
+            const t = s.getAttribute("type");
+            if (!t || /javascript/i.test(t)) { const e = jsSyntaxError(s.textContent); if (e) problems.push(`${p}：第 ${i + 1} 个内联 <script> 语法错误 — ${e}`); }
+          });
+          doc.querySelectorAll("script[src],link[rel~=stylesheet][href],img[src]").forEach((el) => {
+            const ref = el.getAttribute("src") || el.getAttribute("href");
+            if (!ref || /^([a-z][a-z0-9+.-]*:|\/\/|#)/i.test(ref)) return;
+            if (!resolveLocal(p, ref)) problems.push(`${p}：引用了不存在的文件 ${ref}（<${el.tagName.toLowerCase()}>）`);
+          });
+          const seen = new Map();
+          doc.querySelectorAll("[id]").forEach((el) => seen.set(el.id, (seen.get(el.id) || 0) + 1));
+          for (const [id, n] of seen) if (n > 1) problems.push(`${p}：id="${id}" 重复了 ${n} 次`);
+        }
+      }
+      return { checked: targets.length, ok: !problems.length, problems: problems.slice(0, 40) };
+    },
+    view: (a, o) => (o.error ? fail(o) : o.ok ? { text: `✓ 检查了 ${o.checked} 个文件，没发现问题` } : { text: `✗ 发现 ${o.problems.length} 个问题`, cls: "err", extra: o.problems.slice(0, 6).join("\n") }),
+  },
+  Test: {
+    disp: "Test", cat: "preview",
+    desc: "在隔离沙箱里运行测试文件（像 npm test）：内置 describe / it / test / expect(toBe、toEqual、toContain、toThrow、toBeCloseTo…) / beforeEach，支持 async；测试文件里用 import 或 require 引用被测文件（./ 相对路径）。没有 DOM，没有 npm 包，参数: {file_path, timeout_ms?}",
+    label: (a) => argPath(a) || "",
+    async run(a) {
+      const p = normPath(argPath(a));
+      if (!ws.files.has(p)) return { error: `工作区里没有 ${p}` };
+      if (/\.(html?|css|md|json|txt)$/i.test(p)) return { error: `${p} 不是 JS 测试文件` };
+      const inc = [...new Set(Array.isArray(a.include) ? a.include.map(normPath) : [])].filter((i) => i !== p);
+      for (const i of inc) if (!ws.files.has(i)) return { error: `include 里的 ${i} 不存在` };
+      const t = Math.min(20000, Math.max(1000, parseInt(a.timeout_ms, 10) || 8000));
+      const r = inc.length
+        ? await runInSandbox([...inc, p].map((f) => ws.files.get(f)).join("\n;\n"), t, { tests: true })
+        : await runInSandbox("", t, { tests: true, modules: { mods: collectModules(), entry: p } });
+      const failed = r.tests.filter((x) => !x.ok);
+      let status = r.timeout ? "timeout" : failed.length ? "fail" : r.errors.length && !r.tests.length ? "error" : "pass";
+      if (status === "pass" && !r.tests.length) return { error: "没有找到任何测试。用 it(\"名字\", () => { … }) 或 test(…) 定义测试，用 expect(x).toBe(y) 断言" };
+      return { file_path: p, status, total: r.tests.length, passed: r.tests.length - failed.length, failed: failed.length, failures: failed.slice(0, 10).map((x) => ({ name: x.name, message: x.message })), errors: r.errors, output: r.logs.slice(0, 30) };
+    },
+    view(a, o) {
+      if (o.error) return fail(o);
+      if (o.status === "pass") return { text: `✓ ${o.total} 个测试全部通过${o.redirected ? "（已自动改用 Test）" : ""}`, extra: o.output.slice(0, 4).join("\n") };
+      if (o.status === "timeout") return { text: "✗ 测试超时，可能有死循环", cls: "err" };
+      if (o.status === "error") return { text: "✗ 测试文件运行报错", cls: "err", extra: o.errors.join("\n") };
+      return { text: `✗ ${o.failed}/${o.total} 个测试失败${o.redirected ? "（已自动改用 Test）" : ""}`, cls: "err", extra: o.failures.map((f) => `✗ ${f.name}\n   ${f.message}`).join("\n") };
+    },
+  },
+
+  /* ---------- the web ---------- */
+  WebFetch: {
+    disp: "Fetch", cat: "files", ro: true,
+    desc: "读取一个网页 / 文档 / JSON 的文本（HTML 会转成简化的 markdown），查库的用法或 API 文档时用，参数: {url, offset?}。每个域名要先征得用户同意；浏览器只能读开放了 CORS 的站点（raw.githubusercontent.com、cdn.jsdelivr.net、registry.npmjs.org、api.github.com、wikipedia API 等）；本机和内网地址一律禁止",
+    label: (a) => String(a.url || ""),
+    async run(a, ctx) {
+      let u;
+      try { u = new URL(String(a.url)); } catch (e) { return { error: "url 不合法，要完整的 https://…" }; }
+      if (!/^https?:$/.test(u.protocol)) return { error: "只支持 http(s)" };
+      if (isPrivateHost(u.hostname)) return { error: "不允许访问本机 / 内网地址" };
+      if (!webAllowed.has(u.hostname)) {
+        ctx.tb.state("wait");
+        const body = mk("div", "plan-body");
+        body.textContent = u.href + (webProxy ? "\n（直连被浏览器拦截时，会改走 r.jina.ai 阅读代理——它会看到这个 URL）" : "");
+        const r = await askChoice({
+          title: "读取网页", subtitle: u.hostname, body, question: `允许 Agent 读取 ${u.hostname} 吗？`, signal: ctx.signal,
+          options: [{ label: "是", value: "yes" }, { label: `是，本次会话内允许 ${u.hostname}`, value: "host" }, { label: "否，告诉 Agent 该怎么做", value: "no", feedback: true }],
+        });
+        ctx.tb.state("");
+        if (r.index === -1) { ctx.abort(); return { error: "用户中断了任务", denied: true }; }
+        if (r.value === "no") return { error: `用户不同意读取 ${u.hostname}${r.feedback ? "，并说：" + r.feedback : "。换个来源，或直接问用户"}`, denied: true };
+        if (r.value === "host") webAllowed.add(u.hostname);
+      }
+      let r, via = "direct";
+      try { r = await fetchText(u.href, ctx.signal); }
+      catch (e) {
+        if (ctx.signal.aborted) return { error: "用户中断了任务", denied: true };
+        if (!webProxy) return { error: `请求失败：多半是 ${u.hostname} 没有开放 CORS，浏览器拦截了。换一个允许跨域的来源（raw.githubusercontent.com、cdn.jsdelivr.net、registry.npmjs.org、api.github.com），或者请用户输入 /webproxy on 开启阅读代理` };
+        try { r = await fetchText("https://r.jina.ai/" + u.href, ctx.signal); via = "r.jina.ai"; } catch (e2) { return { error: `读取失败：${e2}` }; }
+      }
+      let text = r.text, kind = "text";
+      if (/html/i.test(r.ct) || /^\s*<(!doctype|html)/i.test(text)) { text = htmlToText(text); kind = "html"; }
+      else if (/json/i.test(r.ct)) { try { text = JSON.stringify(JSON.parse(text), null, 2); } catch (e) { /* keep raw */ } kind = "json"; }
+      const off = Math.max(0, parseInt(a.offset, 10) || 0), cap = caps().read;
+      const out = { url: u.href, status: r.status, via, kind, total_chars: text.length, offset: off, truncated: off + cap < text.length, content: text.slice(off, off + cap) };
+      return r.ok ? out : { error: `HTTP ${r.status}`, ...out, content: out.content.slice(0, 500) };
+    },
+    view: (a, o) => (o.error && !o.url ? fail(o) : o.error ? { text: "Error: " + o.error, cls: "err" } : { text: `读到 ${o.total_chars} 字符（${o.kind}${o.via !== "direct" ? "，经 " + o.via : ""}）${o.truncated ? "，已截断，用 offset 继续读" : ""}`, extra: o.content.slice(0, 160).replace(/\s+/g, " ") }),
+  },
+
+  /* ---------- working with the user ---------- */
+  AskUser: {
+    disp: "Ask", cat: "files", ro: true,
+    desc: "需求有歧义、而且选错代价大时，向用户提一个问题，不要自己猜，参数: {question, options?: [\"选项A\", \"选项B\"…]}（最多 6 个选项，用户也可以自己输入）。返回用户的回答",
+    label: (a) => String(a.question || "").slice(0, 50),
+    async run(a, ctx) {
+      if (typeof a.question !== "string" || !a.question.trim()) return { error: "缺少 question" };
+      const options = (Array.isArray(a.options) ? a.options : []).map(String).filter(Boolean).slice(0, 6);
+      ctx.tb.state("wait");
+      const r = await askChoice({
+        title: "Agent 想问你一个问题", question: a.question, signal: ctx.signal,
+        options: [...options.map((o) => ({ label: o, value: o })), { label: options.length ? "其他（自己输入）" : "输入你的回答", value: "\u0000other", feedback: true, placeholder: "输入你的回答（Enter 提交，Esc 跳过）" }],
+      });
+      ctx.tb.state("");
+      if (r.index === -1) { ctx.abort(); return { error: "用户中断了任务", denied: true }; }
+      const answer = r.value === "\u0000other" ? r.feedback || "" : r.value;
+      return answer ? { answer } : { answer: "", note: "用户没有回答。按你的判断继续，并在最终回答里说明你的假设。" };
+    },
+    view: (a, o) => (o.error ? fail(o) : { text: o.answer ? `用户回答：${o.answer}` : "用户没有回答", cls: o.answer ? "" : "dim" }),
+  },
+  Task: {
+    disp: "Task", cat: "files", ro: true,
+    desc: "把一项调研交给只读的子 Agent，它在独立的上下文里读文件 / 搜索 / 查文档，只把结论带回来，不占用你的上下文（适合“找出所有用到 X 的地方并总结”这类大范围调研），参数: {description: \"3-6 个字的标题\", prompt: \"要它查什么、期望什么形式的结论\"}",
+    label: (a) => String(a.description || "").slice(0, 40),
+    async run(a, ctx) {
+      if (typeof a.prompt !== "string" || !a.prompt.trim()) return { error: "缺少 prompt：要子 Agent 查什么" };
+      let r;
+      try { r = await runSubAgent(a.prompt, ctx); }
+      catch (e) { if (e.name === "AbortError" || ctx.signal.aborted) return { error: "用户中断了任务", denied: true }; return { error: `子任务出错：${e.message || e}` }; }
+      return { description: a.description || "", tool_calls: r.calls, report: clip(r.report || "（子 Agent 没有给出结论）", 3000) };
+    },
+    view: (a, o) => (o.error ? fail(o) : { text: `子任务完成（${o.tool_calls} 次工具调用）`, extra: o.report.slice(0, 300) }),
+  },
+});
+
+/* ---------- grouping, and which tools a small local model gets ---------- */
+const TOOL_GROUPS = {
+  LS: "文件", Glob: "文件", Grep: "文件", Read: "文件", Write: "文件", Edit: "文件", MultiEdit: "文件", Delete: "文件", Move: "文件", Copy: "文件", Replace: "文件", Diff: "文件", Outline: "文件",
+  Preview: "页面", Click: "页面", Press: "页面", Type: "页面", Wait: "页面", Inspect: "页面", Eval: "页面", Console: "页面",
+  Run: "代码", Test: "代码", Check: "代码", WebFetch: "网络", AskUser: "协作", Task: "协作", TodoWrite: "协作", ExitPlanMode: "协作",
+};
+const CORE_TOOLS = ["LS", "Glob", "Grep", "Read", "Write", "Edit", "Delete", "Preview", "Click", "Press", "Inspect", "Run", "TodoWrite", "ExitPlanMode"];
+for (const [n, t] of Object.entries(TOOLS)) { t.group = TOOL_GROUPS[n] || "其他"; t.core = CORE_TOOLS.includes(n); }
+/** Browser-local models have 4–8k of context: give them the core set only. Ollama / cloud get everything. */
+const toolsForModel = () => Object.entries(TOOLS).filter(([, t]) => source !== "local" || t.core);
 /* =====================================================================
    Agent loop. Text-JSON protocol (not native tool-calling) so one loop drives WebLLM,
    any OpenAI-compatible API, and Ollama. The model's "thought" is streamed to the
@@ -1956,7 +2750,8 @@ const clip = (s, n) => (s.length > n ? s.slice(0, n) + `…(+${s.length - n})` :
 const TOOL_ALIASES = {
   read_file: "Read", write_file: "Write", edit_file: "Edit", delete_file: "Delete", list_files: "LS", ls: "LS",
   search_files: "Grep", run_preview: "Preview", click_preview: "Click", inspect_preview: "Inspect",
-  todo_write: "TodoWrite", exit_plan_mode: "ExitPlanMode",
+  todo_write: "TodoWrite", exit_plan_mode: "ExitPlanMode", multi_edit: "MultiEdit", web_fetch: "WebFetch",
+  ask_user: "AskUser", askuserquestion: "AskUser", ask_user_question: "AskUser", run_tests: "Test", eval_js: "Eval",
 };
 function findTool(name) {
   if (typeof name !== "string") return null;
@@ -1966,7 +2761,24 @@ function findTool(name) {
 }
 
 function buildSystemPrompt() {
-  const toolLines = Object.entries(TOOLS).filter(([, t]) => !t.onlyPlan || mode === "plan").map(([n, t]) => `- ${n}: ${t.desc}`).join("\n");
+  const avail = toolsForModel().filter(([, t]) => !t.onlyPlan || mode === "plan");
+  const toolLines = avail.map(([n, t]) => `- ${n}: ${t.desc}`).join("\n");
+  const has = (n) => avail.some(([k]) => k === n);
+  const tips = [
+    has("Eval") && "确认页面 / 游戏状态用 Eval 直接读变量（如 Eval {code: \"score\"}），比猜强",
+    has("Type") && "表单用 Type 填写",
+    has("Wait") && "自动运行的游戏 / 动画用 Press + Wait 观察变化",
+    has("Check") && "改完先 Check 做静态检查",
+    has("Test") && "写了测试就用 Test 跑",
+    has("MultiEdit") && "同一文件多处修改用 MultiEdit",
+    has("Replace") && "改名 / 批量改文案用 Replace",
+    has("Outline") && "大文件先 Outline 再 Read 需要的那段",
+    has("Diff") && "想自查改了什么用 Diff",
+    has("AskUser") && "需求有歧义、选错代价大时用 AskUser 问用户，不要自己猜",
+    has("WebFetch") && "要查库 / API 的用法时用 WebFetch（用户会决定是否允许）",
+    has("Task") && "大范围调研交给 Task 子任务，别把自己的上下文塞满",
+  ].filter(Boolean);
+  const tipRule = tips.length ? `\n11. 其他工具怎么用：${tips.join("；")}。` : "";
   const memFile = ws.files.has("CLAUDE.md") ? "CLAUDE.md" : ws.files.has("AGENTS.md") ? "AGENTS.md" : null;
   const mem = memFile ? `\n\n项目记忆（来自 ${memFile}，请遵守）:\n${ws.files.get(memFile).slice(0, 3000)}` : "";
   const plan = mode === "plan" ? "\n\n【当前是 plan 模式】只能调研，不能修改文件、不能运行预览或脚本。调研完用 ExitPlanMode 提交计划，等用户批准后才能动手。" : "";
@@ -1983,15 +2795,15 @@ ${toolLines}
 1. 每一轮只做一个动作。先写一个 JSON 对象（不要用 markdown 代码块包裹它），格式二选一（<> 里的内容换成你自己的真实内容，不要照抄）:
    {"thought": "<给用户看的一句话旁白：你接下来要做什么、为什么>", "action": "<工具名>", "args": {}}
    {"thought": "", "final_answer": "<给用户的最终回答，可用 markdown，简洁>"}
-2. Write 的 args 里只放 file_path，把完整文件内容原样放在 JSON 之后的一个 ${FENCE} 代码块里（不要转义）。
+2. Write 的 args 里只放 file_path，把完整文件内容原样放在 JSON 之后的一个 ${FENCE} 代码块里（不要转义）。Eval 的代码较长、或含引号 / 换行时也一样：args 里省略 code，把代码放在 JSON 之后的代码块里（在 JSON 字符串里手写双引号转义很容易出错）。
 ${rule3}
 4. 先搜后读：不知道在哪个文件时，先 Grep / Glob，再用 offset / limit 只 Read 需要的那一段。
 5. 不能凭空编造文件内容或运行结果；回答之前先用工具拿到真实数据。
 6. 改了网页或脚本之后必须验证：网页用 Preview（必要时 Inspect / Click），脚本用 Run；有报错就修，直到没有报错才能 final_answer。没有报错不等于功能正确：用 Click（按钮）/ Press（键盘类游戏，如方向键、空格）操作之后，要对照返回的 page_changed / text_before / text_after / canvas_changed 确认页面真的变了；对不上就继续修，不要只因为没报错就说做好了。
 7. 多步骤任务开头先用 TodoWrite 列清单，做完一项立刻更新状态。
-8. 预览是沙箱 iframe：入口默认 index.html，多个文件用 <link href> 和 <script src> 引用工作区里的文件，不要用 ES module import；尽量不依赖外部 CDN。Run 在 Worker 里跑，没有 DOM，也不支持 import/require。
+8. 预览是沙箱 iframe：入口默认 index.html，多个文件用 <link href> 和 <script src> 引用工作区里的文件；<script type="module"> 里可以 import 工作区里的相对路径文件（./x.js）；不能 import npm 包或 URL，尽量不依赖外部 CDN。Run / Test 在 Worker 里跑：没有 DOM，可以 import / require 工作区里的相对路径文件和 assert，没有 npm 包和 Node 内置模块。
 9. 用户可能拒绝你的修改并附上意见，按意见调整，不要重复同一处修改。
-10. 回答简短，用中文，不要复述工具输出。${plan}${mem}
+10. 回答简短，用中文，不要复述工具输出。${tipRule}${plan}${mem}
 
 示例:
 用户: 做一个点击加一的计数器
@@ -2037,7 +2849,7 @@ function scanJson(text, start) {
  *    {json} [```fenced content```]  {json} [```fenced content```] …
  *  A content fence ends at the first closing fence that is followed by the next JSON or the end of the text,
  *  so a markdown file that itself contains ``` blocks still comes through whole. */
-function extractActions(text) {
+function extractActions(text, opts = {}) {
   const calls = [];
   let pos = 0;
   while (calls.length < 12) {
@@ -2053,7 +2865,16 @@ function extractActions(text) {
     if (closed) { fenced = closed[1]; fenceClosed = true; used += closed[0].length; }
     else {
       const open = rest.match(/^\s*`{3}[^\n]*\n([\s\S]*)$/);
-      if (open) { fenced = open[1]; used += rest.length; }
+      if (open) {
+        fenced = open[1]; used += rest.length;
+        // The fence is closed, but something odd follows it (a mangled next action, stray backticks …).
+        // Unless the output was cut off by max_tokens, take the last fence line as the end and drop the junk
+        // instead of writing it into the file.
+        if (!opts.truncated) {
+          const fences = [...fenced.matchAll(/\n`{3}[ \t]*(?=\n|$)/g)];
+          if (fences.length) { fenced = fenced.slice(0, fences[fences.length - 1].index); fenceClosed = true; }
+        }
+      }
     }
     const o = r.obj;
     const known = o.action !== undefined || o.final_answer !== undefined || Object.keys(o).every((k) => k === "thought" || k === "args");
@@ -2151,13 +2972,16 @@ async function runTask(task) {
     updateStatusLine();
     spinnerVerb("思考中", 0);
 
-    let raw = "", asst = null, res;
+    let raw = "", asst = null, res, reasonChars = 0;
+    const thinks = (source === "ollama" && cfg.ollama && cfg.ollama.effort && cfg.ollama.effort !== "none")
+      || (source === "cloud" && cfg.cloudExtra && (cfg.cloudExtra.reasoning_effort || (cfg.cloudExtra.thinking && cfg.cloudExtra.thinking.type === "enabled")));
+    const maxTok = local ? 1536 : thinks ? 16000 : 4096;
     try {
       res = await llmChat(compactMessages(convo, local ? 6000 : 60000), {
-        maxTokens: local ? 1536 : (source === "ollama" && cfg.ollama && cfg.ollama.effort && cfg.ollama.effort !== "none") ? 16000 : 4096, signal: ctl.signal,
+        maxTokens: maxTok, signal: ctl.signal,
         onDelta: (t, kind) => {
           spin.chars += t.length;
-          if (kind === "reasoning") return;
+          if (kind === "reasoning") { reasonChars += t.length; return; }
           raw += t;
           const view = liveText(raw);
           if (view) { if (!asst) asst = T.assistant(); if (view !== asst.text) asst.set(view); }
@@ -2171,14 +2995,16 @@ async function runTask(task) {
     }
     if (ctl.signal.aborted) { if (asst) asst.remove(); return interrupted(); }
     if (!raw.trim()) {
-      T.note("模型没有输出正式内容——如果是思考型模型，可能是 token 预算全花在看不见的推理上了。换个非思考模型试试。", "err");
+      T.note(reasonChars > 200
+        ? `模型把这一轮的 token 预算（${maxTok}）全花在“思考”上了，还没写到正式输出（思考了约 ${reasonChars} 字）。关掉思考再试：Ollama 在模型对话框里把「思考」设为关闭；云端在「额外请求参数」里填 BigModel 的 {"thinking":{"type":"disabled"}}（别的厂商写法不同）。`
+        : `模型没有输出任何内容${res.finish ? "（finish_reason=" + res.finish + "）" : ""}。检查模型名 / Key / 额度，或换个模型。`, "err");
       return;
     }
 
     const fake = raw.search(/\s*观察结果[:：]\s*(?=[\{\[]|$)/);      // the model writing "观察结果: {…}" itself
     if (fake > 0) { raw = raw.slice(0, fake); T.note("模型自己续写了一段“观察结果”，已丢弃（它还没拿到真实的工具返回）。", "warn"); }
     let calls;
-    try { calls = extractActions(raw); }
+    try { calls = extractActions(raw, { truncated: res.finish === "length" }); }
     catch (e) {
       if (!raw.includes("{")) calls = [{ obj: { final_answer: raw.trim() }, fenced: null, fenceClosed: false }];   // plain prose → the answer
       else {
@@ -2186,7 +3012,7 @@ async function runTask(task) {
         T.note(`${res.finish === "length" ? "[输出被 max_tokens 截断] " : ""}解析失败：${e.message}`, "err");
         if (++st.parseFails >= 3) { T.note("连续 3 次没有输出合法的 JSON 动作。小模型常见，换更大的模型。", "err"); return; }
         convo.push({ role: "assistant", content: raw });
-        convo.push({ role: "user", content: `你的输出不是合法的 JSON 动作（${e.message}）。${FORMAT_REMINDER}` });
+        convo.push({ role: "user", content: `你的输出不是合法的 JSON 动作（${e.message}）。常见原因：字符串里的双引号没转义。写文件用 Write（内容放 JSON 之后的代码块），长代码 / 含引号的 Eval 也把代码放进代码块。${FORMAT_REMINDER}` });
         continue;
       }
     }
@@ -2225,6 +3051,7 @@ async function runTask(task) {
       const tool = TOOLS[name];
       let args = obj.args && typeof obj.args === "object" && !Array.isArray(obj.args) ? { ...obj.args } : {};
       if (name === "Write" && typeof args.content !== "string" && fenced !== null) args.content = fenced;
+      if (name === "Eval" && typeof args.code !== "string" && fenced !== null) args.code = fenced;
       const label = (() => { try { return tool.label(args); } catch (e) { return ""; } })();
       const tb = T.tool(tool.disp, label);
       const ctx = { tb, signal: ctl.signal, abort: () => ctl.abort() };
@@ -2250,8 +3077,8 @@ async function runTask(task) {
         if (name === "Click" || name === "Press") { st.interacted = true; st.lastInteract = obs.page_changed === false ? "nochange" : "ok"; if (obs.new_errors && obs.new_errors.length) st.bad = true; }
       }
       // 重复失败 / 原地打转的检测：小模型很容易反复提交同一个无效操作
-      const sig = name + ":" + JSON.stringify(args).slice(0, 300);
-      st.recent.push(sig); if (st.recent.length > 6) st.recent.shift();
+      const sig = name + ":" + JSON.stringify(args).slice(0, 300) + "@" + (ws.ver || 0);   // same call on an unchanged workspace
+      st.recent.push(sig); if (st.recent.length > 10) st.recent.shift();
       const repeats = st.recent.filter((x) => x === sig).length;
       st.failStreak = obs.error && !obs.denied ? st.failStreak + 1 : 0;
       if (st.failStreak >= 6 || repeats >= 5) {
@@ -2267,8 +3094,8 @@ async function runTask(task) {
         if (n >= 2) hint = `\n[系统提示] 对 ${f} 的 Edit 已连续失败 ${n} 次。别再靠 old_string 精确匹配了：先 Read 拿到当前内容，然后用 Write 把整个文件重写一遍。`;
       } else if (name === "Write" && !obs.error) st.editFails.delete(String(obs.file_path));
       // 同一个报错反复出现，说明改动没有解决它
-      if (["Preview", "Run", "Click", "Press"].includes(name)) {
-        const e0 = (obs.errors && obs.errors[0]) || (obs.new_errors && obs.new_errors[0]) || (obs.status === "timeout" && "timeout");
+      if (["Preview", "Run", "Click", "Press", "Test"].includes(name)) {
+        const e0 = (obs.errors && obs.errors[0]) || (obs.new_errors && obs.new_errors[0]) || (obs.failures && obs.failures[0] && obs.failures[0].name + obs.failures[0].message) || (obs.status === "timeout" && "timeout");
         if (e0) {
           const key = String(e0).replace(/\d+/g, "#").slice(0, 90), c = (st.errSeen.get(key) || 0) + 1;
           st.errSeen.set(key, c);
@@ -2401,6 +3228,7 @@ function cmdStatus() {
     `模式：${MODE_LABEL[mode]}`,
     `工作区：${ws.name} · ${ws.files.size} 个文件 · ${listChanges().length} 处未写回的改动${ws.handle ? " · 已连接文件夹" : ""}`,
     `会话：${convo.length} 条消息 · 约 ${convoChars()} 字符 · ${checkpoints.length} 个检查点`,
+    `工具：${toolsForModel().length} 个可用（/tools 查看）`,
     `CLAUDE.md：${ws.files.has("CLAUDE.md") ? "已加载" : "没有（/init 生成）"}`,
   ].join("\n"));
 }
@@ -2423,6 +3251,17 @@ const COMMANDS = {
   save: { desc: "把改动写回磁盘", run: () => saveToDisk() },
   rewind: { desc: "回到之前的检查点（/rewind <编号>）", run: cmdRewind },
   status: { desc: "显示模型、模式、上下文", live: true, run: cmdStatus },
+  tools: { desc: "列出当前模型能用的工具", live: true, run() {
+    const groups = {};
+    for (const [n, t] of toolsForModel()) (groups[t.group] ||= []).push(n);
+    const n = toolsForModel().length;
+    T.note(`工具（${n} 个${source === "local" ? "；浏览器本地小模型只提供核心集，换 Ollama / 云端可用全部 " + Object.keys(TOOLS).length + " 个" : ""}）：\n` + Object.entries(groups).map(([g, ns]) => `  ${g.padEnd(2, "　")}  ${ns.join("  ")}`).join("\n"));
+  } },
+  webproxy: { desc: "WebFetch 被浏览器拦截时，经 r.jina.ai 阅读代理读取（/webproxy on|off）", live: true, run(arg) {
+    const a = (arg || "").trim().toLowerCase();
+    if (a === "on" || a === "off") setWebProxy(a === "on");
+    T.note(`阅读代理：${webProxy ? "开" : "关"}。${webProxy ? "直连被拦时，WebFetch 会把 URL 发给 r.jina.ai 代理读取（它会看到这个 URL）。" : "WebFetch 只读开放了 CORS 的站点。"}  用 /webproxy on 或 off 切换。`);
+  } },
 };
 
 /* ---------- prompt box ---------- */
@@ -2508,7 +3347,7 @@ modelDialog.addEventListener("close", () => { maybeEnableRun(); taskInput.focus(
 
 // 调试 / 自动化测试入口（页面本身不依赖它）
 window.__ca = {
-  ws, TOOLS, COMMANDS, T, mountHandle, runPreview, runInSandbox, listChanges, setSource, setMode, extractAction, extractActions, liveText,
+  ws, TOOLS, COMMANDS, T, mountHandle, runPreview, runInSandbox, listChanges, setSource, setMode, extractAction, extractActions, liveText, toolsForModel, webAllowed, setWebProxy, outlineOf, runSubAgent,
   compactMessages, diffLines, runUserTask, submitInput, checkpoints, readSet,
   get convo() { return convo; }, get mode() { return mode; }, get todos() { return todos; },
 };

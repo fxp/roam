@@ -298,15 +298,17 @@
       </div>
       <div class="task-title">Browser Coding Agent：住在标签页里的 Claude Code</div>
       <div class="task-summary">
-        把前面三个页面（文件柜、游戏工坊、自体观察）合成一个跑在浏览器里的 Coding Agent，并改成 Claude
-        Code 的交互：对话流为中心，Read / Edit / Write / Grep 等工具，改动前内联确认，plan 模式，
-        /compact、/rewind，Esc 中断；预览和脚本都在沙箱里运行，报错和页面变化读回给它。接上本机 Ollama
-        真测才发现：7B 模型会在动作后面自己编一段“观察结果”，页面根本没变化也说“验证通过”，Edit
-        精确匹配反复失败、越改越坏——这些靠 harness 兜底：停笔序列、写入前的语法检查、“页面没变化就不许
-        说完成”。30B 级的 gemma4 则 44 秒做出了一个真能玩的贪吃蛇（撞墙结束、空格重开）。
+        把前面三个页面（文件柜、游戏工坊、自体观察）合成一个跑在浏览器里的 Coding Agent，交互照着 Claude
+        Code 来：对话流为中心，29 个工具（Read / Edit / MultiEdit / Grep、能跑测试的 Test、读文档的
+        WebFetch、只读子 Agent Task……），改动前内联确认，plan 模式，/compact、/rewind，Esc 中断；预览和
+        脚本都在沙箱里运行，支持 import / require。接上本机 Ollama 和 BigModel 真测才发现：7B 模型会在
+        动作后面自己编一段“观察结果”、页面没变化也说“验证通过”；GLM-5.3 强制思考且默认最深一档，一个
+        贪吃蛇要 246 秒，把 reasoning_effort 调成 low 后只要 45 秒。这些都靠 harness 兜底：停笔序列、写入
+        前的语法检查、“页面没变化就不许说完成”、同一个报错反复出现就停。30B 级的 gemma4 和 GLM-5.3 都做出了
+        真能玩的贪吃蛇，以及带单元测试的 ES 模块待办应用。
       </div>
       <div class="task-footer">
-        <span>执行者: Claude Sonnet 5.5 · Ollama · WebLLM</span>
+        <span>执行者: Claude Sonnet 5.5 · Ollama · BigModel GLM-5.3 · WebLLM</span>
         <span class="task-arrow">打开 Coding Agent →</span>
       </div>
     </a>
