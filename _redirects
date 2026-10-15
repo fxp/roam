@@ -9,3 +9,11 @@
 # 301 过去比留一个死页面对点进来的人更有用。
 /vendling/*  https://vendling.ai/  301
 /vendling    https://vendling.ai/  301
+
+# 2026-10-15: 三个旧 Agent 演示已整合为 Browser Coding Agent。
+/agent-reads-a-folder/*  /browser-coding-agent/  301
+/agent-reads-a-folder    /browser-coding-agent/  301
+/agent-builds-a-game/*  /browser-coding-agent/  301
+/agent-builds-a-game    /browser-coding-agent/  301
+/browser-agent-webllm/*  /browser-coding-agent/  301
+/browser-agent-webllm    /browser-coding-agent/  301
