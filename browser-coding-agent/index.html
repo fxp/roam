@@ -2725,16 +2725,164 @@ Object.assign(TOOLS, {
   },
 });
 
+/* =====================================================================
+   Bash (SPIKE, optional): a real Node 22 + npm inside the tab, through StackBlitz WebContainers.
+   - only offered when the page is cross-origin isolated (COOP + COEP response headers), because WebContainers needs SharedArrayBuffer
+   - @webcontainer/api is loaded lazily from a CDN on the first call, like WebLLM; the wasm runtime itself comes from stackblitz.com
+   - ws.files is mirrored into the container's virtual FS before every command, and text files that the command changed are
+     mirrored back afterwards (node_modules / .git / build dirs are never copied back)
+   ===================================================================== */
+const WC_API = "https://cdn.jsdelivr.net/npm/@webcontainer/api@1.6.4/+esm";
+const WC_NOSYNC = new Set([...SKIP_DIRS, ".npm"]);
+const WC = { inst: null, booting: null, synced: new Map(), allowed: false, stats: {} };
+const wcUtf8 = new TextDecoder("utf-8", { fatal: true });
+const wcAvailable = () => window.crossOriginIsolated === true && typeof SharedArrayBuffer === "function";
+
+function wcBoot() {
+  if (WC.inst) return Promise.resolve(WC.inst);
+  if (!WC.booting) {
+    WC.booting = (async () => {
+      const t0 = performance.now();
+      // tell WebContainers which COEP flavour the page was served with
+      let coep = "require-corp";
+      try { const h = (await fetch(location.href, { method: "HEAD", cache: "no-store" })).headers.get("cross-origin-embedder-policy"); if (h === "credentialless") coep = h; } catch (e) { /* keep the default */ }
+      const api = await import(WC_API);
+      const t1 = performance.now();
+      const inst = await api.WebContainer.boot({ coep, workdirName: "project" });
+      WC.stats = { coep, importMs: Math.round(t1 - t0), bootMs: Math.round(performance.now() - t1) };
+      WC.inst = inst;
+      return inst;
+    })().catch((e) => { WC.booting = null; throw e; });
+  }
+  return WC.booting;
+}
+
+async function wcPush(fs) {                                       // ws.files → container FS (only what changed since the last sync)
+  let n = 0;
+  for (const [p, c] of ws.files) {
+    if (WC.synced.get(p) === c) continue;
+    const i = p.lastIndexOf("/");
+    if (i > 0) await fs.mkdir(p.slice(0, i), { recursive: true });
+    await fs.writeFile(p, c);
+    WC.synced.set(p, c); n++;
+  }
+  for (const p of [...WC.synced.keys()]) if (!ws.files.has(p)) { await fs.rm(p, { force: true }); WC.synced.delete(p); n++; }
+  return n;
+}
+async function wcWalk(fs, dir, out) {
+  for (const e of await fs.readdir(dir || ".", { withFileTypes: true })) {
+    const p = dir ? `${dir}/${e.name}` : e.name;
+    if (e.isDirectory()) { if (!WC_NOSYNC.has(e.name)) await wcWalk(fs, p, out); }
+    else if (e.isFile()) out.push(p);
+  }
+}
+async function wcPull(fs) {                                       // container FS → ws.files
+  const paths = [], seen = new Set(), res = { added: [], modified: [], removed: [], skipped: [] };
+  await wcWalk(fs, "", paths);
+  for (const p of paths) {
+    seen.add(p);
+    let buf; try { buf = await fs.readFile(p); } catch (e) { continue; }
+    let text = null;
+    if (buf.length <= IMPORT.maxFileBytes) { try { text = wcUtf8.decode(buf); } catch (e) { /* binary */ } }
+    if (text === null || text.includes("\0")) { res.skipped.push(p); continue; }
+    if (WC.synced.get(p) === text) continue;
+    (ws.files.has(p) ? res.modified : res.added).push(p);
+    if (ws.files.get(p) !== text) { setFile(p, text); readSet.delete(p); }     // the model has not seen this version: make it Read again before Edit
+    WC.synced.set(p, text);
+  }
+  for (const p of [...WC.synced.keys()]) if (!seen.has(p)) { removeFile(p); readSet.delete(p); WC.synced.delete(p); res.removed.push(p); }
+  if (res.added.length || res.modified.length || res.removed.length) { renderTree(); updateChrome(); persistScratch(); }
+  return res;
+}
+
+/** Spawn `jsh -c <cmd>`, stream the output, kill on timeout / abort. */
+async function wcExec(inst, cmd, { timeoutMs, signal, onText }) {
+  const env = { CI: "1", NO_COLOR: "1", FORCE_COLOR: "0", NODE_NO_WARNINGS: "1", npm_config_progress: "false", npm_config_fund: "false", npm_config_audit: "false", npm_config_update_notifier: "false" };
+  const proc = await inst.spawn("jsh", ["-c", cmd], { env });
+  let out = "", killed = null, grace;
+  const sink = proc.output.pipeTo(new WritableStream({ write(c) { out += c; onText && onText(out); } })).catch(() => {});
+  const kill = (why) => { if (killed) return; killed = why; try { proc.kill(); } catch (e) { /* already gone */ } grace = new Promise((r) => setTimeout(() => r(-1), 3000)); };
+  const timer = setTimeout(() => kill("timeout"), timeoutMs);
+  const onAbort = () => kill("abort");
+  signal && signal.addEventListener("abort", onAbort, { once: true });
+  const code = await Promise.race([proc.exit, new Promise((r) => { const iv = setInterval(() => { if (killed) { clearInterval(iv); grace.then(r); } }, 100); proc.exit.then(() => clearInterval(iv)); })]);
+  clearTimeout(timer); signal && signal.removeEventListener("abort", onAbort);
+  await Promise.race([sink, sleep(800)]);                          // let the last chunks land
+  return { code, killed, out };
+}
+/** Terminal noise → plain text: ANSI codes, \r redraws, npm / npx spinners, Node's WASI warning. */
+function wcClean(s) {
+  return s.replace(/\x1b\[[0-9;?]*[ -\/]*[@-~]/g, "").replace(/\r+\n/g, "\n")
+    .split("\n").map((l) => l.slice(l.lastIndexOf("\r") + 1)).join("\n")
+    .replace(/(?:\\\|\/-){2,}\\?/g, "").replace(/\n\\$/, "")
+    .split("\n").filter((l) => !/ExperimentalWarning: WASI|--trace-warnings|^\s+at .*(staticblitz\.com|\(node:)/.test(l)).join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+function wcClip(s, n) { return s.length <= n ? s : s.slice(0, Math.floor(n * 0.25)) + `\n…（中间省略 ${s.length - n} 字符）…\n` + s.slice(-Math.floor(n * 0.75)); }
+
+Object.assign(TOOLS, {
+  Bash: {
+    disp: "Bash", cat: "preview", avail: wcAvailable,
+    desc: "在浏览器里的真实 Node 22 + npm 环境（StackBlitz WebContainers）里执行 shell 命令，参数: {command, timeout_ms?}。工作区文件会先同步进去，命令改动的文件会同步回工作区。可用: node、node --test、npm install / test / run、npx。没有 git、gcc、grep/sed/awk，不能装原生模块，python3 只是 RustPython；head 要写 head -n 5。默认超时 60 秒（npm install 建议 timeout_ms: 180000，最长 300000）。第一次调用要启动环境",
+    label: (a) => String(a.command || a.cmd || "").replace(/\s+/g, " ").slice(0, 80),
+    async run(a, ctx) {
+      const cmd = String(a.command ?? a.cmd ?? "").trim();
+      if (!cmd) return { error: "缺少 command" };
+      if (!wcAvailable()) return { error: "这个页面没有开启跨源隔离（COOP / COEP），WebContainers 起不来，Bash 不可用。请用 Run / Test 在沙箱里跑 JS" };
+      ctx = ctx || { tb: { state() {}, attach: (n) => n }, signal: new AbortController().signal, abort() {} };
+      if (!WC.allowed) {          // always ask, in every mode (acceptEdits too): npm install runs package install scripts
+        const body = mk("div", "plan-body"); body.textContent = cmd + "\n\n（在浏览器里的 WebContainers 虚拟机内运行，碰不到你的磁盘；npm install 会经 StackBlitz 的代理下载包）";
+        ctx.tb.state("wait");
+        const r = await askChoice({ title: "运行命令", subtitle: "Bash", body, question: "要运行这条命令吗？", signal: ctx.signal,
+          options: [{ label: "是", value: "yes" }, { label: "是，本次会话内不再询问 Bash", value: "all" }, { label: "否，告诉 Agent 该怎么做", value: "no", feedback: true }] });
+        ctx.tb.state("");
+        if (r.index === -1) { ctx.abort(); return { error: "用户中断了任务", denied: true }; }
+        if (r.value === "no") return { error: `用户拒绝运行这条命令${r.feedback ? "，并说：" + r.feedback : "。先问问用户想怎么做"}`, denied: true };
+        if (r.value === "all") WC.allowed = true;
+      }
+      const t0 = performance.now(), cold = !WC.inst;
+      let inst;
+      if (cold) T.note("正在启动浏览器里的 Node 环境（首次要下载运行时，可能要几十秒；刷新页面后 node_modules 会丢，要重新 npm install）…", "dim");
+      try { inst = await wcBoot(); } catch (e) { return { error: `启动 WebContainers 失败：${e.message || e}。多半是网络访问不了 stackblitz.com，或浏览器不支持（需要 Chromium 系）` }; }
+      const tBoot = performance.now();
+      const pushed = await wcPush(inst.fs);
+      const live = mk("div", "extra", ""); ctx.tb.attach(live);
+      const timeoutMs = Math.min(300000, Math.max(2000, parseInt(a.timeout_ms, 10) || 60000));
+      const tRun = performance.now();
+      const r = await wcExec(inst, cmd, { timeoutMs, signal: ctx.signal, onText: (s) => { live.textContent = wcClean(s).split("\n").slice(-8).join("\n"); } });
+      live.remove();
+      const tPull = performance.now();
+      const pulled = await wcPull(inst.fs);
+      const output = wcClean(r.out);
+      return {
+        command: cmd, exit_code: r.code, ok: r.code === 0,
+        ...(r.killed === "timeout" ? { warning: `超过 ${timeoutMs}ms 没结束，已强制终止；命令可能需要更长时间，调大 timeout_ms 重试` } : r.killed === "abort" ? { warning: "被用户中断" } : {}),
+        output: wcClip(output, Math.max(2000, caps().obs - 1500)),
+        files_changed: { added: pulled.added, modified: pulled.modified, removed: pulled.removed },
+        ...(pulled.skipped.length ? { not_synced_back: pulled.skipped.slice(0, 10) } : {}),
+        elapsed_ms: Math.round(performance.now() - t0),
+        timing: { boot_ms: cold ? Math.round(tBoot - t0) : 0, push_ms: Math.round(tRun - tBoot), run_ms: Math.round(tPull - tRun), pull_ms: Math.round(performance.now() - tPull), pushed_files: pushed },
+      };
+    },
+    view(a, o) {
+      if (o.error) return fail(o);
+      const ch = o.files_changed, n = ch.added.length + ch.modified.length + ch.removed.length;
+      const lines = o.output ? o.output.split("\n") : [];
+      return { text: `${o.ok ? "✓" : "✗"} 退出码 ${o.exit_code} · ${(o.timing.run_ms / 1000).toFixed(1)}s${o.timing.boot_ms ? ` · 启动环境 ${(o.timing.boot_ms / 1000).toFixed(1)}s` : ""}${n ? ` · 同步回 ${n} 个文件` : ""}${o.warning ? " · " + o.warning : ""}`, cls: o.ok ? "" : "err",
+        extra: lines.slice(-14).join("\n") + (lines.length > 14 ? `\n…（前 ${lines.length - 14} 行已折叠）` : "") };
+    },
+  },
+});
+
 /* ---------- grouping, and which tools a small local model gets ---------- */
 const TOOL_GROUPS = {
   LS: "文件", Glob: "文件", Grep: "文件", Read: "文件", Write: "文件", Edit: "文件", MultiEdit: "文件", Delete: "文件", Move: "文件", Copy: "文件", Replace: "文件", Diff: "文件", Outline: "文件",
   Preview: "页面", Click: "页面", Press: "页面", Type: "页面", Wait: "页面", Inspect: "页面", Eval: "页面", Console: "页面",
-  Run: "代码", Test: "代码", Check: "代码", WebFetch: "网络", AskUser: "协作", Task: "协作", TodoWrite: "协作", ExitPlanMode: "协作",
+  Run: "代码", Test: "代码", Check: "代码", Bash: "代码", WebFetch: "网络", AskUser: "协作", Task: "协作", TodoWrite: "协作", ExitPlanMode: "协作",
 };
 const CORE_TOOLS = ["LS", "Glob", "Grep", "Read", "Write", "Edit", "Delete", "Preview", "Click", "Press", "Inspect", "Run", "TodoWrite", "ExitPlanMode"];
 for (const [n, t] of Object.entries(TOOLS)) { t.group = TOOL_GROUPS[n] || "其他"; t.core = CORE_TOOLS.includes(n); }
 /** Browser-local models have 4–8k of context: give them the core set only. Ollama / cloud get everything. */
-const toolsForModel = () => Object.entries(TOOLS).filter(([, t]) => source !== "local" || t.core);
+const toolsForModel = () => Object.entries(TOOLS).filter(([, t]) => (source !== "local" || t.core) && (!t.avail || t.avail()));
 /* =====================================================================
    Agent loop. Text-JSON protocol (not native tool-calling) so one loop drives WebLLM,
    any OpenAI-compatible API, and Ollama. The model's "thought" is streamed to the
@@ -2770,6 +2918,7 @@ function buildSystemPrompt() {
     has("Wait") && "自动运行的游戏 / 动画用 Press + Wait 观察变化",
     has("Check") && "改完先 Check 做静态检查",
     has("Test") && "写了测试就用 Test 跑",
+    has("Bash") && "需要真实 Node / npm（node --test、npm install、npm test、npx、vitest 等）时用 Bash，它比 Run / Test 更接近用户的真实环境；改完代码用 Bash 跑一遍测试再收尾",
     has("MultiEdit") && "同一文件多处修改用 MultiEdit",
     has("Replace") && "改名 / 批量改文案用 Replace",
     has("Outline") && "大文件先 Outline 再 Read 需要的那段",
@@ -2963,7 +3112,7 @@ async function runTask(task) {
   if (todos.length && todos.every((t) => t.status === "completed")) { todos = []; renderTodos(); }
   if (!convo.length) convo.push({ role: "system", content: "" });
   convo.push({ role: "user", content: `${workspaceLine()}[模式: ${mode}]\n${task}` });
-  const st = { tools: 0, dirty: new Set(), bad: false, gate: {}, parseFails: 0, failStreak: 0, recent: [], editFails: new Map(), errSeen: new Map(), interactive: null, interacted: false, lastInteract: null };
+  const st = { tools: 0, dirty: new Set(), bad: false, gate: {}, parseFails: 0, failStreak: 0, recent: [], editFails: new Map(), errSeen: new Map(), interactive: null, interacted: false, lastInteract: null, bashFail: null };
   const interrupted = () => T.note("已中断（esc）", "warn");
 
   for (let step = 0; step < MAX_STEPS; step++) {
@@ -3074,6 +3223,7 @@ async function runTask(task) {
         if ((name === "Write" || name === "Edit" || name === "Delete") && WEB_EXT.test(String(obs.file_path))) st.dirty.add(obs.file_path);
         if (name === "Preview") { st.dirty.clear(); st.bad = !obs.ok; st.interactive = obs.interactive || null; st.interacted = false; st.lastInteract = null; }
         if (name === "Run") { st.bad = obs.status !== "ok"; st.dirty.delete(obs.file_path); (Array.isArray(args.include) ? args.include : []).forEach((i) => st.dirty.delete(String(i))); }
+        if (name === "Bash") st.bashFail = obs.exit_code === 0 ? null : `最近一次 Bash 命令（${String(args.command || "").slice(0, 60)}）以退出码 ${obs.exit_code} 结束`;
         if (name === "Click" || name === "Press") { st.interacted = true; st.lastInteract = obs.page_changed === false ? "nochange" : "ok"; if (obs.new_errors && obs.new_errors.length) st.bad = true; }
       }
       // 重复失败 / 原地打转的检测：小模型很容易反复提交同一个无效操作
@@ -3117,6 +3267,9 @@ async function runTask(task) {
       else if ((st.bad || st.dirty.size) && htmlEntries().length && (st.gate.verify || 0) < 2) {
         kind = "verify";
         gate = st.bad ? "最近一次预览/运行仍然有报错。修好并重新验证之后再 final_answer。" : `你改了 ${[...st.dirty].join("、")}，但还没有验证（网页用 Preview，脚本用 Run）。先验证再 final_answer。`;
+      } else if (st.bashFail && (st.gate.bash || 0) < 2) {
+        kind = "bash";
+        gate = `${st.bashFail}。修好并重新用 Bash 验证通过之后再 final_answer；如果失败是预期之内的（比如本来就要演示失败），在回答里明说。`;
       } else if (st.lastInteract === "nochange" && (st.gate.nochange || 0) < 2) {
         kind = "nochange";
         gate = "你最近一次 Click / Press 的结果是 page_changed:false —— 页面文字和画面都没有变化，说明功能没有生效（事件没绑定、id 对不上，或者逻辑根本没写）。你不能说它能用。先 Read 代码找原因，修好后重新 Preview，再操作一次确认。";
@@ -3135,6 +3288,7 @@ async function runTask(task) {
         const issues = [];
         if (st.bad) issues.push("最近一次预览 / 运行有报错");
         if (st.lastInteract === "nochange") issues.push("最近一次 Click / Press 显示页面没有变化");
+        if (st.bashFail) issues.push(st.bashFail);
         if (st.dirty.size && htmlEntries().length) issues.push("改动之后没有重新验证");
         if (issues.length && mode !== "plan") T.note(`⚠ 注意：Agent 说完成了，但它自己最后一次验证并不通过（${issues.join("；")}）。别直接相信这个结论，用 /preview 看一眼。`, "warn");
         return;
@@ -3237,7 +3391,7 @@ const COMMANDS = {
     T.note(["命令：", ...Object.entries(COMMANDS).map(([n, c]) => `  /${n.padEnd(8)} ${c.desc}`),
       "", "快捷键：", "  Enter 发送 · Shift+Enter 换行 · ↑/↓ 翻历史 · Esc 中断",
       "  Shift+Tab 切换模式：默认 → 自动接受修改 → plan（只读）", "  # 开头的输入：直接记进 CLAUDE.md",
-      "", "和 Claude Code 的不同：改动只在内存里，/save 才落盘；没有 Bash，用 Run 在沙箱里跑 JS；没有子 Agent / MCP / hooks。"].join("\n"));
+      "", "和 Claude Code 的不同：改动只在内存里，/save 才落盘；Bash 跑在浏览器里的 WebContainers（页面开启跨源隔离时才有），否则用 Run 在沙箱里跑 JS；没有子 Agent / MCP / hooks。"].join("\n"));
   } },
   clear: { desc: "清空会话和检查点（文件保留）", run: () => resetSession(true) },
   compact: { desc: "让模型把会话压缩成摘要（可附关注点）", run: cmdCompact },
@@ -3348,7 +3502,7 @@ modelDialog.addEventListener("close", () => { maybeEnableRun(); taskInput.focus(
 // 调试 / 自动化测试入口（页面本身不依赖它）
 window.__ca = {
   ws, TOOLS, COMMANDS, T, mountHandle, runPreview, runInSandbox, listChanges, setSource, setMode, extractAction, extractActions, liveText, toolsForModel, webAllowed, setWebProxy, outlineOf, runSubAgent,
-  compactMessages, diffLines, runUserTask, submitInput, checkpoints, readSet,
+  compactMessages, diffLines, runUserTask, submitInput, checkpoints, readSet, WC, wcBoot, wcExec, wcClean,
   get convo() { return convo; }, get mode() { return mode; }, get todos() { return todos; },
 };
 </script>

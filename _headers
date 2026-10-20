@@ -1,0 +1,5 @@
+# Cross-origin isolation for the Browser Coding Agent only (WebContainers needs SharedArrayBuffer).
+# `credentialless` keeps third-party images/scripts in the page's preview working; Chromium-only, other browsers just don't get the Bash tool.
+/browser-coding-agent/*
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: credentialless
