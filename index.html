@@ -290,6 +290,31 @@
   <div class="section-label">近期任务</div>
 
   <div class="task-card">
+    <a href="/browser-coding-agent-wasmer/">
+      <div class="task-meta">
+        <span class="task-tag ai">技术验证</span>
+        <span>RM · 0010</span>
+        <span>2026-10-20</span>
+      </div>
+      <div class="task-title">Browser Coding Agent × Wasmer：把 shell 装进标签页</div>
+      <div class="task-summary">
+        「在浏览器里跑 Coding Agent」系列第二篇。agent 外壳和上一篇完全相同，只把 Bash 工具换到开源的
+        Wasmer SDK（WASIX）上：bash、Node 24、pnpm 和按需加载的 Python 都在本机标签页里执行；SDK 随页面
+        同源发出，bash、Node 这些包首次使用时从 Wasmer 的包仓库下载，之后由浏览器缓存。用 GLM-5.3（reasoning_effort=low）真测：页面自带沙箱的
+        Test 跑 node:test 会报“test is not a function”，agent 自己改用 Bash，61 秒修好 3 个 bug，我在
+        真实 Node 里复核 5/5 通过。同样实测出一串坑：node --test 默认模式不能用、node 当管道上游时输出
+        为空、npm install 失败只能用 pnpm、没有 git / grep / sed、vitest 5 跑不了；装依赖要用户自己起一个
+        WISP 中继（标签页开不了 TCP），没配时 Bash 直接拒绝而不是卡死；首次要下载约 90MB 运行时，冷启动
+        三十多秒。
+      </div>
+      <div class="task-footer">
+        <span>执行者: Claude Sonnet 5.5 · BigModel GLM-5.3 · Wasmer SDK</span>
+        <span class="task-arrow">打开 Wasmer 版 →</span>
+      </div>
+    </a>
+  </div>
+
+  <div class="task-card">
     <a href="/browser-coding-agent/">
       <div class="task-meta">
         <span class="task-tag ai">技术验证</span>
@@ -305,7 +330,8 @@
         动作后面自己编一段“观察结果”、页面没变化也说“验证通过”；GLM-5.3 强制思考且默认最深一档，一个
         贪吃蛇要 246 秒，把 reasoning_effort 调成 low 后只要 45 秒。这些都靠 harness 兜底：停笔序列、写入
         前的语法检查、“页面没变化就不许说完成”、同一个报错反复出现就停。30B 级的 gemma4 和 GLM-5.3 都做出了
-        真能玩的贪吃蛇，以及带单元测试的 ES 模块待办应用。
+        真能玩的贪吃蛇，以及带单元测试的 ES 模块待办应用。2026-10-20 起多了一个可选的 Bash 工具，跑在浏览器里
+        的 WebContainers（Node 22 + npm）上；这是「在浏览器里跑 Coding Agent」系列的第一篇，第二篇换成开源的 Wasmer。
       </div>
       <div class="task-footer">
         <span>执行者: Claude Sonnet 5.5 · Ollama · BigModel GLM-5.3 · WebLLM</span>
