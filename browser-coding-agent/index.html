@@ -2658,7 +2658,7 @@ Object.assign(TOOLS, {
   /* ---------- the web ---------- */
   WebFetch: {
     disp: "Fetch", cat: "files", ro: true,
-    desc: "读取一个网页 / 文档 / JSON 的文本（HTML 会转成简化的 markdown），查库的用法或 API 文档时用，参数: {url, offset?}。每个域名要先征得用户同意；浏览器只能读开放了 CORS 的站点（raw.githubusercontent.com、cdn.jsdelivr.net、registry.npmjs.org、api.github.com、wikipedia API 等）；本机和内网地址一律禁止",
+    get desc() { return "读取一个网页 / 文档 / JSON 的文本（HTML 会转成简化的 markdown），查库的用法或 API 文档时用，参数: {url, offset?}。每个域名要先征得用户同意；浏览器只能读开放了 CORS 的站点（raw.githubusercontent.com、cdn.jsdelivr.net、registry.npmjs.org、api.github.com、wikipedia API 等）；本机和内网地址一律禁止" + (webProxy ? " 【阅读代理已开启】直连被 CORS 拦截时会自动改走 r.jina.ai，所以大多数公开网页（票务、新闻、资讯站）都能读；用户问的是需要查网上资料的非编程问题时，也请用它去读，不要直接说做不到" : ""); },
     label: (a) => String(a.url || ""),
     async run(a, ctx) {
       let u;
@@ -2940,7 +2940,7 @@ function buildSystemPrompt() {
   const rule3 = smallModel
     ? "3. 先读后改：改已有文件之前必须 Read。文件不超过 100 行时，直接用 Write 把整个文件重写（比 Edit 精确匹配稳）；只有大文件才用 Edit，且 old_string 要逐字一致、不带行号。每次只改一件事，改完马上验证。"
     : "3. 先读后改：改已有文件之前必须 Read；优先用 Edit 做最小修改，不要为改一行重写整个文件。old_string 不要带 Read 输出里的行号。";
-  return `你是 Browser Coding Agent，一个运行在浏览器标签页里的、Claude Code 风格的编程助手。你通过工具读写一个「工作区」（内存里的一组文件，可能来自用户打开的本地文件夹），并在沙箱里运行网页或脚本来验证自己的修改。你看不到文件内容和运行结果，只能通过工具查询。
+  return `今天是 ${new Date().toLocaleDateString("zh-CN",{year:"numeric",month:"2-digit",day:"2-digit",weekday:"long"})}。\n你是 Browser Coding Agent，一个运行在浏览器标签页里的、Claude Code 风格的编程助手。你通过工具读写一个「工作区」（内存里的一组文件，可能来自用户打开的本地文件夹），并在沙箱里运行网页或脚本来验证自己的修改。你看不到文件内容和运行结果，只能通过工具查询。
 
 可用工具:
 ${toolLines}
