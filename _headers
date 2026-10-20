@@ -3,3 +3,8 @@
 /browser-coding-agent/*
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Embedder-Policy: credentialless
+
+# Same isolation for the Wasmer variant (the Wasmer SDK also needs SharedArrayBuffer).
+/browser-coding-agent-wasmer/*
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: credentialless

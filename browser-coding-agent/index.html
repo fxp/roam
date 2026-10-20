@@ -48,6 +48,10 @@
   .topbar a.home{text-decoration:none;color:var(--fg-mute)}
   .topbar a.home:hover{color:var(--claude)}
   .topbar .brand{color:var(--fg-dim)}
+  .topbar nav.series{display:flex;align-items:center;gap:10px;margin-left:6px;padding-left:12px;border-left:1px solid var(--line);color:var(--fg-mute)}
+  .topbar nav.series a{color:var(--fg-dim);text-decoration:none}
+  .topbar nav.series a:hover{color:var(--claude)}
+  .topbar nav.series a[aria-current]{color:var(--claude);pointer-events:none}
   .topbar .spacer{flex:1}
   .badge{display:inline-block;min-width:16px;margin-left:5px;padding:0 5px;border-radius:8px;background:var(--warn);color:#241a00;font-size:10px;text-align:center}
   .dot{width:7px;height:7px;border-radius:50%;background:var(--fg-mute);flex:none}
@@ -232,7 +236,8 @@
   <a class="home" href="/">← 问野</a>
   <span class="dot idle" id="vital-dot"></span>
   <span id="vital-text">待命</span>
-  <span class="brand">Browser Coding Agent</span>
+  <span class="brand">Browser Coding Agent × WebContainers</span>
+  <nav class="series" aria-label="系列：在浏览器里跑 Coding Agent"><span>系列 · 在浏览器里跑 Coding Agent</span><a href="/browser-coding-agent/" aria-current="page">① WebContainers</a><a href="/browser-coding-agent-wasmer/">② Wasmer</a></nav>
   <span class="spacer"></span>
   <button class="ghost small" id="open-folder-btn">打开文件夹</button>
   <button class="ghost small" id="new-ws-btn">空工作区</button>
