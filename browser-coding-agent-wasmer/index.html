@@ -2837,7 +2837,11 @@ async function wrExec(cmd, { timeoutMs, signal, onText }) {
   const pumps = Promise.all([pump(proc.stdout), pump(proc.stderr)]).catch(() => {});
   const onAbort = () => { killed = "abort"; proc.kill().catch(() => {}); };
   signal && signal.addEventListener("abort", onAbort, { once: true });
+  // the SDK's own timeoutMs only fires once a blocking guest call such as `sleep 30` returns (measured: 30 s late, 8 of 8 runs
+  // on 2026-10-20 afternoon), so enforce the limit here as well; kill() stops every kind of command within a few ms
+  const watchdog = setTimeout(() => { killed = killed || "timeout"; proc.kill().catch(() => {}); }, timeoutMs);
   const res = await proc.wait({ check: false });
+  clearTimeout(watchdog);
   signal && signal.removeEventListener("abort", onAbort);
   await Promise.race([pumps, sleep(800)]);                         // let the last chunks land
   if (res.reason === "timeout") killed = "timeout";
