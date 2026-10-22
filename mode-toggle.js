@@ -12,7 +12,8 @@
  *   1. Restores saved mode from localStorage (key: ai-bw-mode) on first paint
  *   2. Toggles <html data-mode="light|"> on click
  *   3. Persists to localStorage
- *   4. Respects prefers-color-scheme on first visit (defaults dark)
+ *   4. On first visit (no saved preference): honors <html data-default-mode="light|dark">
+ *      if the page sets one, else falls back to prefers-color-scheme, else dark.
  *
  * Honored everywhere colors_and_type.css is loaded — that file declares the
  * parchment palette under [data-mode="light"] / [data-theme="light"].
@@ -25,6 +26,8 @@
   function pickInitialMode() {
     const saved = (() => { try { return localStorage.getItem(KEY); } catch (_) { return null; } })();
     if (saved === 'light' || saved === 'dark') return saved;
+    const pageDefault = root.dataset.defaultMode;
+    if (pageDefault === 'light' || pageDefault === 'dark') return pageDefault;
     if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) return 'light';
     return 'dark';
   }

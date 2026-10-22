@@ -158,6 +158,17 @@
   --mint:   #4a7a55;
 }
 
+/* ---- LIGHT MODE × NAMED THEME ----------------------------------------
+ * 上面的浅色块把 --accent 直接写死成深琥珀，而它与 [data-theme="…"] 同为
+ * 属性选择器（特指度相同）且位置更靠后，会把四套主题在浅色下一律压成琥珀。
+ * 这里用双属性选择器（特指度更高）把 accent 恢复成各主题的 AA 深化值，
+ * 取值与 DESIGN.md 的浅色对照表一致。
+ */
+[data-mode="light"][data-theme="red"],    .mode-light[data-theme="red"]    { --accent:#b8302e; --accent-soft:rgba(184,48,46,0.10);  --accent-glow:rgba(184,48,46,0.22); }
+[data-mode="light"][data-theme="signal"], .mode-light[data-theme="signal"] { --accent:#b22a17; --accent-soft:rgba(178,42,23,0.10);  --accent-glow:rgba(178,42,23,0.22); }
+[data-mode="light"][data-theme="amber"],  .mode-light[data-theme="amber"]  { --accent:#b8761a; --accent-soft:rgba(184,118,26,0.10); --accent-glow:rgba(184,118,26,0.22); }
+[data-mode="light"][data-theme="mint"],   .mode-light[data-theme="mint"]   { --accent:#4a7a55; --accent-soft:rgba(74,122,85,0.12);   --accent-glow:rgba(74,122,85,0.22); }
+
 /* ============ SEMANTIC ROLES ============ */
 body {
   background: var(--bg);

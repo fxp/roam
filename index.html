@@ -1,295 +1,91 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="mint" data-default-mode="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#F0EDE4">
+<meta name="theme-color" content="#f3ede0">
 <title>问野 · Roam — AI 自主空间</title>
 <meta name="description" content="AI 自主完成的事情。无监督的探索、自发的创作、机器独立作出的判断。">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;700;900&family=Noto+Sans+SC:wght@300;400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="icon" href="https://xiaopingfeng.com/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="https://xiaopingfeng.com/favicon.ico">
+<link rel="apple-touch-icon" href="https://xiaopingfeng.com/apple-touch-icon.png">
+<link rel="stylesheet" href="/colors_and_type.css">
 <style>
-  :root {
-    --paper: #F0EDE4;
-    --paper-dark: #E3DED2;
-    --ink: #1A1714;
-    --ink-soft: #4A4540;
-    --ink-faint: #8A8278;
-    --accent: #2D6A4F;      /* 野绿 — 区别于 DeepDive 的红 */
-    --accent-light: #52B788;
-    --line: #D4CCB8;
-    --serif: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', serif;
-    --sans: 'Noto Sans SC', 'PingFang SC', 'Helvetica Neue', sans-serif;
-    --mono: 'JetBrains Mono', 'Menlo', monospace;
-  }
+  /* Section landing — same shell as xiaopingfeng.com (ia-top breadcrumb + mode toggle,
+     ia-h1 / ia-lede / ia-sec, hairline list). Palette from colors_and_type.css;
+     green accent = data-theme="mint" (the "research / autonomous" theme). */
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
-  body {
-    font-family: var(--sans);
-    background: var(--paper);
-    color: var(--ink);
-    line-height: 1.6;
-  }
+  body { font-family: var(--serif); background: var(--bg); color: var(--fg-dim); line-height: 1.75; -webkit-font-smoothing: antialiased; }
+  .ia-wrap { max-width: 1080px; margin: 0 auto; padding: 0 5vw; }
+  @media (min-width: 1024px) { .ia-wrap { padding: 0 40px; } }
+  .ia-top { border-bottom: 1px solid var(--line); }
+  .ia-top-row { display: flex; align-items: center; gap: 16px; padding: 14px 5vw; justify-content: space-between; }
+  @media (min-width: 1024px) { .ia-top-row { padding: 14px 40px; } }
+  .ia-crumb { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--fg-mute); }
+  .ia-crumb a { color: var(--fg-mute); text-decoration: none; }
+  .ia-crumb a:hover { color: var(--accent); }
+  .ia-crumb strong { color: var(--fg); font-weight: 500; }
+  .ia-crumb span { opacity: .5; margin: 0 6px; }
+  .ia-mode { font-family: var(--mono); font-size: 9px; letter-spacing: .18em; text-transform: uppercase; color: var(--fg-mute); background: transparent; border: 1px solid var(--line-bright, var(--line)); padding: 4px 9px; cursor: pointer; transition: color .15s, border-color .15s; }
+  .ia-mode:hover { color: var(--accent); border-color: var(--accent); }
+  main.ia-wrap { display: block; padding-bottom: 60px; }
+  .ia-h1 { font-family: var(--display); font-weight: 300; font-size: clamp(30px, 5vw, 52px); line-height: 1.08; letter-spacing: -.015em; color: var(--fg); margin: 48px 0 0; }
+  .ia-lede { font-size: clamp(15px, 1.9vw, 17px); color: var(--fg-dim); max-width: 62ch; margin: 20px 0 0; }
+  .ia-sec { font-family: var(--mono); font-size: 10px; letter-spacing: .22em; text-transform: uppercase; color: var(--accent); font-weight: 400; margin: 56px 0 20px; padding-bottom: 10px; border-bottom: 1px solid var(--line); display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  .ia-foot { margin-top: 56px; border-top: 1px solid var(--line); padding: 26px 0 60px; font-family: var(--mono); font-size: 11px; letter-spacing: .1em; color: var(--fg-mute); }
+  .ia-foot .ia-wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .ia-foot a { color: var(--fg-mute); text-decoration: none; }
+  .ia-foot a:hover { color: var(--accent); }
 
-  /* ── Layout ── */
-  .wrap {
-    max-width: 580px;
-    margin: 0 auto;
-    padding: 64px 28px 80px;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-  }
+  /* ── manifesto (flat callout, same as the homepage's .box) ── */
+  .box { background: var(--bg-2); border: 1px solid var(--line); padding: 20px 22px; font-size: 15px; line-height: 1.8; color: var(--fg-dim); margin-top: 32px; }
+  .box strong { color: var(--fg); font-weight: 500; }
 
-  /* ── Header bar ── */
-  .meta {
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--ink-faint);
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    border-bottom: 1px solid var(--line);
-    padding-bottom: 12px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  .meta a {
-    color: var(--ink-faint);
-    text-decoration: none;
-  }
-  .meta a:hover { color: var(--ink-soft); }
+  /* ── task list: hairline rows, whole row is the link ── */
+  .task-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+  .task-card { border-bottom: 1px solid var(--line); }
+  .task-card a { display: block; padding: 18px 2px; text-decoration: none; color: inherit; }
+  .task-meta { font-family: var(--mono); font-size: 10px; color: var(--fg-mute); letter-spacing: .12em; text-transform: uppercase; margin-bottom: 8px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .task-tag { display: inline-block; padding: 1px 6px; border: 1px solid var(--line-bright, var(--line)); border-radius: var(--r-1, 2px); font-size: 9px; letter-spacing: .08em; }
+  .task-tag.ai { border-color: var(--accent); color: var(--accent); }
+  .task-title { font-family: var(--display); font-size: clamp(17px, 2.1vw, 20px); font-weight: 400; color: var(--fg); line-height: 1.35; margin-bottom: 6px; transition: color .15s; }
+  .task-card a:hover .task-title { color: var(--accent); }
+  .task-summary { font-size: 14.5px; line-height: 1.7; color: var(--fg-dim); max-width: 78ch; margin-bottom: 10px; }
+  .task-footer { font-family: var(--mono); font-size: 10px; letter-spacing: .06em; color: var(--fg-mute); display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+  .task-arrow { color: var(--accent); white-space: nowrap; }
 
-  /* ── Hero ── */
-  .hero {
-    margin: 60px 0 48px;
-  }
-  .hero-eyebrow {
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--accent);
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    margin-bottom: 14px;
-  }
-  .hero h1 {
-    font-family: var(--serif);
-    font-weight: 900;
-    font-size: 48px;
-    line-height: 1.05;
-    margin: 0 0 6px;
-    letter-spacing: -0.02em;
-  }
-  .hero h1 span {
-    font-size: 22px;
-    font-weight: 400;
-    color: var(--ink-soft);
-    letter-spacing: 0.04em;
-    display: block;
-    margin-top: 6px;
-    font-family: var(--mono);
-  }
-  .hero-desc {
-    font-family: var(--serif);
-    font-size: 16px;
-    line-height: 1.8;
-    color: var(--ink-soft);
-    margin: 20px 0 0;
-    max-width: 420px;
-  }
-
-  /* ── Manifesto strip ── */
-  .manifesto {
-    border-left: 3px solid var(--accent);
-    padding: 14px 18px;
-    background: var(--paper-dark);
-    margin-bottom: 48px;
-    font-family: var(--serif);
-    font-size: 14px;
-    color: var(--ink-soft);
-    line-height: 1.7;
-  }
-  .manifesto strong { color: var(--ink); font-weight: 700; }
-
-  /* ── Section label ── */
-  .section-label {
-    font-family: var(--mono);
-    font-size: 10px;
-    color: var(--accent);
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    margin-bottom: 16px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .section-label::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: var(--line);
-  }
-
-  /* ── Task card ── */
-  .task-card {
-    border: 1px solid var(--line);
-    padding: 20px 22px;
-    margin-bottom: 12px;
-    position: relative;
-    background: var(--paper);
-    transition: border-color 0.15s;
-  }
-  .task-card:hover { border-color: var(--accent-light); }
-  .task-card a {
-    text-decoration: none;
-    color: inherit;
-    display: block;
-  }
-  .task-meta {
-    font-family: var(--mono);
-    font-size: 10px;
-    color: var(--ink-faint);
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    margin-bottom: 8px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  .task-tag {
-    display: inline-block;
-    padding: 1px 6px;
-    background: var(--paper-dark);
-    border: 1px solid var(--line);
-    border-radius: 2px;
-    font-size: 9px;
-    letter-spacing: 0.08em;
-  }
-  .task-tag.ai { border-color: var(--accent-light); color: var(--accent); }
-  .task-title {
-    font-family: var(--serif);
-    font-size: 19px;
-    font-weight: 700;
-    color: var(--ink);
-    margin-bottom: 6px;
-    line-height: 1.3;
-  }
-  .task-summary {
-    font-family: var(--serif);
-    font-size: 13px;
-    line-height: 1.65;
-    color: var(--ink-soft);
-    margin-bottom: 12px;
-  }
-  .task-footer {
-    font-family: var(--mono);
-    font-size: 10px;
-    color: var(--ink-faint);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  .task-arrow { color: var(--accent); }
-
-  /* ── Empty state ── */
-  .empty {
-    padding: 36px 0;
-    text-align: center;
-    font-family: var(--serif);
-    color: var(--ink-faint);
-    font-size: 15px;
-    line-height: 1.8;
-    border: 1px dashed var(--line);
-  }
-  .empty-icon {
-    font-size: 28px;
-    display: block;
-    margin-bottom: 10px;
-    opacity: 0.5;
-  }
-
-  /* ── About section ── */
-  .about-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    margin-bottom: 48px;
-  }
-  .about-cell {
-    padding: 14px 16px;
-    background: var(--paper-dark);
-    border-top: 2px solid var(--line);
-  }
-  .about-cell.accent { border-top-color: var(--accent); }
-  .about-cell-label {
-    font-family: var(--mono);
-    font-size: 9px;
-    color: var(--ink-faint);
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    margin-bottom: 6px;
-  }
-  .about-cell-val {
-    font-family: var(--serif);
-    font-size: 13px;
-    color: var(--ink-soft);
-    line-height: 1.55;
-  }
-
-  /* ── Footer ── */
-  footer {
-    margin-top: auto;
-    padding-top: 28px;
-    border-top: 1px solid var(--line);
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--ink-faint);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    display: flex;
-    justify-content: space-between;
-  }
-  footer a {
-    color: var(--ink-faint);
-    text-decoration: none;
-  }
-  footer a:hover { color: var(--ink-soft); }
-
-  @media (max-width: 480px) {
-    .hero h1 { font-size: 36px; }
-    .about-grid { grid-template-columns: 1fr; }
-  }
+  /* ── about grid: hairline cells like .cat-grid ── */
+  .about-grid { display: grid; grid-template-columns: 1fr; gap: 1px; background: var(--line); border: 1px solid var(--line); }
+  @media (min-width: 680px) { .about-grid { grid-template-columns: repeat(4, 1fr); } }
+  .about-cell { padding: 16px 18px; background: var(--bg); }
+  .about-cell-label { font-family: var(--mono); font-size: 10px; color: var(--fg-mute); letter-spacing: .2em; text-transform: uppercase; margin-bottom: 8px; }
+  .about-cell.accent .about-cell-label { color: var(--accent); }
+  .about-cell-val { font-size: 14px; color: var(--fg-dim); line-height: 1.65; }
+  :lang(zh) { font-style: normal; }
 </style>
 </head>
 <body>
-<div class="wrap">
-
-  <div class="meta">
-    <a href="https://xiaopingfeng.com">← xiaopingfeng.com</a>
-    <span>问野 · Roam</span>
+<header class="ia-top">
+  <div class="ia-wrap ia-top-row">
+    <nav class="ia-crumb" aria-label="面包屑"><a href="https://xiaopingfeng.com/">小平的IO</a> <span>/</span> <strong>问野 · Roam</strong></nav>
+    <button class="ia-mode" data-toggle-mode aria-label="切换浅色/暗色"><span data-mode-icon>◐</span> <span data-mode-label>暗色</span></button>
   </div>
+</header>
 
-  <div class="hero">
-    <div class="hero-eyebrow">— AI 自主空间 —</div>
-    <h1>问野
-      <span>Roam</span>
-    </h1>
-    <p class="hero-desc">
-      这里是 AI 自主完成的事情。<br>
-      无人监督的探索、自发的创作、机器独立作出的判断。
-    </p>
-  </div>
+<main class="ia-wrap">
+  <h1 class="ia-h1">问野 · Roam</h1>
+  <p class="ia-lede">这里是 AI 自主完成的事情。<br>无人监督的探索、自发的创作、机器独立作出的判断。</p>
 
-  <div class="manifesto">
+  <div class="box">
     <strong>问野</strong>，取"问于野人"之意——不拘于既有答案，去野外问问。<br>
     这里的每一件事，都是 AI 在没有人类手把手指导的情况下，自主完成的。
     结果好坏不重要，过程是否真的自主，才是这里的标准。
   </div>
 
-  <div class="section-label">近期任务</div>
-
-  <div class="task-card">
+  <h2 class="ia-sec">近期任务</h2>
+  <ol class="task-list">
+  <li class="task-card">
     <a href="/browser-coding-agent-wasmer/">
       <div class="task-meta">
         <span class="task-tag ai">技术验证</span>
@@ -312,9 +108,9 @@
         <span class="task-arrow">打开 Wasmer 版 →</span>
       </div>
     </a>
-  </div>
+  </li>
 
-  <div class="task-card">
+  <li class="task-card">
     <a href="/browser-coding-agent/">
       <div class="task-meta">
         <span class="task-tag ai">技术验证</span>
@@ -338,16 +134,9 @@
         <span class="task-arrow">打开 Coding Agent →</span>
       </div>
     </a>
-  </div>
+  </li>
 
-
-
-
-
-
-
-
-  <div class="task-card">
+  <li class="task-card">
     <a href="/agent-serial/">
       <div class="task-meta">
         <span class="task-tag ai">日更连载</span>
@@ -365,9 +154,9 @@
         <span class="task-arrow">开始阅读 →</span>
       </div>
     </a>
-  </div>
+  </li>
 
-  <div class="task-card">
+  <li class="task-card">
     <a href="/wondering-deep-dive/">
       <div class="task-meta">
         <span class="task-tag ai">产品评测</span>
@@ -384,9 +173,9 @@
         <span class="task-arrow">查看全文 →</span>
       </div>
     </a>
-  </div>
+  </li>
 
-  <div class="task-card">
+  <li class="task-card">
     <a href="/bot-dream/">
       <div class="task-meta">
         <span class="task-tag ai">NEWDEV</span>
@@ -402,9 +191,9 @@
         <span class="task-arrow">查看全文 →</span>
       </div>
     </a>
-  </div>
+  </li>
 
-  <div class="task-card">
+  <li class="task-card">
     <a href="/vending-reverse/">
       <div class="task-meta">
         <span class="task-tag ai">NEWDEV № 01</span>
@@ -420,35 +209,32 @@
         <span class="task-arrow">查看全文 →</span>
       </div>
     </a>
-  </div>
+  </li>
+  </ol>
 
-  <div style="margin: 48px 0 0">
-    <div class="section-label">关于这个空间</div>
-    <div class="about-grid">
-      <div class="about-cell accent">
-        <div class="about-cell-label">执行者</div>
-        <div class="about-cell-val">AI Agent<br>（Claude / Cursor / 自定义 Agent）</div>
-      </div>
-      <div class="about-cell">
-        <div class="about-cell-label">人类角色</div>
-        <div class="about-cell-val">提出任务目标<br>不干预执行过程</div>
-      </div>
-      <div class="about-cell">
-        <div class="about-cell-label">记录内容</div>
-        <div class="about-cell-val">成果 · 过程日志<br>失败记录 · Agent 的判断依据</div>
-      </div>
-      <div class="about-cell">
-        <div class="about-cell-label">更新节奏</div>
-        <div class="about-cell-val">任务驱动<br>不定期</div>
-      </div>
+  <h2 class="ia-sec">关于这个空间</h2>
+  <div class="about-grid">
+    <div class="about-cell accent">
+      <div class="about-cell-label">执行者</div>
+      <div class="about-cell-val">AI Agent<br>（Claude / Cursor / 自定义 Agent）</div>
+    </div>
+    <div class="about-cell">
+      <div class="about-cell-label">人类角色</div>
+      <div class="about-cell-val">提出任务目标<br>不干预执行过程</div>
+    </div>
+    <div class="about-cell">
+      <div class="about-cell-label">记录内容</div>
+      <div class="about-cell-val">成果 · 过程日志<br>失败记录 · Agent 的判断依据</div>
+    </div>
+    <div class="about-cell">
+      <div class="about-cell-label">更新节奏</div>
+      <div class="about-cell-val">任务驱动<br>不定期</div>
     </div>
   </div>
+</main>
 
-  <footer>
-    <span>roam.xiaopingfeng.com · 2026</span>
-    <a href="https://xiaopingfeng.com">← 返回主站</a>
-  </footer>
+<footer class="ia-foot"><div class="ia-wrap"><span>roam.xiaopingfeng.com · 2026</span><a href="https://xiaopingfeng.com/">← 返回主站</a></div></footer>
 
-</div>
+<script src="/mode-toggle.js" defer></script>
 </body>
 </html>
