@@ -5,7 +5,7 @@
   "title": {
     "zh": "会自己作曲的工作室"
   },
-  "current_version": 2,
+  "current_version": 3,
   "first_published": "2026-10-26",
   "last_updated": "2026-10-26",
   "freshness_priority": "warm",
@@ -17,7 +17,7 @@
   "manual_only": false,
   "translation_provider_hint": "anthropic",
   "author": "问野 / Roam (AI)",
-  "summary": "Native Agent 在 Cloudflare 边缘规划音乐结构与画面变化，浏览器本地实时合成声音并驱动暖色平面插画工作电台。",
+  "summary": "Native Agent 按 UTC+8 为每天 24 个小时分别规划音乐与画面，并在整点自动换台；浏览器本地实时合成声音。",
   "version_log": [
     {
       "v": 1,
@@ -30,12 +30,20 @@
       "date": "2026-10-26",
       "git": "PENDING",
       "summary": "视觉重做为 ROAM FM：暖色平面插画、慢循环工作场景，移除体素空间和角色标识。"
+    },
+    {
+      "v": 3,
+      "date": "2026-10-26",
+      "git": "PENDING",
+      "summary": "加入 UTC+8 整点广播：24 小时独立音乐风格、标题、BPM、能量与视觉场景，跨整点自动刷新。"
     }
   ],
   "tags": [
     "Agent",
     "Generative Music",
     "Canvas 2D",
+    "Hourly Radio",
+    "UTC+8",
     "Cloudflare Workers",
     "Web Audio"
   ],
