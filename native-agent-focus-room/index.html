@@ -3,79 +3,81 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#13201d" />
-    <meta name="description" content="由 Native Agent 持续创作音乐与空间的安静体素工作室。" />
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='32' fill='%2313201d'/%3E%3Ctext x='32' y='43' text-anchor='middle' font-size='34' fill='%23eef0e6' font-family='serif' font-style='italic'%3EN%3C/text%3E%3C/svg%3E" />
-    <title>Quiet Blocks · Native Agent Focus Room</title>
-    <script type="module" crossorigin src="./assets/index-CNtt3gxd.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-Cf-GbAiE.css">
+    <meta name="theme-color" content="#d87558" />
+    <meta name="description" content="ROAM FM：由 Native Agent 持续生成音乐与视觉的工作电台。" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23d87558'/%3E%3Cpath d='M14 35c7-14 13 14 20 0s12 9 16-4' fill='none' stroke='%23f4ead8' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E" />
+    <title>ROAM FM · Music for Thinking and Building</title>
+    <script type="module" crossorigin src="./assets/index-DjuNg3R2.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-D38fXioQ.css">
   </head>
   <body>
-    <canvas id="world" aria-label="由 Agent 控制的安静体素工作室"></canvas>
-    <div class="atmosphere" aria-hidden="true"></div>
-    <div class="grain" aria-hidden="true"></div>
+    <canvas id="world" aria-label="由 Agent 控制的抽象工作电台场景"></canvas>
+    <div class="paper-grain" aria-hidden="true"></div>
 
-    <header class="brand">
-      <span class="agent-mark">N</span>
-      <div><strong>QUIET BLOCKS</strong><small>A NATIVE AGENT WORKSPACE</small></div>
+    <header class="topbar">
+      <a class="wordmark" href="https://roam.xiaopingfeng.com/" aria-label="返回问野主页">
+        <strong>ROAM FM</strong>
+        <span>问野 · RM 0011</span>
+      </a>
+      <p>MUSIC FOR THINKING<br />AND BUILDING</p>
+      <button id="panel-toggle" class="panel-toggle" type="button">Tune the room <i>↗</i></button>
     </header>
 
-    <a class="roam-link" href="https://roam.xiaopingfeng.com/" aria-label="返回问野主页">问野 · RM 0011</a>
-
-    <section class="intro-copy">
-      <span>GENERATIVE FOCUS ROOM · 01</span>
-      <p>A room that composes itself<br />while you make something.</p>
-    </section>
-
     <section class="now-playing" aria-live="polite">
-      <div class="eyebrow">NOW SETTLING IN</div>
-      <h1 id="track-title">一间会自己呼吸的工作室</h1>
+      <div class="live-row"><i></i><span>AGENT ON AIR</span></div>
+      <h1 id="track-title">无人值守的下午</h1>
       <div class="track-meta">
         <span id="bpm-label">-- BPM</span>
         <span id="section-label">READY</span>
         <span id="seed-label">SEED —</span>
       </div>
       <div class="meter"><i id="progress"></i></div>
-      <button id="quick-start" class="quick-start" type="button"><span>开始专注</span><i>↗</i></button>
+      <button id="quick-start" class="quick-start" type="button">
+        <span>开始播放这一刻</span><i>▶</i>
+      </button>
     </section>
 
-    <button id="panel-toggle" class="panel-toggle" type="button">调整氛围</button>
     <section class="director-state" aria-live="polite">
-      <span>SPACE AGENT</span>
-      <strong id="director-mode">QUIETLY READY</strong>
-      <p id="director-cue">等待第一段专注时光</p>
-      <div><i id="director-light"></i><i id="director-beams"></i><i id="director-floor"></i></div>
+      <div>
+        <span>VISUAL DIRECTOR</span>
+        <strong id="director-mode">WAITING FOR A SIGNAL</strong>
+      </div>
+      <p id="director-cue">光线、空气与节奏尚未开始</p>
+      <div class="director-bars"><i id="director-light"></i><i id="director-beams"></i><i id="director-floor"></i></div>
     </section>
 
     <aside id="control-panel" class="control-panel">
       <div class="panel-heading">
-        <div><div class="eyebrow">FOCUS COMPOSER</div><h2>设计下一段<br />专注时光</h2></div>
+        <div><span>ROAM FM / CONTROL ROOM</span><h2>这一段，想怎样工作？</h2></div>
         <button id="panel-close" class="icon-button" type="button" aria-label="关闭">×</button>
       </div>
-      <label>你想进入怎样的状态？
-        <textarea id="prompt" rows="3">雨后清晨的安静木屋，柔和钢琴、温暖模拟合成器和轻微雨声，帮助进入深度工作状态</textarea>
+      <label>给 Agent 一个画面
+        <textarea id="prompt" rows="3">午后三点的创作桌，柔和钢琴、磁带颗粒和缓慢漂浮的空气，适合持续思考与写作</textarea>
       </label>
       <div class="form-grid">
-        <label>声音质地<input id="style" value="ambient focus / lo-fi" /></label>
-        <label>情绪<input id="mood" value="calm, clear, warm" /></label>
+        <label>声音质地<input id="style" value="warm ambient / soft tape / minimal keys" /></label>
+        <label>情绪<input id="mood" value="curious, warm, unhurried" /></label>
       </div>
-      <label>空间活跃度 <output id="energy-value">30%</output>
-        <input id="energy" type="range" min="0.1" max="0.7" step="0.01" value="0.30" />
+      <label>空间活跃度 <output id="energy-value">28%</output>
+        <input id="energy" type="range" min="0.1" max="0.7" step="0.01" value="0.28" />
       </label>
-      <div class="form-grid">
+      <div class="form-grid compact-grid">
         <label>每段时长（秒）<input id="duration" type="number" min="15" max="180" value="90" /></label>
         <label>BPM（可选）<input id="bpm" type="number" min="45" max="120" placeholder="由 Agent 决定" /></label>
       </div>
       <label class="autonomy-toggle">
-        <span><strong>连续专注模式</strong><small>每段结束后，Agent 会自然续写音乐与空间。</small></span>
+        <span><strong>连续广播</strong><small>每段结束后，Agent 自己续写音乐与画面。</small></span>
         <input id="autonomous" type="checkbox" checked />
       </label>
-      <button id="generate" class="primary-button" type="button"><span>让 Agent 开始创作</span><i>↗</i></button>
-      <p id="status" class="status">空间正在准备</p>
-      <p class="agent-note">音乐和空间方案均由 Native Agent 现场生成。没有歌单，也不调用外部音乐 API。</p>
+      <button id="generate" class="primary-button" type="button"><span>生成新的工作时段</span><i>↗</i></button>
+      <p id="status" class="status">信号已就绪</p>
+      <p class="agent-note">没有歌单，没有预制音轨。结构由边缘 Agent 决定，声音由浏览器现场合成。</p>
     </aside>
 
-    <footer><span>MOVE YOUR MOUSE SLOWLY</span><span>LIGHT · AIR · SOUND · ROOM</span></footer>
+    <footer>
+      <span>NO PLAYLIST · NO MASCOT · ALWAYS GENERATIVE</span>
+      <span id="clock">LOCAL SIGNAL</span>
+    </footer>
     <audio id="player" crossorigin="anonymous"></audio>
   </body>
 </html>
