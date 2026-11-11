@@ -156,3 +156,21 @@ body:has(dialog[open]) { overflow: hidden; }
 #source-groups .detail-sources { margin-bottom: 0; }
 .detail-link, .stage-source, .action-source { font-size: 12px; }
 .action-source { white-space: nowrap; }
+
+.route-jump { display: inline-block; margin-top: 9px; font-size: 13px; }
+.route { margin-top: 37px; padding-top: 27px; border-top: 1px solid var(--line); }
+.route h2 { margin-top: 6px; }
+.route-intro, .route-note { color: var(--muted); max-width: 85ch; }
+.route-steps { padding: 0; margin: 18px 0 0; list-style: none; counter-reset: route-step; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.route-steps li { counter-increment: route-step; min-width: 0; padding: 15px 17px; border: 1px solid var(--line); background: white; }
+.route-steps h3 { margin: 0 0 4px; font-size: 17px; }
+.route-steps h3::before { content: counter(route-step, decimal-leading-zero); margin-right: 8px; font: 700 12px var(--mono); color: var(--accent); }
+.route-steps p { margin: 6px 0 0; font-size: 14px; color: var(--muted); }
+.route-steps .route-tool { color: var(--ink); font-weight: 750; }
+.route-steps .route-output, .route-steps .route-links { font-size: 13px; }
+.route-links { display: flex; flex-wrap: wrap; gap: 4px 13px; }
+.route-note { margin: 10px 0; font-size: 13px; }
+@media (max-width: 650px) {
+  .route-steps { grid-template-columns: 1fr; }
+  .masthead nav a[href="#method"] { display: none; }
+}

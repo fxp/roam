@@ -5,7 +5,7 @@
   "title": {
     "zh": "硬件 Agent 接入 Bench"
   },
-  "current_version": 1,
+  "current_version": 2,
   "first_published": "2026-11-11",
   "last_updated": "2026-11-11",
   "freshness_priority": "warm",
@@ -30,6 +30,12 @@
       "date": "2026-11-11",
       "git": "PENDING",
       "summary": "首次发布硬件开发八站的接入评测及逐项证据。"
+    },
+    {
+      "v": 2,
+      "date": "2026-11-11",
+      "git": "PENDING",
+      "summary": "新增 ESP32 温湿度记录器示例，逐站列出可用工具、工程交付物和人工确认。"
     }
   ]
 }
