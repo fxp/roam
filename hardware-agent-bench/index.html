@@ -9,9 +9,9 @@
   <meta property="og:title" content="硬件 Agent 接入 Bench">
   <meta property="og:description" content="按硬件开发八站对比嘉立创、华秋、黑湖、Hi3D 等八个产品入口，逐项查看 MCP、API、人工确认和官方证据。">
   <meta property="og:url" content="https://roam.xiaopingfeng.com/hardware-agent-bench/">
-  <link rel="stylesheet" href="./bench.css?v=5">
+  <link rel="stylesheet" href="./bench.css?v=7">
   <script defer src="./bench-data.js?v=5"></script>
-  <script defer src="./bench.js?v=6"></script>
+  <script defer src="./bench.js?v=7"></script>
 </head>
 <body>
   <a class="skip" href="#matrix">跳到评测矩阵</a>
@@ -19,7 +19,6 @@
     <div class="wrap masthead-inner">
       <a class="brand" href="/" aria-label="返回问野 Roam"><span class="brand-mark">R/</span> 问野 · ROAM</a>
       <nav aria-label="页面导航">
-        <a href="#route">开发路线</a>
         <a href="#matrix">评测矩阵</a>
         <a href="#method">评测口径</a>
         <a href="#sources">证据索引</a>
@@ -32,7 +31,6 @@
         <p class="kicker"><span></span> HARDWARE AGENT BENCH</p>
         <h1 id="page-title">硬件 Agent<br>接入 <em>Bench.</em></h1>
         <p class="intro">从需求、画板、选件到制造与认证，逐站查看 Agent 能调用什么、哪里要人接手。</p>
-        <a class="route-jump" href="#route">比较三条从需求到样机的路线 ↓</a>
       </div>
       <aside class="snapshot" aria-label="评测范围">
         <div class="snapshot-head"><span>公开证据评测</span><time datetime="2026-11-11">2026.11.11</time></div>
@@ -47,7 +45,7 @@
       <div class="section-head" id="route">
         <div>
           <h2 id="matrix-title">平台 × 开发阶段</h2>
-          <p>选择 ESP32 温湿度记录器的开发路线。参与的格子保持清晰，其他格子淡化。点开看工具、交接和依据。</p>
+          <p>点开任一格查看操作方式和依据。选中「可行路线」可沿八个阶段查看相关格子。</p>
         </div>
         <div class="view-switch" role="group" aria-label="比较视图">
           <button id="stage-view" type="button" aria-pressed="true">阶段覆盖</button>
@@ -55,14 +53,9 @@
         </div>
       </div>
 
-      <div class="route-controls" role="group" aria-label="开发路线高亮">
-        <span>路线高亮</span>
-        <button type="button" data-highlight="mixed" aria-pressed="true">混合路线</button>
-        <button type="button" data-highlight="jlc" aria-pressed="false">嘉立创路线</button>
-        <button type="button" data-highlight="hq" aria-pressed="false">华秋路线</button>
-        <button type="button" data-highlight="all" aria-pressed="false">全部路线</button>
-        <button type="button" data-highlight="none" aria-pressed="false">取消高亮</button>
-        <button type="button" class="route-overview" data-route="overview">样例与范围</button>
+      <div class="route-controls" role="group" aria-label="路线高亮">
+        <button type="button" data-highlight="viable" aria-pressed="false">可行路线</button>
+        <button type="button" data-highlight="none" aria-pressed="true">取消高亮</button>
       </div>
       <div class="matrix-frame">
         <div class="toolbar">
@@ -110,118 +103,6 @@
     </section>
     <footer class="page-footer"><a href="/">问野 · Roam</a><a href="#page-title">回到顶部 ↑</a></footer>
   </main>
-
-  <template id="route-content">
-
-      <p class="route-intro">样例是一台 USB 供电的 ESP32 桌面温湿度记录器。先用开发板跑通采样，再做定制 PCB 和打印外壳。首版通过 USB 串口输出读数，由电脑保存带时间戳的 CSV。设备无电池，关闭无线功能。目标是做出能复测的样机，并保留转小批量所需的生产资料。</p>
-      <ol class="route-steps">
-        <li data-step="intent" data-handoff="需求与验收表 → 外观参考图、接口限制和尺寸包络 → Hi3D 与电子、结构设计。" data-platform="shared" data-mode="API 建单 · 人工确认需求" data-tools="GitHub Issues" data-transfer="规格 → 设计">
-          <p class="route-tool">GitHub Issues + 仓库里的需求文档</p>
-          <p>用 GitHub Issues 网页或 REST API 建需求和验收项。定义采样间隔、允许误差、供电及外壳尺寸，由负责人确认后再选料。</p>
-          <p class="route-output"><strong>交付</strong> · <code>SPEC.md</code> 与验收用例表</p>
-          <p class="route-links"><a href="https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/creating-an-issue">GitHub Issues 指南 ↗</a> <a href="https://docs.github.com/en/rest/issues/issues#create-an-issue">Issues REST API ↗</a></p>
-        </li>
-        <li data-step="design" data-handoff="Hi3D 外观网格和 PCB STEP → FreeCAD 重建工程外壳 → 带版本的 PCB、外壳和固件文件。" data-platform="easyeda" data-mode="MCP / CLI · 本地 CAD" data-tools="ESP-IDF + 嘉立创 EDA + FreeCAD" data-transfer="板卡 STEP → 结构">
-          <p class="route-tool">ESP-IDF + 嘉立创 EDA 专业版 + FreeCAD</p>
-          <p>用 ESP32 开发板和传感器验证读数及串口协议。用嘉立创 EDA 的本地 MCP 辅助画板、检查和导出。将 PCB 的 STEP 导入 FreeCAD，按实际尺寸设计开孔、螺柱和传感器通风。</p>
-          <p class="route-output"><strong>交付</strong> · EDA 源工程、固件源码、板卡 STEP、外壳 FCStd / STEP</p>
-          <p class="route-links"><a href="https://docs.espressif.com/projects/esp-idf/en/stable/esp32/get-started/start-project.html">ESP-IDF ↗</a> <a href="?platform=easyeda&amp;stage=design#matrix">嘉立创 EDA MCP</a> <a href="https://www.freecad.org/features">FreeCAD ↗</a></p>
-        </li>
-        <li data-step="parts" data-handoff="EDA 导出 BOM → 对照实际可贴库存 → 锁定料号、封装和替代件后送审单。" data-platform="jlc" data-mode="人工核料 · API 试开放" data-tools="立创商城 + 嘉立创 SMT" data-transfer="锁定 BOM → 审单">
-          <p class="route-tool">立创商城 BOM 配单 + 嘉立创 SMT 料库</p>
-          <p>用立创商城做初选，最终在 SMT 下单侧复核可贴库存。冻结厂商料号、贴片料号、封装和经工程确认的替代料。料号变化时重新核对引脚、封装和固件。</p>
-          <p class="route-output"><strong>交付</strong> · 带准确料号和缺料处理的锁定 BOM</p>
-          <p class="route-links"><a href="https://www.szlcsc.com/news/16581.html">立创新版 BOM 配单 ↗</a> <a href="https://prodocs.easyeda.com/cn/schematic/export-order-parts/">嘉立创选料与贴片指南 ↗</a></p>
-        </li>
-        <li data-step="order" data-handoff="Gerber、钻孔、BOM、贴片坐标与外壳 STEP → 网页审单及人工付款 → PCB、贴片与外壳订单号。" data-platform="jlc" data-mode="人工下单付款 · PCB API 需审批" data-tools="嘉立创 PCB / SMT + 三维猴" data-transfer="文件包 → 订单号">
-          <p class="route-tool">嘉立创 PCB / SMT 网页 + 三维猴 3D 打印</p>
-          <p>先做 ERC、DRC 和装配尺寸检查。打包 Gerber 与钻孔文件，另存 BOM、贴片坐标和外壳 STEP。先走少量样件，由人核对文件版本、数量、总价及交期，再确认并付款。</p>
-          <p class="route-output"><strong>交付</strong> · 制造文件包、审单记录和订单号</p>
-          <p class="route-links"><a href="https://prodocs.easyeda.com/cn/quick-start.html">EDA 导出指南 ↗</a> <a href="?platform=jlc&amp;stage=order#matrix">PCB 下单接口与人工交接</a> <a href="https://www.jlc.com/portal/q7i28571.html">三维猴报价与下单 ↗</a></p>
-        </li>
-        <li data-step="fabrication" data-handoff="订单号和版本 → 跟踪制板与打印 → 将到货件、供应商批次和修订号交给装配。" data-platform="jlc" data-mode="进度 API（获批后）· 网页" data-tools="嘉立创制板 + 三维猴" data-transfer="到货件 → 装配">
-          <p class="route-tool">嘉立创制板 + 三维猴打印</p>
-          <p>板和外壳按同一修订号生产。确认板厚、孔位、外壳材料和关键尺寸。首单用网页订单状态跟踪，已获批的业务线可以接 API。</p>
-          <p class="route-output"><strong>交付</strong> · 裸板与外壳样件、对应订单和版本</p>
-          <p class="route-links"><a href="?platform=jlc&amp;stage=fabrication#matrix">生产进度接口</a> <a href="https://www.jlc.com/portal/q7i40026.html">打印文件要求 ↗</a> <a href="https://www.jlc.com/portal/server_guide_29849.html">打印进度查询 ↗</a></p>
-        </li>
-        <li data-step="assembly" data-handoff="同版本 PCBA、外壳和装配说明 → 样机编号 → 带编号样机和贴片记录交给台架。" data-platform="jlc" data-mode="人工确认贴片 · 实物装配" data-tools="嘉立创 SMT + 本地装配" data-transfer="样机编号 → 台架">
-          <p class="route-tool">嘉立创 SMT + 本地整机装配</p>
-          <p>贴片前逐件核对位号、正反面、极性和旋转，确认工艺边及基准点。PCBA 和外壳到货后，在本地装螺丝、检查接口对位和传感器通风。</p>
-          <p class="route-output"><strong>交付</strong> · 完整样机、贴片确认记录与装配说明</p>
-          <p class="route-links"><a href="https://www.jlc.com/portal/server_guide_19327.html">嘉立创 SMT 流程 ↗</a> <a href="?platform=jlc&amp;stage=assembly#matrix">装配接口覆盖</a></p>
-        </li>
-        <li data-step="verify" data-handoff="样机编号、固件版本和验收限值 → 台架测试 → 日志、CSV 及检验判定交给黑湖报工。" data-platform="shared" data-mode="CLI 烧录 · 人工实测" data-tools="ESP-IDF + 台架实测" data-transfer="测试 CSV → 黑湖">
-          <p class="route-tool">ESP-IDF + 万用表、限流电源和参考温湿度计</p>
-          <p>工程师先检查短路和供电，再用 <code>idf.py flash monitor</code> 烧录与抓日志。逐台验证读数误差、重启后恢复、连续运行和外壳适配，按需求表判定结果。</p>
-          <p class="route-output"><strong>交付</strong> · 按样机编号归档的测试结果、CSV、串口日志和复测记录</p>
-          <p class="route-links"><a href="https://docs.espressif.com/projects/esp-idf/en/stable/esp32/get-started/start-project.html">烧录和串口监视 ↗</a> <a href="?stage=verify#matrix">设计检查与实物验证的边界</a></p>
-        </li>
-        <li data-step="scale" data-handoff="签字的样机报告、冻结文件与试产数量 → 嘉立创返单 → 供货订单号和到货批次交给试产工厂。" data-platform="jlc" data-mode="PCB 返单 API（获批后）· 人工放行" data-tools="嘉立创返单 + 第三方实验室" data-transfer="供货批次 → 试产">
-          <p class="route-tool">嘉立创小批量返单 + SGS 等具备相应资质的实验室</p>
-          <p>样机通过后，冻结 BOM、制造文件、固件版本和测试规程，先做一批试产并按批次验收。计划对外销售时，依据目标市场及最终配置，请实验室确认适用项目与样品要求。工程与质量负责人依据结果放行。</p>
-          <p class="route-output"><strong>交付</strong> · 可复产资料包、首批良率与返修记录、适用的检测报告或证书</p>
-          <p class="route-links"><a href="?platform=jlc&amp;stage=scale#matrix">嘉立创返单接口</a> <a href="https://www.sgs-cqe.de/en/service-portfolio.html">SGS 测试项目 ↗</a></p>
-        </li>
-      </ol>
-      <p class="route-note">混合路线以 Hi3D 做概念外观，再用尺寸和公差重建工程外壳。黑湖试产和质检需要工厂已部署并授权接入。<a href="?platform=hi3d&amp;stage=design#matrix">Hi3D</a> · <a href="?platform=blacklake&amp;stage=fabrication#matrix">黑湖智造</a></p>
-      <p class="route-note">路线按公开文档和现有接口设计。本次未为该样例打样、下单或送检。</p>
-  </template>
-
-  <template id="huaqiu-route">
-      <ol>
-        <li data-step="design" data-platform="huaqiu-kicad" data-tools="华秋 KiCad + FreeCAD + ESP-IDF" data-mode="DSH / IPC API · CLI">
-          <p>用 ESP-IDF 在开发板跑通采样，华秋 KiCad 用 DSH 生成原理图、经 IPC API 辅助改 PCB，再用 FreeCAD 按板卡尺寸做外壳。公开文档确认 DSH、IPC 和 CLI；当前版 MCP 工具清单待核实。</p>
-          <p><strong>交付</strong> · KiCad 工程、固件源码、板卡 STEP、外壳 FCStd / STEP</p>
-          <p class="route-links"><a href="https://kicad.eda.cn/docs/posts/KiCad-10.0.7-2-Release.html">华秋 KiCad 发布说明 ↗</a> <a href="https://github.com/Huaqiu-Electronics/dsh-pcb-eda">DSH 工具与 IPC ↗</a> <a href="https://www.freecad.org/features">FreeCAD ↗</a></p>
-        </li>
-        <li data-step="parts" data-platform="huaqiu-kicad" data-tools="华秋商城 + DSH 器件工具" data-mode="DSH 查价 · 人工确认">
-          <p>用 DSH 导出 BOM、搜料和询价，再在华秋 PCBA 页面核对实际可装物料。工程师批准缺料替换并复核封装和引脚。</p>
-          <p><strong>交付</strong> · 含厂商料号、封装和已批准替代料的 BOM</p>
-          <p class="route-links"><a href="https://kicad.eda.cn/docs/posts/KiCad-10.0.6-1-Release.html">BOM 匹配与询价 ↗</a> <a href="https://www.hqpcb.com/help/p_1721.html">PCBA 物料确认 ↗</a></p>
-        </li>
-        <li data-step="order" data-platform="huaqiu" data-tools="华秋 PCBA + 华秋 3D 打印" data-mode="人工网页 · PCB API 需审批">
-          <p>先用 KiCad DRC 和华秋 DFM 核对板卡，再上传 Gerber、钻孔、BOM 与贴片坐标到华秋 PCBA。外壳在华秋 3D 打印上传 STEP 或 STL。由人核价、确认文件和付款。华秋 PCB 合作 API 可申请用于计价和建单，PCBA 和外壳走网页。</p>
-          <p><strong>交付</strong> · 制造文件包、确认记录和订单号</p>
-          <p class="route-links"><a href="https://www.hqpcb.com/help/p_1721.html">PCBA 下单 ↗</a> <a href="https://www.hqpcb.com/help/p_1867.html">PCB 合作 API ↗</a> <a href="https://www.hq3dp.cn/quote">华秋 3D 打印报价 ↗</a></p>
-        </li>
-        <li data-step="fabrication" data-platform="huaqiu" data-tools="华秋制板 + 华秋 3D 打印" data-mode="PCB 进度 API（获批后）· 网页">
-          <p>板卡和外壳使用同一修订号。获批后可用 PCB API 查生产进度和物流。PCBA、打印订单在各自网页处理和跟踪。</p>
-          <p><strong>交付</strong> · 板卡、外壳及对应订单和版本</p>
-          <p class="route-links"><a href="https://www.hqpcb.com/help/p_1867.html">PCB 进度 API ↗</a> <a href="https://www.hq3dp.cn/">华秋 3D 打印流程 ↗</a></p>
-        </li>
-        <li data-step="assembly" data-platform="huaqiu" data-tools="华秋 PCBA + 本地装配" data-mode="人工网页 · 实物装配">
-          <p>在贴片预览核对位号、旋转和极性，解决缺料待办。到货后在本地装壳，检查接口对位与传感器通风。</p>
-          <p><strong>交付</strong> · 装壳样机、贴片确认记录与装配说明</p>
-          <p class="route-links"><a href="https://www.hqpcb.com/help/p_1721.html">华秋 PCBA 贴片预览与待办 ↗</a></p>
-        </li>
-        <li data-step="scale" data-platform="huaqiu" data-tools="华秋 PCBA 返单 + 第三方实验室" data-mode="人工返单、送检与放行">
-          <p>样机通过后冻结 BOM、制造文件和固件。未改版可通过网页返单做首批。对外销售前请具备相应资质的实验室按目标市场和实际配置确认检测项目，由质量负责人放行。</p>
-          <p><strong>交付</strong> · 可复产资料包、试产良率和适用的检测报告</p>
-          <p class="route-links"><a href="https://www.hqpcb.com/help/p_1721.html">华秋 PCBA 返单 ↗</a> <a href="https://www.sgs-cqe.de/en/service-portfolio.html">实验室检测项目示例 ↗</a></p>
-        </li>
-      </ol>
-  </template>
-
-  <template id="mixed-route">
-    <ol>
-      <li data-step="design" data-platform="hi3d" data-tools="Hi3D · 概念外观" data-mode="MCP / REST · 人工选稿" data-handoff="参考图 → Hi3D 网格和预览图 → FreeCAD 尺寸建模。随文件标注外观意图、禁改接口与尺寸约束。" data-transfer="外观网格 → FreeCAD">
-        <p>用参考图生成三维外观。人确认输入素材和积分预算，再选择外观版本。下载网格和预览图交给结构设计，保留任务 ID。</p>
-        <p><strong>工程交付</strong> · FreeCAD 根据 PCB STEP、接口位置和装配公差重建可编辑外壳，再导出制造用 STEP。</p>
-        <p class="route-links"><a href="https://docs.hi3d.ai/en/mcp-tools">Hi3D MCP ↗</a> <a href="https://docs.hi3d.ai/zh/api/api-reference/list/query-task">查询任务与下载 ↗</a> <a href="https://www.freecad.org/features">FreeCAD ↗</a></p>
-      </li>
-      <li data-step="verify" data-platform="blacklake" data-tools="黑湖智造 · 质检状态" data-mode="报工 API · 人工判定" data-handoff="ESP-IDF 日志和台架测试 CSV → 按工单、批次和样机编号关联 → 将质量状态与不良原因写入黑湖报工。" data-transfer="测试记录 → 质量状态">
-        <p>检验员按验收用例判定。已部署黑湖并授权的团队可用批量报工 API 记录质量状态、不良原因和批次。报工是异步操作，提交后要查处理结果。原始读数、日志与签字记录留在项目档案，按同一批次号索引。</p>
-        <p><strong>交付</strong> · 批次质检汇总与不良记录。当前业务 MCP 工具清单待核实。</p>
-        <p class="route-links"><a href="https://v3-hw-openapi.blacklake.cn/document/api?catId=1650452818128086&amp;detailId=1681109889053798&amp;url=%2Fmfg%2Fopen%2Fv1%2Fprogress_report%2F_progress_report">黑湖批量报工 ↗</a></p>
-      </li>
-      <li data-step="scale" data-platform="blacklake" data-tools="黑湖智造 · 试产工单" data-mode="工单 API · 人工放行" data-handoff="嘉立创首批板卡、外壳订单号与冻结版本 → 自有或合作装测工厂的黑湖试产工单 → 工单 ID、批次、良率与返修记录。" data-transfer="冻结版本 → 试产工单">
-        <p>试产开始前，由有权操作的工厂创建工单，带上产品料号、BOM 版本、计划数量和工序。工单号用于关联随后产生的质检记录。取得租户授权后用 API 建单、查工单和报工。由项目方把供应商订单号与内部工单关联，质量负责人按批次记录签字放行。</p>
-        <p><strong>接入条件</strong> · 需已部署黑湖且可授权的工厂。接入前用工单与质检表人工交接，再按租户流程录入。对外销售所需检测另行送检。</p>
-        <p class="route-links"><a href="https://support.huaweicloud.com/bestpractice-sparkpack/zh-cn_topic_0000001443502088.html">黑湖工单接口清单 ↗</a> <a href="https://v3-hw-openapi.blacklake.cn/document/mcp">黑湖 MCP 指南 ↗</a></p>
-      </li>
-    </ol>
-  </template>
 
   <dialog id="details" aria-labelledby="detail-title">
     <div class="detail-header">
