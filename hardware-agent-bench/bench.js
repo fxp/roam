@@ -16,7 +16,7 @@ const routeControls = document.querySelector('.route-controls');
 const routeNames = { jlc: '嘉立创', hq: '华秋', mixed: '混合', shared: '三条路线共用' };
 const directLink = new URLSearchParams(location.search);
 let view = 'stage';
-let highlight = ['jlc', 'hq', 'mixed', 'all'].find(value => value === directLink.get('focus')) ?? 'mixed';
+let highlight = ['jlc', 'hq', 'mixed', 'all', 'none'].find(value => value === directLink.get('focus')) ?? 'mixed';
 
 const filters = {
   all: () => true,
@@ -46,7 +46,7 @@ function stageCell(platform, stage) {
     : `<strong><span class="dot" aria-hidden="true"></span>${action}</strong><small>${channel}</small>`;
   const featured = step && highlightVisible(step);
   const label = featured ? `${routeTag(step)}，${step.dataset.tools}，${step.dataset.mode}` : `${levels[level].label}${level === 'na' ? '' : '，' + action}`;
-  return `<td><button type="button" class="cell ${featured ? 'route-highlight ' + displayRoute(step) : level + ' route-muted'}" data-platform="${platform.id}" data-stage="${stage.id}"
+  return `<td><button type="button" class="cell ${featured ? 'route-highlight ' + displayRoute(step) : level + (highlight === 'none' ? '' : ' route-muted')}" data-platform="${platform.id}" data-stage="${stage.id}"
     aria-label="${platform.name}，${stage.name}，${label}">${body}</button></td>`;
 }
 
@@ -91,7 +91,7 @@ function routeLabel(step) {
 }
 
 function stageHeading(stage, index) {
-  const step = routeStep('shared', stage.id);
+  const step = highlight === 'none' ? null : routeStep('shared', stage.id);
   return `<th scope="col"><button type="button" data-stage="${stage.id}"><span class="stage-number">${String(index + 1).padStart(2, '0')}</span>${stage.name}</button>
     ${step ? `<button type="button" class="route-highlight shared" data-route="${stage.id}" aria-label="${stage.name}，三条路线共用，${step.dataset.tools}，${step.dataset.mode}">${routeLabel(step)}</button>` : ''}</th>`;
 }
@@ -177,7 +177,7 @@ function showCell(platform, stage) {
   ];
   showDetail(`${platform.name} / ${stage.name}`, `<h2 id="detail-title">${action}</h2>
     ${detailLink(platform, stage)}
-    ${step ? `<section class="route-detail ${displayRoute(step)}">
+    ${step && highlight !== 'none' ? `<section class="route-detail ${displayRoute(step)}">
       <h3>${routeTag(step)}路线 · ${stage.name}</h3>
       <p><strong>${step.dataset.tools}</strong> · ${step.dataset.mode}</p>
       ${step.innerHTML}${handoff(step)}</section>` : ''}
