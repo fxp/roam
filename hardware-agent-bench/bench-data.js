@@ -10,18 +10,17 @@ const bench = {
     na: { label: '范围外', description: '超出本行产品的评测范围。' }
   },
   stages: [
-    { id: 'intent', name: '想法与需求', source: 'c-st12', task: '收集需求、澄清约束并输出可交接的规格。' },
-    { id: 'design', name: '设计', source: 'c-st12', task: '生成或修改原理图、PCB、外壳或固件，并导出设计文件。' },
-    { id: 'parts', name: '选件', source: 'c-st34', task: '查料号、库存、价格和替代件，并形成可采购的 BOM。' },
-    { id: 'order', name: '下单', source: 'c-st34', task: '校验文件、计价、创建订单、确认付款、跟踪与取消。' },
-    { id: 'fabrication', name: '制造', source: 'c-st5', task: '查询工艺与材料能力，提交制造任务并读取生产进度。' },
-    { id: 'assembly', name: '装配', source: 'c-st6', task: '提交贴片或装配任务，确认物料与工艺，读取进度。' },
-    { id: 'verify', name: '验证', source: 'c-st7', task: '区分设计规则检查、工厂质量记录和实物上电或功能测试。' },
-    { id: 'scale', name: '量产与认证', source: 'c-st8', task: '追踪批次、变更和量产放行，并取得可追溯的认证记录。' }
+    { id: 'intent', name: '想法与需求', task: '收集需求、澄清约束并输出可交接的规格。' },
+    { id: 'design', name: '设计', task: '生成或修改原理图、PCB、外壳或固件，并导出设计文件。' },
+    { id: 'parts', name: '选件', task: '查料号、库存、价格和替代件，并形成可采购的 BOM。' },
+    { id: 'order', name: '下单', task: '校验文件、计价、创建订单、确认付款、跟踪与取消。' },
+    { id: 'fabrication', name: '制造', task: '查询工艺与材料能力，提交制造任务并读取生产进度。' },
+    { id: 'assembly', name: '装配', task: '提交贴片或装配任务，确认物料与工艺，读取进度。' },
+    { id: 'verify', name: '验证', task: '区分设计规则检查、工厂质量记录和实物上电或功能测试。' },
+    { id: 'scale', name: '量产与认证', task: '追踪批次、变更和量产放行，并取得可追溯的认证记录。' }
   ],
   orderChecks: ['能力查询', '文件校验', '报价', '下单与付款', '跟踪', '取消'],
   sources: {
-    episode: ['AI Buzzwords EP.110 · 故事线 C', 'https://xiaopingfeng.com/buzzwords/110/#story-c'],
     deepdive: ['DeepDive · 哪家服务真正做到了 Agent native', 'https://xiaopingfeng.com/deepdive/agent-native-services/?v=2'],
     deepdiveMethod: ['DeepDive §01 · 六个动作与接入尺度', 'https://xiaopingfeng.com/deepdive/agent-native-services/?v=2#sec-01'],
     deepdiveJlc: ['DeepDive §03 · 嘉立创订单实测与接口清单', 'https://xiaopingfeng.com/deepdive/agent-native-services/?v=2#sec-03'],

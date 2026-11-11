@@ -8,6 +8,8 @@ const stageView = document.querySelector('#stage-view');
 const accessView = document.querySelector('#access-view');
 const dialog = document.querySelector('#details');
 const detailBody = document.querySelector('#detail-body');
+const routeContent = document.querySelector('#route-content').content;
+const routeSteps = new Map([...routeContent.querySelectorAll('[data-step]')].map(step => [step.dataset.step, step]));
 let view = 'stage';
 
 const filters = {
@@ -44,6 +46,18 @@ function accessCells(platform) {
     <td>${platform.access}</td><td>${platform.test}</td><td>${platform.human}</td>`;
 }
 
+function routeRow() {
+  const cells = stages.map(stage => {
+    const tools = routeSteps.get(stage.id).dataset.tools;
+    return `<td><button type="button" class="cell route-cell" data-route="${stage.id}"
+      aria-label="开发路线，${stage.name}，${tools}"><strong>${tools}</strong></button></td>`;
+  });
+  return `<tr class="route-row" id="route">
+    <th scope="row"><button type="button" class="platform" data-route="overview">
+      <span><span class="platform-name">推荐开发路线</span><span class="platform-scope">ESP32 温湿度记录器</span></span>
+    </button></th>${cells.join('')}</tr>`;
+}
+
 function render() {
   const stageMode = view === 'stage';
   const visible = visiblePlatforms();
@@ -61,8 +75,9 @@ function render() {
         `<th scope="col"><button type="button" data-stage="${stage.id}"><span class="stage-number">${String(index + 1).padStart(2, '0')}</span>${stage.name}</button></th>`)
     : ['官方 MCP', 'API 类型', '接入与文档', '测试环境', '人工确认 / 费用'].map(label => `<th scope="col">${label}</th>`);
   matrix.tHead.innerHTML = `<tr><th scope="col">平台 / 产品</th>${headings.join('')}</tr>`;
-  matrix.tBodies[0].innerHTML = visible.map(platform =>
+  const platformRows = visible.map(platform =>
     `<tr>${platformHeading(platform)}${stageMode ? stages.map(stage => stageCell(platform, stage)).join('') : accessCells(platform)}</tr>`).join('');
+  matrix.tBodies[0].innerHTML = (stageMode ? routeRow() : '') + platformRows;
   document.querySelector('#row-count').textContent = `显示 ${visible.length} / ${platforms.length} 个产品入口`;
   document.querySelector('.matrix-footer span:last-child').textContent =
     stageMode ? '覆盖等级按单个产品与阶段判定' : '业务调用条件以平台授权为准';
@@ -70,11 +85,6 @@ function render() {
 
 function externalLink(name, url) {
   return `<a href="${url}" target="_blank" rel="noopener noreferrer">${name} <span aria-hidden="true">↗</span></a>`;
-}
-
-function stageSource(stage) {
-  const [, url] = sources.episode;
-  return externalLink(`EP.110 · ${stage.name}`, new URL(`#${stage.source}`, url));
 }
 
 function sourceList(refs) {
@@ -90,8 +100,7 @@ function detailLink(platform, stage) {
 
 function renderSourceIndex() {
   document.querySelector('#source-groups').innerHTML = `
-    <details><summary>八个阶段与评测方法</summary>
-      <ul class="detail-sources">${stages.map(stage => `<li>${stageSource(stage)}</li>`).join('')}</ul>
+    <details><summary>评测方法</summary>
       ${sourceList(['deepdive', 'deepdiveMethod'])}
     </details>
     ${platforms.map(platform => {
@@ -136,8 +145,7 @@ function showCell(platform, stage) {
     </dl>${stage.id === 'order' && platform.order ? `<h3>下单动作核对</h3>
       <dl class="detail-list">${bench.orderChecks.map((check, index) =>
         `<dt>${check}</dt><dd>${platform.order[index]} <span class="action-source">${externalLink('依据', sources[platform.orderRefs[index]][1])}</span></dd>`).join('')}</dl>` : ''}
-    <h3>证据来源</h3>${sourceList(refs)}
-    <p class="stage-source">${stageSource(stage)}</p>`);
+    <h3>证据来源</h3>${sourceList(refs)}`);
 }
 
 function showStage(stage) {
@@ -148,15 +156,33 @@ function showStage(stage) {
       <strong>${platform.name}</strong><span>${action} · ${levels[level].label}</span>
     </button></li>`;
   });
-  showDetail(`EP.110 / 第 ${number} 站`, `<h2 id="detail-title">${stage.name}</h2>
+  showDetail(`硬件开发 / 第 ${number} 站`, `<h2 id="detail-title">${stage.name}</h2>
     ${detailLink(null, stage)}
-    <p>${stage.task}</p><ul class="stage-platforms">${rows.join('')}</ul>
-    <p class="stage-source">${stageSource(stage)}</p>`);
+    <p>${stage.task}</p><ul class="stage-platforms">${rows.join('')}</ul>`);
+}
+
+function showRoute(id) {
+  if (id === 'overview') {
+    const steps = stages.map(stage => `<li><button type="button" data-route="${stage.id}">
+      <strong>${stage.name}</strong><span>${routeSteps.get(stage.id).dataset.tools}</span>
+    </button></li>`).join('');
+    const notes = [...routeContent.querySelectorAll('.route-note')].map(note => note.outerHTML).join('');
+    showDetail('推荐开发路线', `<h2 id="detail-title">ESP32 温湿度记录器</h2>
+      ${routeContent.querySelector('.route-intro').outerHTML}<ul class="stage-platforms">${steps}</ul>${notes}`);
+    return;
+  }
+  const stage = stages.find(item => item.id === id);
+  if (!stage) return;
+  showDetail('推荐开发路线 / ESP32 温湿度记录器', `<h2 id="detail-title">${stage.name}</h2>
+    <a class="detail-link" href="?route=${stage.id}#route">此项链接</a>
+    ${routeSteps.get(id).innerHTML}
+    <button type="button" class="route-back" data-route="overview">查看完整路线</button>`);
 }
 
 function openFromButton(event) {
-  const trigger = event.target.closest('button[data-platform], button[data-stage]');
+  const trigger = event.target.closest('button[data-platform], button[data-stage], button[data-route]');
   if (!trigger) return;
+  if (trigger.dataset.route) return showRoute(trigger.dataset.route);
   const platform = platforms.find(item => item.id === trigger.dataset.platform);
   const stage = stages.find(item => item.id === trigger.dataset.stage);
   if (platform && stage) showCell(platform, stage);
@@ -175,6 +201,9 @@ accessView.addEventListener('click', () => {
   render();
 });
 filter.addEventListener('change', render);
+document.querySelectorAll('a[href="#route"]').forEach(link => link.addEventListener('click', () => {
+  if (view === 'access') stageView.click();
+}));
 matrix.addEventListener('click', openFromButton);
 detailBody.addEventListener('click', openFromButton);
 dialog.addEventListener('click', event => {
@@ -187,6 +216,7 @@ renderSourceIndex();
 const directLink = new URLSearchParams(location.search);
 const directPlatform = platforms.find(platform => platform.id === directLink.get('platform'));
 const directStage = stages.find(stage => stage.id === directLink.get('stage'));
-if (directPlatform && directStage) showCell(directPlatform, directStage);
+if (directLink.has('route')) showRoute(directLink.get('route'));
+else if (directPlatform && directStage) showCell(directPlatform, directStage);
 else if (directPlatform) showPlatform(directPlatform);
 else if (directStage) showStage(directStage);

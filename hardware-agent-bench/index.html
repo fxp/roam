@@ -40,15 +40,14 @@
           <div><strong>08</strong><span>硬件开发阶段</span></div>
           <div><strong id="platform-count">08</strong><span>平台与产品入口</span></div>
         </div>
-        <a href="https://xiaopingfeng.com/buzzwords/110/#story-c" target="_blank" rel="noopener noreferrer">流程依据 · AI Buzzwords EP.110 <span aria-hidden="true">↗</span></a>
-      </aside>
+          </aside>
     </section>
 
     <section id="matrix" aria-labelledby="matrix-title">
       <div class="section-head">
         <div>
           <h2 id="matrix-title">平台 × 开发阶段</h2>
-          <p>点开任一单元格，查看已知动作、接入限制与证据。</p>
+          <p>第一行是 ESP32 样例路线。点开每格查看工具、交付物或接口证据。</p>
         </div>
         <div class="view-switch" role="group" aria-label="比较视图">
           <button id="stage-view" type="button" aria-pressed="true">阶段覆盖</button>
@@ -82,84 +81,17 @@
       <noscript>请启用 JavaScript 以查看比较表。</noscript>
     </section>
 
-    <section class="route" id="route" aria-labelledby="route-title">
-      <p class="kicker">从需求到可验收实物</p>
-      <h2 id="route-title">一条今天能走的开发路线</h2>
-      <p class="route-intro">样例是一台 USB 供电的 ESP32 桌面温湿度记录器。先用开发板跑通采样，再做定制 PCB 和打印外壳。首版通过 USB 串口输出读数，由电脑保存带时间戳的 CSV。设备无电池，关闭无线功能。目标是做出能复测的样机，并保留转小批量所需的生产资料。</p>
-      <ol class="route-steps">
-        <li id="route-intent">
-          <h3>想法与需求</h3>
-          <p class="route-tool">GitHub Issues + 仓库里的需求文档</p>
-          <p>定义采样间隔、允许误差、供电、外壳尺寸和验收办法。由负责人确认这些指标后再选料。</p>
-          <p class="route-output"><strong>交付</strong> · <code>SPEC.md</code> 与验收用例表</p>
-          <p class="route-links"><a href="https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/creating-an-issue">GitHub Issues 指南 ↗</a></p>
-        </li>
-        <li id="route-design">
-          <h3>设计</h3>
-          <p class="route-tool">ESP-IDF + 嘉立创 EDA 专业版 + FreeCAD</p>
-          <p>用 ESP32 开发板和传感器验证读数及串口协议。用嘉立创 EDA 的本地 MCP 辅助画板、检查和导出。将 PCB 的 STEP 导入 FreeCAD，按实际尺寸设计开孔、螺柱和传感器通风。</p>
-          <p class="route-output"><strong>交付</strong> · EDA 源工程、固件源码、板卡 STEP、外壳 FCStd / STEP</p>
-          <p class="route-links"><a href="https://docs.espressif.com/projects/esp-idf/en/stable/esp32/get-started/start-project.html">ESP-IDF ↗</a> <a href="?platform=easyeda&amp;stage=design#matrix">嘉立创 EDA MCP</a> <a href="https://www.freecad.org/features">FreeCAD ↗</a></p>
-        </li>
-        <li id="route-parts">
-          <h3>选件</h3>
-          <p class="route-tool">立创商城 BOM 配单 + 嘉立创 SMT 料库</p>
-          <p>用立创商城做初选，最终在 SMT 下单侧复核可贴库存。冻结厂商料号、贴片料号、封装和经工程确认的替代料。料号变化时重新核对引脚、封装和固件。</p>
-          <p class="route-output"><strong>交付</strong> · 带准确料号和缺料处理的锁定 BOM</p>
-          <p class="route-links"><a href="https://www.szlcsc.com/news/16581.html">立创新版 BOM 配单 ↗</a> <a href="https://prodocs.easyeda.com/cn/schematic/export-order-parts/">嘉立创选料与贴片指南 ↗</a></p>
-        </li>
-        <li id="route-order">
-          <h3>下单</h3>
-          <p class="route-tool">嘉立创 PCB / SMT 网页 + 三维猴 3D 打印</p>
-          <p>先做 ERC、DRC 和装配尺寸检查。打包 Gerber 与钻孔文件，另存 BOM、贴片坐标和外壳 STEP。先走少量样件，由人核对文件版本、数量、总价及交期，再确认并付款。</p>
-          <p class="route-output"><strong>交付</strong> · 制造文件包、审单记录和订单号</p>
-          <p class="route-links"><a href="https://prodocs.easyeda.com/cn/quick-start.html">EDA 导出指南 ↗</a> <a href="?platform=jlc&amp;stage=order#matrix">PCB 下单接口与人工交接</a> <a href="https://www.jlc.com/portal/q7i28571.html">三维猴报价与下单 ↗</a></p>
-        </li>
-        <li id="route-fabrication">
-          <h3>制造</h3>
-          <p class="route-tool">嘉立创制板 + 三维猴打印</p>
-          <p>板和外壳按同一修订号生产。确认板厚、孔位、外壳材料和关键尺寸。首单用网页订单状态跟踪，已获批的业务线可以接 API。</p>
-          <p class="route-output"><strong>交付</strong> · 裸板与外壳样件、对应订单和版本</p>
-          <p class="route-links"><a href="?platform=jlc&amp;stage=fabrication#matrix">生产进度接口</a> <a href="https://www.jlc.com/portal/q7i40026.html">打印文件要求 ↗</a> <a href="https://www.jlc.com/portal/server_guide_29849.html">打印进度查询 ↗</a></p>
-        </li>
-        <li id="route-assembly">
-          <h3>装配</h3>
-          <p class="route-tool">嘉立创 SMT + 本地整机装配</p>
-          <p>贴片前逐件核对位号、正反面、极性和旋转，确认工艺边及基准点。PCBA 和外壳到货后，在本地装螺丝、检查接口对位和传感器通风。</p>
-          <p class="route-output"><strong>交付</strong> · 完整样机、贴片确认记录与装配说明</p>
-          <p class="route-links"><a href="https://www.jlc.com/portal/server_guide_19327.html">嘉立创 SMT 流程 ↗</a> <a href="?platform=jlc&amp;stage=assembly#matrix">装配接口覆盖</a></p>
-        </li>
-        <li id="route-verify">
-          <h3>验证</h3>
-          <p class="route-tool">ESP-IDF + 万用表、限流电源和参考温湿度计</p>
-          <p>工程师先检查短路和供电，再用 <code>idf.py flash monitor</code> 烧录与抓日志。逐台验证读数误差、重启后恢复、连续运行和外壳适配，按需求表判定结果。</p>
-          <p class="route-output"><strong>交付</strong> · 按样机编号归档的测试结果、CSV、串口日志和复测记录</p>
-          <p class="route-links"><a href="https://docs.espressif.com/projects/esp-idf/en/stable/esp32/get-started/start-project.html">烧录和串口监视 ↗</a> <a href="?stage=verify#matrix">设计检查与实物验证的边界</a></p>
-        </li>
-        <li id="route-scale">
-          <h3>量产与认证</h3>
-          <p class="route-tool">嘉立创小批量返单 + SGS 等具备相应资质的实验室</p>
-          <p>样机通过后，冻结 BOM、制造文件、固件版本和测试规程，先做一批试产并按批次验收。计划对外销售时，依据目标市场及最终配置，请实验室确认适用项目与样品要求。工程与质量负责人依据结果放行。</p>
-          <p class="route-output"><strong>交付</strong> · 可复产资料包、首批良率与返修记录、适用的检测报告或证书</p>
-          <p class="route-links"><a href="?platform=jlc&amp;stage=scale#matrix">嘉立创返单接口</a> <a href="https://www.sgs-cqe.de/en/service-portfolio.html">SGS 测试项目 ↗</a></p>
-        </li>
-      </ol>
-      <p class="route-note">Hi3D 可放在概念外观阶段，工程外壳仍以尺寸、公差和 STEP 为准。工厂已经部署黑湖时，可在试产阶段接工单、报工和批次记录。<a href="?platform=hi3d&amp;stage=design#matrix">Hi3D</a> · <a href="?platform=blacklake&amp;stage=fabrication#matrix">黑湖智造</a></p>
-      <p class="route-note">这条路线按公开文档和现有接口设计。本次未为该样例打样、下单或送检。</p>
-    </section>
-
     <section class="method" id="method" aria-labelledby="method-title">
       <div>
         <h2 id="method-title">评测口径</h2>
-        <p>八个阶段沿用 EP.110。下单一列借用 DeepDive 的六个动作：能力查询、校验、报价、下单、跟踪和取消，并记录凭据、测试环境和人工确认。</p>
+        <p>矩阵覆盖硬件开发八个阶段。下单一列借用 DeepDive 的六个动作：能力查询、校验、报价、下单、跟踪和取消，并记录凭据、测试环境和人工确认。</p>
         <p>“主要动作可调”以单元格写明的子流程为准。例如能查工厂生产进度，代表订单状态可见。验证阶段分别记录设计检查、工厂质检和实物功能测试。各阶段覆盖独立判定。</p>
       </div>
       <div>
         <h3>证据与复核</h3>
         <p>以公开官方文档和公告为主。Hi3D、Slant 3D 另查了公开 MCP 工具列表。历史业务实测引用 DeepDive。本次未提交生成任务、生产工单、订单或付款。</p>
         <div class="method-links">
-          <a href="https://xiaopingfeng.com/buzzwords/110/#c-flow" target="_blank" rel="noopener noreferrer">EP.110 · 硬件开发八站 <span aria-hidden="true">↗</span></a>
-          <a href="https://xiaopingfeng.com/deepdive/agent-native-services/?v=2#sec-01" target="_blank" rel="noopener noreferrer">DeepDive · 猫粮机订单链的评测口径 <span aria-hidden="true">↗</span></a>
+                <a href="https://xiaopingfeng.com/deepdive/agent-native-services/?v=2#sec-01" target="_blank" rel="noopener noreferrer">DeepDive · 猫粮机订单链的评测口径 <span aria-hidden="true">↗</span></a>
         </div>
       </div>
     </section>
@@ -169,6 +101,63 @@
     </section>
     <footer class="page-footer"><a href="/">问野 · Roam</a><a href="#page-title">回到顶部 ↑</a></footer>
   </main>
+
+  <template id="route-content">
+
+      <p class="route-intro">样例是一台 USB 供电的 ESP32 桌面温湿度记录器。先用开发板跑通采样，再做定制 PCB 和打印外壳。首版通过 USB 串口输出读数，由电脑保存带时间戳的 CSV。设备无电池，关闭无线功能。目标是做出能复测的样机，并保留转小批量所需的生产资料。</p>
+      <ol class="route-steps">
+        <li data-step="intent" data-tools="GitHub Issues">
+          <p class="route-tool">GitHub Issues + 仓库里的需求文档</p>
+          <p>定义采样间隔、允许误差、供电、外壳尺寸和验收办法。由负责人确认这些指标后再选料。</p>
+          <p class="route-output"><strong>交付</strong> · <code>SPEC.md</code> 与验收用例表</p>
+          <p class="route-links"><a href="https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/creating-an-issue">GitHub Issues 指南 ↗</a></p>
+        </li>
+        <li data-step="design" data-tools="ESP-IDF + 嘉立创 EDA + FreeCAD">
+          <p class="route-tool">ESP-IDF + 嘉立创 EDA 专业版 + FreeCAD</p>
+          <p>用 ESP32 开发板和传感器验证读数及串口协议。用嘉立创 EDA 的本地 MCP 辅助画板、检查和导出。将 PCB 的 STEP 导入 FreeCAD，按实际尺寸设计开孔、螺柱和传感器通风。</p>
+          <p class="route-output"><strong>交付</strong> · EDA 源工程、固件源码、板卡 STEP、外壳 FCStd / STEP</p>
+          <p class="route-links"><a href="https://docs.espressif.com/projects/esp-idf/en/stable/esp32/get-started/start-project.html">ESP-IDF ↗</a> <a href="?platform=easyeda&amp;stage=design#matrix">嘉立创 EDA MCP</a> <a href="https://www.freecad.org/features">FreeCAD ↗</a></p>
+        </li>
+        <li data-step="parts" data-tools="立创商城 + 嘉立创 SMT">
+          <p class="route-tool">立创商城 BOM 配单 + 嘉立创 SMT 料库</p>
+          <p>用立创商城做初选，最终在 SMT 下单侧复核可贴库存。冻结厂商料号、贴片料号、封装和经工程确认的替代料。料号变化时重新核对引脚、封装和固件。</p>
+          <p class="route-output"><strong>交付</strong> · 带准确料号和缺料处理的锁定 BOM</p>
+          <p class="route-links"><a href="https://www.szlcsc.com/news/16581.html">立创新版 BOM 配单 ↗</a> <a href="https://prodocs.easyeda.com/cn/schematic/export-order-parts/">嘉立创选料与贴片指南 ↗</a></p>
+        </li>
+        <li data-step="order" data-tools="嘉立创 PCB / SMT + 三维猴">
+          <p class="route-tool">嘉立创 PCB / SMT 网页 + 三维猴 3D 打印</p>
+          <p>先做 ERC、DRC 和装配尺寸检查。打包 Gerber 与钻孔文件，另存 BOM、贴片坐标和外壳 STEP。先走少量样件，由人核对文件版本、数量、总价及交期，再确认并付款。</p>
+          <p class="route-output"><strong>交付</strong> · 制造文件包、审单记录和订单号</p>
+          <p class="route-links"><a href="https://prodocs.easyeda.com/cn/quick-start.html">EDA 导出指南 ↗</a> <a href="?platform=jlc&amp;stage=order#matrix">PCB 下单接口与人工交接</a> <a href="https://www.jlc.com/portal/q7i28571.html">三维猴报价与下单 ↗</a></p>
+        </li>
+        <li data-step="fabrication" data-tools="嘉立创制板 + 三维猴">
+          <p class="route-tool">嘉立创制板 + 三维猴打印</p>
+          <p>板和外壳按同一修订号生产。确认板厚、孔位、外壳材料和关键尺寸。首单用网页订单状态跟踪，已获批的业务线可以接 API。</p>
+          <p class="route-output"><strong>交付</strong> · 裸板与外壳样件、对应订单和版本</p>
+          <p class="route-links"><a href="?platform=jlc&amp;stage=fabrication#matrix">生产进度接口</a> <a href="https://www.jlc.com/portal/q7i40026.html">打印文件要求 ↗</a> <a href="https://www.jlc.com/portal/server_guide_29849.html">打印进度查询 ↗</a></p>
+        </li>
+        <li data-step="assembly" data-tools="嘉立创 SMT + 本地装配">
+          <p class="route-tool">嘉立创 SMT + 本地整机装配</p>
+          <p>贴片前逐件核对位号、正反面、极性和旋转，确认工艺边及基准点。PCBA 和外壳到货后，在本地装螺丝、检查接口对位和传感器通风。</p>
+          <p class="route-output"><strong>交付</strong> · 完整样机、贴片确认记录与装配说明</p>
+          <p class="route-links"><a href="https://www.jlc.com/portal/server_guide_19327.html">嘉立创 SMT 流程 ↗</a> <a href="?platform=jlc&amp;stage=assembly#matrix">装配接口覆盖</a></p>
+        </li>
+        <li data-step="verify" data-tools="ESP-IDF + 台架实测">
+          <p class="route-tool">ESP-IDF + 万用表、限流电源和参考温湿度计</p>
+          <p>工程师先检查短路和供电，再用 <code>idf.py flash monitor</code> 烧录与抓日志。逐台验证读数误差、重启后恢复、连续运行和外壳适配，按需求表判定结果。</p>
+          <p class="route-output"><strong>交付</strong> · 按样机编号归档的测试结果、CSV、串口日志和复测记录</p>
+          <p class="route-links"><a href="https://docs.espressif.com/projects/esp-idf/en/stable/esp32/get-started/start-project.html">烧录和串口监视 ↗</a> <a href="?stage=verify#matrix">设计检查与实物验证的边界</a></p>
+        </li>
+        <li data-step="scale" data-tools="嘉立创返单 + 第三方实验室">
+          <p class="route-tool">嘉立创小批量返单 + SGS 等具备相应资质的实验室</p>
+          <p>样机通过后，冻结 BOM、制造文件、固件版本和测试规程，先做一批试产并按批次验收。计划对外销售时，依据目标市场及最终配置，请实验室确认适用项目与样品要求。工程与质量负责人依据结果放行。</p>
+          <p class="route-output"><strong>交付</strong> · 可复产资料包、首批良率与返修记录、适用的检测报告或证书</p>
+          <p class="route-links"><a href="?platform=jlc&amp;stage=scale#matrix">嘉立创返单接口</a> <a href="https://www.sgs-cqe.de/en/service-portfolio.html">SGS 测试项目 ↗</a></p>
+        </li>
+      </ol>
+      <p class="route-note">Hi3D 可放在概念外观阶段，工程外壳仍以尺寸、公差和 STEP 为准。工厂已经部署黑湖时，可在试产阶段接工单、报工和批次记录。<a href="?platform=hi3d&amp;stage=design#matrix">Hi3D</a> · <a href="?platform=blacklake&amp;stage=fabrication#matrix">黑湖智造</a></p>
+      <p class="route-note">这条路线按公开文档和现有接口设计。本次未为该样例打样、下单或送检。</p>
+  </template>
 
   <dialog id="details" aria-labelledby="detail-title">
     <div class="detail-header">
