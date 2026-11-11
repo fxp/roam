@@ -3,15 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="从需求到量产，比较硬件平台在八个阶段的 MCP、API、CLI 和人工交接。">
+  <meta name="description" content="从需求到量产，比较硬件平台在 17 个阶段的 MCP、API、CLI 和人工交接。">
   <title>硬件 Agent 接入 Bench · 问野 Roam</title>
   <link rel="canonical" href="https://roam.xiaopingfeng.com/hardware-agent-bench/">
   <meta property="og:title" content="硬件 Agent 接入 Bench">
-  <meta property="og:description" content="按硬件开发八站对比嘉立创、华秋、黑湖、Hi3D 等八个产品入口，逐项查看 MCP、API、人工确认和官方证据。">
+  <meta property="og:description" content="把硬件开发拆成 17 个阶段，对比嘉立创、华秋、黑湖、Hi3D、乐鑫、Wokwi 等 18 个产品入口的 MCP、API、人工操作与官方证据。">
   <meta property="og:url" content="https://roam.xiaopingfeng.com/hardware-agent-bench/">
-  <link rel="stylesheet" href="./bench.css?v=7">
-  <script defer src="./bench-data.js?v=5"></script>
-  <script defer src="./bench.js?v=7"></script>
+  <link rel="stylesheet" href="./bench.css?v=8">
+  <script defer src="./bench-data.js?v=8"></script>
+  <script defer src="./bench.js?v=8"></script>
 </head>
 <body>
   <a class="skip" href="#matrix">跳到评测矩阵</a>
@@ -35,8 +35,8 @@
       <aside class="snapshot" aria-label="评测范围">
         <div class="snapshot-head"><span>公开证据评测</span><time datetime="2026-11-11">2026.11.11</time></div>
         <div class="snapshot-stats">
-          <div><strong>08</strong><span>硬件开发阶段</span></div>
-          <div><strong id="platform-count">08</strong><span>平台与产品入口</span></div>
+          <div><strong id="stage-count">17</strong><span>硬件开发阶段</span></div>
+          <div><strong id="platform-count">18</strong><span>平台与产品入口</span></div>
         </div>
           </aside>
     </section>
@@ -45,7 +45,7 @@
       <div class="section-head" id="route">
         <div>
           <h2 id="matrix-title">平台 × 开发阶段</h2>
-          <p>点开任一格查看操作方式和依据。选中「可行路线」可沿八个阶段查看相关格子。</p>
+          <p>点开任一格查看操作方式和依据。选中「可行路线」可沿 17 个阶段查看相关格子。</p>
         </div>
         <div class="view-switch" role="group" aria-label="比较视图">
           <button id="stage-view" type="button" aria-pressed="true">阶段覆盖</button>
@@ -61,6 +61,8 @@
         <div class="toolbar">
           <div class="legend" id="legend" aria-label="覆盖图例"></div>
           <div class="filters">
+            <label class="visually-hidden" for="stage-group">筛选阶段组</label>
+            <select id="stage-group" aria-label="筛选阶段组"><option value="all">全部阶段</option></select>
             <label class="visually-hidden" for="filter">筛选平台入口</label>
             <select id="filter">
               <option value="all">全部入口</option>
@@ -86,13 +88,14 @@
     <section class="method" id="method" aria-labelledby="method-title">
       <div>
         <h2 id="method-title">评测口径</h2>
-        <p>矩阵覆盖硬件开发八个阶段。下单一列借用 DeepDive 的六个动作：能力查询、校验、报价、下单、跟踪和取消，并记录凭据、测试环境和人工确认。</p>
+        <p>矩阵把硬件开发分为 17 个阶段。设计、仿真、投产前审查、实板验证和送检各有独立交付物。选件、固件和结构可以并行推进，发现问题时回到对应设计阶段。下单一列借用 DeepDive 的六个动作：能力查询、校验、报价、下单、跟踪和取消，并记录凭据、测试环境和人工确认。</p>
         <p>“主要动作可调”以单元格写明的子流程为准。例如能查工厂生产进度，代表订单状态可见。验证阶段分别记录设计检查、工厂质检和实物功能测试。各阶段覆盖独立判定。</p>
       </div>
       <div>
         <h3>证据与复核</h3>
         <p>以公开官方文档和公告为主。Hi3D、Slant 3D 另查了公开 MCP 工具列表。历史业务实测引用 DeepDive。本次未提交生成任务、生产工单、订单或付款。</p>
         <div class="method-links">
+          <a href="https://www.nasa.gov/reference/5-0-product-realization/" target="_blank" rel="noopener noreferrer">NASA · 实现、集成与验证 ↗</a>
                 <a href="https://xiaopingfeng.com/deepdive/agent-native-services/?v=2#sec-01" target="_blank" rel="noopener noreferrer">DeepDive · 猫粮机订单链的评测口径 <span aria-hidden="true">↗</span></a>
         </div>
       </div>

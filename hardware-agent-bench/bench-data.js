@@ -9,18 +9,56 @@ const bench = {
     unknown: { label: '待核实', description: '业务相关，但公开证据不足以判定接口覆盖。' },
     na: { label: '范围外', description: '超出本行产品的评测范围。' }
   },
+  groups: [
+    ['definition', '产品定义'],
+    ['engineering', '设计与工程'],
+    ['prototype', '打样与验证'],
+    ['production', '试产与上市']
+  ],
   stages: [
-    { id: 'intent', name: '想法与需求', task: '收集需求、澄清约束并输出可交接的规格。' },
-    { id: 'design', name: '设计', task: '生成或修改原理图、PCB、外壳或固件，并导出设计文件。' },
-    { id: 'parts', name: '选件', task: '查料号、库存、价格和替代件，并形成可采购的 BOM。' },
-    { id: 'order', name: '下单', task: '校验文件、计价、创建订单、确认付款、跟踪与取消。' },
-    { id: 'fabrication', name: '制造', task: '查询工艺与材料能力，提交制造任务并读取生产进度。' },
-    { id: 'assembly', name: '装配', task: '提交贴片或装配任务，确认物料与工艺，读取进度。' },
-    { id: 'verify', name: '验证', task: '区分设计规则检查、工厂质量记录和实物上电或功能测试。' },
-    { id: 'scale', name: '量产与认证', task: '追踪批次、变更和量产放行，并取得可追溯的认证记录。' }
+    { id: 'intent', group: 'definition', name: '需求规格', task: '确定用户场景、功能、预算、约束和可测的验收指标。', handoff: '需求编号、规格表与验收用例。' },
+    { id: 'concept', group: 'definition', name: '概念外观', task: '探索外观、使用方式与尺寸包络，确认接口和不可变约束。', handoff: '参考图、选定外观和尺寸包络。网格可供结构设计参考。' },
+    { id: 'schematic', group: 'engineering', name: '电路原理图', task: '选择系统架构、电源、信号与接口，绘制原理图。', handoff: '原理图源文件、网表和接口约束。' },
+    { id: 'layout', group: 'engineering', name: 'PCB 布局布线', task: '按叠层、板框、封装与走线约束布局布线，保留测试点。', handoff: 'PCB 源工程、板框和 3D 板卡模型。' },
+    { id: 'mechanical', group: 'engineering', name: '机械结构', task: '设计外壳、固定件与接口开孔，校核公差、散热和装配空间。', handoff: '可编辑 CAD、制造 STEP 和关键尺寸图。' },
+    { id: 'firmware', group: 'engineering', name: '固件开发', task: '实现驱动、通信与业务逻辑，构建可重复的固件版本。', handoff: '源码、编译配置、固件二进制与版本号。' },
+    { id: 'parts', group: 'engineering', name: '选件与 BOM', task: '核对厂商料号、库存、价格、封装和替代件。', handoff: '含准确料号、用量、封装和已批准替代件的 BOM。' },
+    { id: 'simulation', group: 'engineering', name: '仿真与回归', task: '在虚拟电路或目标模型上运行用例，核对预期信号和串口输出。', handoff: '仿真配置、用例和回归日志。实板验收在后续执行。' },
+    { id: 'preflight', group: 'engineering', name: '投产前审查', task: '做 ERC、DRC、DFM 及贴片复核，确认制板和装配资料一致。', handoff: '审查结果、Gerber、钻孔、BOM、贴片坐标和适用的结构文件。' },
+    { id: 'order', group: 'prototype', name: '报价与下单', task: '提交制造包，计价、建单、确认付款并核对取消条件。', handoff: '报价、确认记录、供应商订单号和对应版本。' },
+    { id: 'fabrication', group: 'prototype', name: '制板与加工', task: '跟踪裸板、打印件或机加工件的工艺、生产与到货。', handoff: '来料、供应商批次和加工或运输状态。' },
+    { id: 'assembly', group: 'prototype', name: '贴片与装配', task: '核对贴片物料、位置、极性和工艺，完成板卡或整机装配。', handoff: '带样机编号的实物与装配记录。' },
+    { id: 'bringup', group: 'prototype', name: '上电与烧录', task: '检查电源和短路，首次上电，烧录并观察串口及关键总线。', handoff: '带样机编号的烧录版本、启动日志与波形。' },
+    { id: 'verify', group: 'prototype', name: '整机验证', task: '按需求执行功能、性能与可靠性用例，并记录缺陷。', handoff: '带实测结果、环境、版本、批次和签字的测试记录。' },
+    { id: 'scale', group: 'production', name: '小批量试产', task: '冻结工程包，创建试产工单，按批次追踪投料、良率与返修。', handoff: '工单、批次追溯、良率和返修记录。' },
+    { id: 'compliance', group: 'production', name: '送检与认证', task: '按目标市场与最终配置确认适用项目，安排样品和检测。', handoff: '送检配置、实验室报告与适用的认证资料。' },
+    { id: 'release', group: 'production', name: '量产放行', task: '核对试产、问题关闭和适用报告，批准生产基线并留存变更记录。', handoff: '签字放行记录、生产版本和可追溯的发布包。' }
   ],
   orderChecks: ['能力查询', '文件校验', '报价', '下单与付款', '跟踪', '取消'],
   sources: {
+    nasaDesign: ['NASA · 系统工程与需求分解', 'https://www.nasa.gov/reference/2-0-fundamentals-of-systems-engineering/'],
+    nasaRealization: ['NASA · 实现、集成与验证', 'https://www.nasa.gov/reference/5-0-product-realization/'],
+    githubMcp: ['GitHub · 官方 MCP 服务与 Issues 工具', 'https://github.com/github/github-mcp-server'],
+    githubIssues: ['GitHub · Issues REST API', 'https://docs.github.com/en/rest/issues/issues#create-an-issue'],
+    githubRelease: ['GitHub · Releases 与发布附件 API', 'https://docs.github.com/en/rest/releases'],
+    kicadCli: ['KiCad 10 · CLI、规则检查与导出', 'https://docs.kicad.org/10.0/en/cli/cli.html'],
+    kicadIpc: ['KiCad · IPC API 版本与编辑限制', 'https://dev-docs.kicad.org/en/apis-and-binding/ipc-api/for-addon-developers/'],
+    kicadSpice: ['KiCad 10 · 原理图 SPICE 仿真', 'https://docs.kicad.org/10.0/zh/eeschema/eeschema.html#simulator'],
+    freecad: ['FreeCAD · 参数化设计和 STEP 支持', 'https://www.freecad.org/features'],
+    freecadScript: ['FreeCAD · 官方手册与 Python 脚本', 'https://www.freecad.org/manual/a-freecad-manual.pdf'],
+    idfMcp: ['乐鑫 · ESP-IDF 命令行与 MCP', 'https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/tools/idf-py.html#esp-idf-mcp-server'],
+    idfFlash: ['乐鑫 · 构建、烧录和串口监视', 'https://docs.espressif.com/projects/esp-idf/en/stable/esp32/get-started/start-project.html'],
+    idfTest: ['乐鑫 · pytest-embedded 测试服务', 'https://docs.espressif.com/projects/pytest-embedded/en/latest/concepts/services.html'],
+    wokwiCi: ['Wokwi · CI 仿真与测试场景', 'https://docs.wokwi.com/wokwi-ci/getting-started'],
+    wokwiMcp: ['Wokwi · 实验性 MCP', 'https://docs.wokwi.com/wokwi-ci/mcp-support'],
+    digikeySearch: ['DigiKey · 产品搜索 V4', 'https://developer.digikey.com/products/product-information-v4/productsearch/keywordsearch'],
+    digikeyProducts: ['DigiKey · 报价、订单与状态 API', 'https://developer.digikey.com/products'],
+    digikeyFaq: ['DigiKey · 实时库存、OAuth 与沙箱', 'https://developer.digikey.com/faq'],
+    lcscBom: ['立创商城 · 新版 BOM 智能云表', 'https://www.szlcsc.com/news/16581.html'],
+    saleaeApi: ['Saleae · Logic 2 Automation API', 'https://docs.saleae.com/'],
+    saleaeOverview: ['Saleae · 自动采集、分析与导出', 'https://www.saleae.com/support/extensions-api/automation-api/automation'],
+    sgsPortfolio: ['SGS · EMC、产品安全与认证服务', 'https://www.sgs-cqe.de/en/service-portfolio.html'],
+    hqPrint: ['华秋 3D 打印 · 在线报价与文件格式', 'https://www.hq3dp.cn/quote'],
     deepdive: ['DeepDive · 哪家服务真正做到了 Agent native', 'https://xiaopingfeng.com/deepdive/agent-native-services/?v=2'],
     deepdiveMethod: ['DeepDive §01 · 六个动作与接入尺度', 'https://xiaopingfeng.com/deepdive/agent-native-services/?v=2#sec-01'],
     deepdiveJlc: ['DeepDive §03 · 嘉立创订单实测与接口清单', 'https://xiaopingfeng.com/deepdive/agent-native-services/?v=2#sec-03'],
@@ -63,9 +101,10 @@ const bench = {
       order: ['本地编辑器提供设计文件与制造数据导出。', '下单检查与本地 PCB DFM 扩展。', '报价由制造平台处理。', 'Beta 方法打开下单页，由人继续操作。', '订单跟踪由制造平台处理。', '撤单由制造平台处理。'],
       orderRefs: ['eda', 'edaDfm', 'edaOrder', 'edaOrder', 'edaOrder', 'edaOrder'],
       cells: {
-        design: ['core', '原理图与 PCB', 'MCP · API · CLI', '专业版可打开或创建项目，经 MCP、CLI 或脚本调用扩展 API，操作原理图和 PCB 并导出制造文件。需运行本地编辑器。', ['eda']],
+        schematic: ['core', '编辑原理图', 'MCP · API · CLI', '运行专业版客户端，经 MCP 或 CLI 调扩展 API 操作原理图并导出 BOM。', ['eda']],
+        layout: ['core', 'PCB 编辑与导出', 'MCP · API · CLI', '使用本地编辑器的扩展 API 操作 PCB，导出 Gerber 和 3D 文件。', ['eda']],
         order: ['partial', '检查后跳转', 'MCP · API · CLI', 'Beta 方法先做下单检查，再生成订单数据并打开下单页。后续报价、付款及撤单在制造侧处理。', ['edaOrder', 'deepdiveJlc']],
-        verify: ['partial', '本地 DFM', '扩展', '官方扩展可检查部分 PCB 可制造性规则。实物上电、功能测试和贴片方向复核仍需各自的验证证据。', ['edaDfm', 'deepdiveJlc']]
+        preflight: ['partial', '本地 DFM', '扩展', '官方扩展可检查部分 PCB 可制造性规则。实物上电、功能测试和贴片方向复核仍需各自的验证证据。', ['edaDfm', 'deepdiveJlc']]
       }
     },
     {
@@ -81,7 +120,7 @@ const bench = {
         order: ['partial', 'PCB 计价 / 建单', 'API', '国内 PCB 计价经 DeepDive 实跑。该文查到建单、订单查询，记录的建单流程通过公网 URL 交文件。国内 PCB 校验与撤单接口未见于该文核过的清单。', ['jlc', 'jlcGuide', 'deepdiveJlc'], '历史实测仅覆盖 PCB 计价。'],
         fabrication: ['core', '生产进度与物流', 'API', '国内 PCB 与 3D 打印可建单并查生产进度和物流。可见的是厂商履约状态，实时机台产能仍待核实。', ['jlc']],
         assembly: ['partial', 'SMT 订单查询', 'API · 网页', 'API 可查 SMT 订单、生产进度和物料。SMT 建单公开指引走网页，需核对 PCB 订单、BOM 和贴片位置。', ['jlc', 'jlcSmt', 'deepdiveJlc']],
-        verify: ['ui', '网页贴片复核', '网页', 'DeepDive 记录了在贴片预览中人工核对元件方向。制造侧的结构化 DFM、测试报告或验收签署接口未核实。', ['deepdiveJlc']],
+        preflight: ['ui', '网页贴片复核', '网页', 'DeepDive 记录了在贴片预览中人工核对元件方向。制造侧的结构化 DFM、测试报告或验收签署接口未核实。', ['deepdiveJlc']],
         scale: ['partial', 'PCB 返单', 'API', '开放平台支持 PCB 返单和进度跟踪。批次质量放行、工程变更和认证记录接口待核实。', ['jlc']]
       }
     },
@@ -107,8 +146,8 @@ const bench = {
       human: '人开通资源包。任务消耗积分，部分失败类型退还或免扣。',
       refs: ['hiMcp', 'hiApi', 'hiQuery', 'hiFaq', 'deepdiveAgent'],
       cells: {
-        design: ['core', '图生 3D', 'MCP · API', '可提交图片生成几何与纹理，随后查询任务并取下载链接。REST 支持状态回调。尺寸、公差和可编辑工程 CAD 需另行验证。', ['hiMcp', 'hiApi', 'hiQuery', 'hiFaq', 'deepdiveAgent'], '本页只读探测列出 2 个 MCP 工具，均无 annotations。未提交生成任务。'],
-        verify: ['unknown', '网格校验待核', '待核实', '生成接口输出网格和纹理。公开 MCP 工具列表只有提交和查询，独立的尺寸、公差或可打印性校验能力待核实。', ['hiMcp', 'hiFaq']]
+        concept: ['core', '图生 3D', 'MCP · API', '可提交图片生成几何与纹理，随后查询任务并取下载链接。REST 支持状态回调。尺寸、公差和可编辑工程 CAD 需另行验证。', ['hiMcp', 'hiApi', 'hiQuery', 'hiFaq', 'deepdiveAgent'], '本页只读探测列出 2 个 MCP 工具，均无 annotations。未提交生成任务。'],
+        preflight: ['unknown', '网格校验待核', '待核实', '生成接口输出网格和纹理。公开 MCP 工具列表只有提交和查询，独立的尺寸、公差或可打印性校验能力待核实。', ['hiMcp', 'hiFaq']]
       }
     },
     {
@@ -119,10 +158,11 @@ const bench = {
       refs: ['hqKiCad', 'hqDsh', 'hqPlugins'],
       cells: {
         intent: ['partial', '需求转系统方案', 'DSH 工具', '开源插件注册系统模块图和原理图生成工具，并可交付预览或工程文件。完整需求追踪与验收规格接口待核实。', ['hqPlugins']],
-        design: ['core', '原理图与 PCB', 'DSH · IPC API', 'DSH 插件支持原理图、符号和封装生成，经 KiCad IPC API 操作 PCB。新版 Windows 发行版另有自动布线适配器。', ['hqDsh', 'hqPlugins']],
+        schematic: ['core', '原理图与符号生成', 'DSH 工具', 'DSH 插件可生成原理图、符号和封装。工程师仍需复核设计结果。', ['hqDsh', 'hqPlugins']],
+        layout: ['core', 'PCB 编辑与布线', 'DSH · IPC API', '经 KiCad IPC API 操作 PCB。新版 Windows 发行版另有自动布线适配器。', ['hqDsh', 'hqPlugins']],
         parts: ['partial', '查件 / BOM 询价', 'DSH 工具', '有器件搜索和报价工具。发行版支持 BOM 匹配，替代件审批与采购闭环待核实。', ['hqDsh', 'hqPlugins']],
         order: ['ui', '插件上传文件', '桌面工具', '发行说明展示 PCB、SMT 插件导出制造文件并转入下单页。华秋 PCB 合作 API 单独评估。', ['hqKiCad']],
-        verify: ['partial', '结构化 DRC', 'CLI · DSH', 'DRC 插件调用 kicad-cli 并返回结构化结果。实物上电与功能验收另需证据。', ['hqDsh']]
+        preflight: ['partial', '结构化 DRC', 'CLI · DSH', 'DRC 插件调用 kicad-cli 并返回结构化结果。实物上电与功能验收另需证据。', ['hqDsh']]
       }
     },
     {
@@ -138,7 +178,7 @@ const bench = {
         order: ['partial', '建单 / 支付 / 删除', 'API', '官方公告列出计价及订单创建、修改、查询、支付和删除。校验、删除边界及付款审批语义需申请后核实。', ['hq']],
         fabrication: ['core', '生产进度与物流', 'API', 'PCB 合作公告列出创建 PCB 订单、查询生产进度和物流跟踪。字段级合同及调用结果待联调。', ['hq']],
         assembly: ['ui', 'PCBA 网页下单', '网页', '公开帮助提供 PCBA 下单和 SMT 返单流程。PCB API 合作公告未列明 SMT 建单接口。', ['hqPcba', 'hq']],
-        verify: ['ui', '桌面 DFM', '桌面工具', '官方提供 PCB 可制造性分析软件。公开的检查 API、结构化结果和实物测试接口待核实。', ['hqDfm']],
+        preflight: ['ui', '桌面 DFM', '桌面工具', '官方提供 PCB 可制造性分析软件。公开的检查 API、结构化结果和实物测试接口待核实。', ['hqDfm']],
         scale: ['ui', 'PCBA 网页返单', '网页', '已审过生产资料的 PCBA 订单可在网页返单。批次放行、变更或认证记录的专用接口待核实。', ['hqPcba', 'hq']]
       }
     },
@@ -167,8 +207,118 @@ const bench = {
       cells: {
         order: ['partial', '报价与结账链接', 'MCP · API', '公共 MCP 支持上传 STL、改数量、查运费并生成结账链接。公开 MCP 工具列表未见撤单或订单状态工具，REST 支持查订单及开工前撤单。', ['slantMcp', 'slantApi'], '本页只读探测列出 10 个带 annotations 的工具。报价实跑见 DeepDive。'],
         fabrication: ['core', '打印与进度', 'MCP · API', 'MCP 公开材料、数量和交期，完成付款后进入打印。REST 提供订单进度。', ['slantMcp', 'slantApi']],
-        verify: ['partial', '可打印性反馈', 'MCP', '报价接口可返回实验性的可打印性问题与改进建议。实物尺寸、材料性能和功能验收另需证据。', ['slantMcp', 'deepdiveSlant']],
+        preflight: ['partial', '可打印性反馈', 'MCP', '报价接口可返回实验性的可打印性问题与改进建议。实物尺寸、材料性能和功能验收另需证据。', ['slantMcp', 'deepdiveSlant']],
         scale: ['partial', '批量阶梯报价', 'MCP · API', '可按不同数量查单价和交期。量产批次放行与认证的接口待核实。', ['slantMcp', 'slantApi']]
+      }
+    },
+    {
+      id: 'github', name: 'GitHub', scope: '需求与版本管理', color: 'blue', mcp: '托管 / 本地', api: 'REST',
+      access: '使用仓库权限授权官方 MCP 或 REST API，按需开启 Issues 工具。',
+      test: '可用测试仓库验证权限、需求和发布流程。',
+      human: '产品负责人确认需求和验收阈值。发版权限由仓库配置，实体批次仍需质量签字。',
+      refs: ['githubMcp', 'githubIssues', 'githubRelease'],
+      cells: {
+        intent: ['core', '需求单与验收项', 'MCP · REST', '用 Issues 读写需求、验收标准和责任人。以需求编号关联后续设计和测试。', ['githubMcp', 'githubIssues']],
+        release: ['partial', '版本与发布附件', 'REST', '可创建发布并上传与版本对应的固件、制造包和测试报告。质量负责人另行审核实体批次。', ['githubRelease']]
+      }
+    },
+    {
+      id: 'kicad', name: 'KiCad', scope: '开源电子设计', color: 'violet', mcp: '未找到', api: 'IPC API · CLI',
+      access: '安装 KiCad。9/10 的 IPC 需要正在运行的 PCB 编辑器，导出与规则检查可走 CLI。',
+      test: '本地工程可复跑 CLI。按所用版本核对 IPC 的编辑范围。',
+      human: '工程师确认电路行为、板厂约束和无法靠规则判断的问题。',
+      refs: ['kicadCli', 'kicadIpc'],
+      cells: {
+        schematic: ['partial', '原理图与网表', 'CLI · 编辑器', 'KiCad 10 可用 CLI 导出原理图网表和 BOM。原理图编辑在桌面完成，10 版 IPC 插件入口位于 PCB 编辑器。', ['kicadCli', 'kicadIpc']],
+        layout: ['core', 'PCB 编辑与导出', 'IPC API · CLI', '通过 IPC 对接 PCB 编辑器，并用 CLI 导出 Gerber、钻孔和 STEP。9/10 的 IPC 需要 GUI 会话。', ['kicadIpc', 'kicadCli']],
+        simulation: ['ui', '电路 SPICE 仿真', '桌面工具', 'KiCad 原理图编辑器集成 ngspice。先为器件配置模型，再选择瞬态或频域分析。此格记录编辑器中的操作流程。', ['kicadSpice']],
+        preflight: ['core', 'ERC / DRC 报告', 'CLI', '可脚本化执行原理图 ERC 与 PCB DRC，并保存报告或按违规退出。板厂专用 DFM 和功能验证仍需对应流程。', ['kicadCli']]
+      }
+    },
+    {
+      id: 'freecad', name: 'FreeCAD', scope: '参数化机械 CAD', color: 'violet', mcp: '未找到', api: '本地 Python',
+      access: '安装桌面应用，用本地 Python 脚本操作参数化模型。',
+      test: '用本地样件、板卡 STEP 和尺寸约束验证脚本与导出。',
+      human: '工程师确认配合公差、材料和装配可达性。',
+      refs: ['freecad', 'freecadScript'],
+      cells: {
+        mechanical: ['core', '参数化外壳 / STEP', 'Python · 桌面', '可导入板卡 STEP，按板框、连接器和固定点建立可编辑外壳，再导出 STEP 或 STL。', ['freecad', 'freecadScript']]
+      }
+    },
+    {
+      id: 'esp-idf', name: '乐鑫 ESP-IDF', scope: 'ESP32 固件与实板测试', color: 'blue', mcp: '本地', api: '本地 CLI',
+      access: '安装支持 MCP 的 ESP-IDF 与 mcp 功能，或直接使用 idf.py 命令行。按版本核对工具清单。',
+      test: '可本地构建。实板测试需要目标板、串口和相应测试连接。',
+      human: '人确认目标板与串口，首次上电检查电源及接线。',
+      refs: ['idfMcp', 'idfFlash', 'idfTest'],
+      cells: {
+        firmware: ['core', '创建、配置与构建', 'MCP · CLI', '官方文档列出建项目、选芯片、构建和读取产物状态。固定芯片型号、配置和固件版本后交给烧录。', ['idfMcp', 'idfFlash']],
+        bringup: ['core', '烧录与串口日志', 'MCP · CLI', '可按端口烧录。官方最新 MCP 文档含脚本式串口监视。首次上电和电源测量由人完成。', ['idfMcp', 'idfFlash']],
+        verify: ['partial', '实板回归测试', 'pytest · CLI', 'pytest-embedded 可驱动实板并断言串口输出。测试夹具、传感器参考值和整机验收仍需项目定义。', ['idfTest']]
+      }
+    },
+    {
+      id: 'wokwi', name: 'Wokwi', scope: '嵌入式仿真与 CI', color: 'violet', mcp: '本地 · 实验性', api: 'CLI',
+      access: '用 Wokwi CLI 和 CI token，提供固件二进制与仿真配置。实验性 MCP 随 CLI。',
+      test: '云端仿真支持自动化场景和串口断言，受方案配额约束。',
+      human: '人确认目标芯片、模拟器件和验收用例，实板测试另行执行。',
+      refs: ['wokwiCi', 'wokwiMcp'],
+      cells: {
+        simulation: ['core', '仿真场景与串口断言', 'CLI · 实验 MCP', 'CI 可运行固件、模拟按键和传感器输入，并对串口输出设断言。仿真服务器需要固件二进制。', ['wokwiCi', 'wokwiMcp']]
+      }
+    },
+    {
+      id: 'lcsc', name: '立创商城', scope: '国内元器件与 BOM 配单', color: 'orange', mcp: '未找到', api: '商城端待核实',
+      access: '新版 BOM 智能云表可通过网页导入或粘贴。此行评估商城端，嘉立创开放平台按业务线单列。',
+      test: '可在网页试配单，公开商城采购沙箱待核实。',
+      human: '人核对料号、价格、库存和替代料，再确认采购。',
+      refs: ['lcscBom', 'jlc'],
+      cells: {
+        parts: ['ui', '匹配 BOM 和查库存', '网页', '新版 BOM 云表可匹配商品并查看参数、库存和价格。商城端公开可调用的配单合同待核实。', ['lcscBom']],
+        order: ['ui', '批量采购元器件', '网页', 'BOM 配单支持网页批量采购。此格仅指器件采购，制板和贴片下单分别评估。', ['lcscBom']]
+      }
+    },
+    {
+      id: 'digikey', name: 'DigiKey', scope: '全球元器件分销', color: 'orange', mcp: '未找到', api: 'OAuth REST',
+      access: '注册应用，按所需 API 使用 OAuth。Ordering API 要求有效的 DigiKey 企业信用账户。',
+      test: '官方有沙箱。部分查询返回示例数据，用于验证接入与响应结构。',
+      human: '工程师批准替代件。下单遵守账户权限和项目付款授权。',
+      refs: ['digikeySearch', 'digikeyProducts', 'digikeyFaq'],
+      cells: {
+        parts: ['core', '料号、价格与库存', 'REST API', '可按料号、参数和品类查询。用 Product Details 复核实时价格和库存，关键词查询可能来自缓存。', ['digikeySearch', 'digikeyFaq']],
+        order: ['partial', '报价与器件订单', 'REST API', '官方目录有报价、下单及订单状态。Ordering 需要企业信用账户，此格限元器件采购。', ['digikeyProducts']]
+      }
+    },
+    {
+      id: 'saleae', name: 'Saleae Logic 2', scope: '台架波形与总线测试', color: 'teal', mcp: '未找到', api: '本地 Python',
+      access: '用 Logic 2 启动自动化服务，经 Python 连接。实测需要受支持的 USB 逻辑分析仪。',
+      test: '可保存和加载采集记录，连接硬件后运行重复采集。',
+      human: '人接线、选量程与采样率，并判断波形是否符合工程要求。',
+      refs: ['saleaeOverview', 'saleaeApi'],
+      cells: {
+        bringup: ['partial', '采集启动与总线信号', 'Python API · 人工接线', '脚本可配置、启动采集并保存波形，用于复查 SPI、I²C 或串口。上电及电气安全检查仍由工程师负责。', ['saleaeOverview', 'saleaeApi']],
+        verify: ['partial', '自动采集与导出', 'Python API', '能重复记录、分析并导出捕获数据，供台架用例比较。验收规则和其他测量仪器由项目补齐。', ['saleaeOverview', 'saleaeApi']]
+      }
+    },
+    {
+      id: 'sgs', name: 'SGS', scope: '第三方检测与认证服务', color: 'teal', mcp: '未找到', api: '业务接口待核实',
+      access: '根据目标市场、产品与适用项目联系具备相应资质的实验室。',
+      test: '实验室按项目和样品执行，接入沙箱待核实。',
+      human: '工程师与实验室确认配置、检测范围及报告。质量负责人据此审批。',
+      refs: ['sgsPortfolio'],
+      cells: {
+        compliance: ['ui', 'EMC 与安全送检', '人工 / 实验室', '公开服务包括 EMC、射频、产品安全和认证支持。应按目标市场与最终产品配置确认适用项目。', ['sgsPortfolio']]
+      }
+    },
+    {
+      id: 'hq3dp', name: '华秋 3D 打印', scope: '结构件与小批量打印', color: 'orange', mcp: '未找到', api: '业务接口待核实',
+      access: '登录官网上传 STEP 或 STL，选材料和工艺，使用在线报价。',
+      test: '公开资料可核对文件格式和工艺。接入沙箱待核实。',
+      human: '人确认模型版本、材料、数量、报价和订单。',
+      refs: ['hqPrint'],
+      cells: {
+        order: ['ui', '打印在线报价与下单', '网页', '登录后可上传模型、选工艺并建单。公开可调用的报价和订单接口待核实。', ['hqPrint']],
+        fabrication: ['ui', '打印结构件', '网页', '平台接单后生产打印件。工程师确认版本、材料和关键尺寸。', ['hqPrint']]
       }
     }
   ]

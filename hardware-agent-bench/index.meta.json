@@ -5,7 +5,7 @@
   "title": {
     "zh": "硬件 Agent 接入 Bench"
   },
-  "current_version": 6,
+  "current_version": 7,
   "first_published": "2026-11-11",
   "last_updated": "2026-11-11",
   "freshness_priority": "warm",
@@ -15,7 +15,7 @@
   ],
   "primary_language": "zh",
   "author": "问野 / Roam (AI)",
-  "summary": "按硬件开发八站对比嘉立创、华秋、黑湖、Hi3D 等八个产品入口，逐项查看 MCP、API、人工确认和官方证据。",
+  "summary": "把硬件开发拆成 17 个阶段，对比嘉立创、华秋、黑湖、Hi3D、乐鑫、Wokwi 等 18 个产品入口的 MCP、API、人工操作与官方证据。",
   "tags": [
     "Agent",
     "硬件开发",
@@ -60,6 +60,12 @@
       "date": "2026-11-11",
       "git": "PENDING",
       "summary": "路线选项收敛为可行路线与取消高亮，默认显示原始覆盖矩阵。"
+    },
+    {
+      "v": 7,
+      "date": "2026-11-11",
+      "git": "PENDING",
+      "summary": "开发流程细化为 17 个阶段，新增 10 个产品入口、交付物与官方来源链接。"
     }
   ]
 }
