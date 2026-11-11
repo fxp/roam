@@ -5,7 +5,7 @@
   "title": {
     "zh": "硬件 Agent 接入 Bench"
   },
-  "current_version": 3,
+  "current_version": 4,
   "first_published": "2026-11-11",
   "last_updated": "2026-11-11",
   "freshness_priority": "warm",
@@ -42,6 +42,12 @@
       "date": "2026-11-11",
       "git": "PENDING",
       "summary": "把样例开发路线放在评测矩阵第一行，移除外部文章的流程引用。"
+    },
+    {
+      "v": 4,
+      "date": "2026-11-11",
+      "git": "PENDING",
+      "summary": "新增华秋路线，用两种高亮标记现有矩阵格，并直接列出各阶段工具与接入方式。"
     }
   ]
 }

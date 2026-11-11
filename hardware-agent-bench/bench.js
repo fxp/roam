@@ -9,8 +9,12 @@ const accessView = document.querySelector('#access-view');
 const dialog = document.querySelector('#details');
 const detailBody = document.querySelector('#detail-body');
 const routeContent = document.querySelector('#route-content').content;
-const routeSteps = new Map([...routeContent.querySelectorAll('[data-step]')].map(step => [step.dataset.step, step]));
+const huaqiuContent = document.querySelector('#huaqiu-route').content;
+const routeSteps = [...routeContent.querySelectorAll('[data-step]'), ...huaqiuContent.querySelectorAll('[data-step]')];
+const routeControls = document.querySelector('.route-controls');
+const routeNames = { jlc: '嘉立创', hq: '华秋', shared: '两条路线共用' };
 let view = 'stage';
+let highlight = 'both';
 
 const filters = {
   all: () => true,
@@ -32,11 +36,16 @@ function platformHeading(platform) {
 
 function stageCell(platform, stage) {
   const [level, action, channel] = platform.cells[stage.id] ?? ['na', '范围外', ''];
-  const body = level === 'na'
+  const step = routeStep(platform.id, stage.id);
+  const body = step && highlightVisible(step)
+    ? routeLabel(step)
+    : level === 'na'
     ? '<span aria-hidden="true">—</span>'
     : `<strong><span class="dot" aria-hidden="true"></span>${action}</strong><small>${channel}</small>`;
-  return `<td><button type="button" class="cell ${level}" data-platform="${platform.id}" data-stage="${stage.id}"
-    aria-label="${platform.name}，${stage.name}，${levels[level].label}${level === 'na' ? '' : '，' + action}">${body}</button></td>`;
+  const featured = step && highlightVisible(step);
+  const label = featured ? `${routeNames[routeKind(step)]}路线，${step.dataset.tools}，${step.dataset.mode}` : `${levels[level].label}${level === 'na' ? '' : '，' + action}`;
+  return `<td><button type="button" class="cell ${featured ? 'route-highlight ' + routeKind(step) : level}" data-platform="${platform.id}" data-stage="${stage.id}"
+    aria-label="${platform.name}，${stage.name}，${label}">${body}</button></td>`;
 }
 
 function accessCells(platform) {
@@ -46,16 +55,28 @@ function accessCells(platform) {
     <td>${platform.access}</td><td>${platform.test}</td><td>${platform.human}</td>`;
 }
 
-function routeRow() {
-  const cells = stages.map(stage => {
-    const tools = routeSteps.get(stage.id).dataset.tools;
-    return `<td><button type="button" class="cell route-cell" data-route="${stage.id}"
-      aria-label="开发路线，${stage.name}，${tools}"><strong>${tools}</strong></button></td>`;
-  });
-  return `<tr class="route-row" id="route">
-    <th scope="row"><button type="button" class="platform" data-route="overview">
-      <span><span class="platform-name">推荐开发路线</span><span class="platform-scope">ESP32 温湿度记录器</span></span>
-    </button></th>${cells.join('')}</tr>`;
+function routeStep(platform, stage) {
+  return routeSteps.find(step => step.dataset.platform === platform && step.dataset.step === stage);
+}
+
+function routeKind(step) {
+  if (step.dataset.platform === 'shared') return 'shared';
+  return step.getRootNode() === huaqiuContent ? 'hq' : 'jlc';
+}
+
+function highlightVisible(step) {
+  return highlight === 'both' || routeKind(step) === 'shared' || routeKind(step) === highlight;
+}
+
+function routeLabel(step) {
+  return `<span class="route-tag">${routeNames[routeKind(step)]}</span>
+    <strong>${step.dataset.tools}</strong><small>${step.dataset.mode}</small>`;
+}
+
+function stageHeading(stage, index) {
+  const step = routeStep('shared', stage.id);
+  return `<th scope="col"><button type="button" data-stage="${stage.id}"><span class="stage-number">${String(index + 1).padStart(2, '0')}</span>${stage.name}</button>
+    ${step ? `<button type="button" class="route-highlight shared" data-route="${stage.id}" aria-label="${stage.name}，两条路线共用，${step.dataset.tools}，${step.dataset.mode}">${routeLabel(step)}</button>` : ''}</th>`;
 }
 
 function render() {
@@ -65,19 +86,19 @@ function render() {
   matrix.caption.textContent = stageMode ? '硬件平台分阶段接口覆盖' : '硬件平台接入条件';
   stageView.setAttribute('aria-pressed', stageMode);
   accessView.setAttribute('aria-pressed', !stageMode);
+  routeControls.hidden = !stageMode;
   legend.innerHTML = stageMode
     ? Object.entries(levels).map(([id, { label, description }]) =>
         `<span class="legend-item ${id}" title="${description}"><span class="dot" aria-hidden="true"></span>${label}</span>`).join('')
     : '点平台名称查看接入说明与来源';
   document.querySelector('.mobile-note').firstChild.textContent = stageMode ? '左右滑动查看各阶段 ' : '左右滑动查看接入条件 ';
   const headings = stageMode
-    ? stages.map((stage, index) =>
-        `<th scope="col"><button type="button" data-stage="${stage.id}"><span class="stage-number">${String(index + 1).padStart(2, '0')}</span>${stage.name}</button></th>`)
+    ? stages.map(stageHeading)
     : ['官方 MCP', 'API 类型', '接入与文档', '测试环境', '人工确认 / 费用'].map(label => `<th scope="col">${label}</th>`);
   matrix.tHead.innerHTML = `<tr><th scope="col">平台 / 产品</th>${headings.join('')}</tr>`;
   const platformRows = visible.map(platform =>
     `<tr>${platformHeading(platform)}${stageMode ? stages.map(stage => stageCell(platform, stage)).join('') : accessCells(platform)}</tr>`).join('');
-  matrix.tBodies[0].innerHTML = (stageMode ? routeRow() : '') + platformRows;
+  matrix.tBodies[0].innerHTML = platformRows;
   document.querySelector('#row-count').textContent = `显示 ${visible.length} / ${platforms.length} 个产品入口`;
   document.querySelector('.matrix-footer span:last-child').textContent =
     stageMode ? '覆盖等级按单个产品与阶段判定' : '业务调用条件以平台授权为准';
@@ -130,11 +151,16 @@ function showPlatform(platform) {
 }
 
 function showCell(platform, stage) {
+  const step = routeStep(platform.id, stage.id);
   const [level, action, channel, summary, refs, note] = platform.cells[stage.id] ?? [
     'na', '范围外', '—', `本行评估 ${platform.scope}。该阶段超出此产品在本评测中的范围。`, platform.refs
   ];
   showDetail(`${platform.name} / ${stage.name}`, `<h2 id="detail-title">${action}</h2>
     ${detailLink(platform, stage)}
+    ${step ? `<section class="route-detail ${routeKind(step)}">
+      <h3>${routeNames[routeKind(step)]}路线 · ${stage.name}</h3>
+      <p><strong>${step.dataset.tools}</strong> · ${step.dataset.mode}</p>
+      ${step.innerHTML}</section>` : ''}
     <p><span class="detail-status ${level}"><span class="dot" aria-hidden="true"></span>${levels[level].label}</span></p>
     <p>${summary}</p>
     ${note ? `<p class="detail-note">${note}</p>` : ''}
@@ -163,20 +189,22 @@ function showStage(stage) {
 
 function showRoute(id) {
   if (id === 'overview') {
-    const steps = stages.map(stage => `<li><button type="button" data-route="${stage.id}">
-      <strong>${stage.name}</strong><span>${routeSteps.get(stage.id).dataset.tools}</span>
-    </button></li>`).join('');
     const notes = [...routeContent.querySelectorAll('.route-note')].map(note => note.outerHTML).join('');
-    showDetail('推荐开发路线', `<h2 id="detail-title">ESP32 温湿度记录器</h2>
-      ${routeContent.querySelector('.route-intro').outerHTML}<ul class="stage-platforms">${steps}</ul>${notes}`);
+    showDetail('开发路线', `<h2 id="detail-title">ESP32 温湿度记录器</h2>
+      ${routeContent.querySelector('.route-intro').outerHTML}${notes}`);
     return;
   }
   const stage = stages.find(item => item.id === id);
   if (!stage) return;
-  showDetail('推荐开发路线 / ESP32 温湿度记录器', `<h2 id="detail-title">${stage.name}</h2>
+  const step = routeStep('shared', id);
+  if (!step) {
+    const original = routeSteps.find(item => item.dataset.step === id);
+    return showCell(platforms.find(item => item.id === original.dataset.platform), stage);
+  }
+  showDetail('两条路线共用 / ESP32 温湿度记录器', `<h2 id="detail-title">${stage.name}</h2>
     <a class="detail-link" href="?route=${stage.id}#route">此项链接</a>
-    ${routeSteps.get(id).innerHTML}
-    <button type="button" class="route-back" data-route="overview">查看完整路线</button>`);
+    <p><strong>${step.dataset.tools}</strong> · ${step.dataset.mode}</p>
+    ${step.innerHTML}`);
 }
 
 function openFromButton(event) {
@@ -201,10 +229,19 @@ accessView.addEventListener('click', () => {
   render();
 });
 filter.addEventListener('change', render);
+routeControls.addEventListener('click', event => {
+  const button = event.target.closest('[data-highlight]');
+  if (!button) return;
+  highlight = button.dataset.highlight;
+  filter.value = 'all';
+  routeControls.querySelectorAll('[data-highlight]').forEach(item => item.setAttribute('aria-pressed', item === button));
+  render();
+});
 document.querySelectorAll('a[href="#route"]').forEach(link => link.addEventListener('click', () => {
   if (view === 'access') stageView.click();
 }));
 matrix.addEventListener('click', openFromButton);
+routeControls.addEventListener('click', openFromButton);
 detailBody.addEventListener('click', openFromButton);
 dialog.addEventListener('click', event => {
   const bounds = dialog.getBoundingClientRect();

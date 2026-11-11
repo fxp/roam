@@ -45,6 +45,7 @@ const bench = {
     hqDsh: ['华秋 KiCad · 10.0.7-2 发布说明', 'https://kicad.eda.cn/docs/posts/KiCad-10.0.7-2-Release.html'],
     hqPlugins: ['华秋 · DSH 插件与工具源码', 'https://github.com/Huaqiu-Electronics/dsh-pcb-eda'],
     hqDfm: ['华秋 · DFM 软件介绍', 'https://www.huaqiu.com/news/detail/id/31.html'],
+    hqPcba: ['华秋 · PCBA 下单、贴片与返单', 'https://www.hqpcb.com/help/p_1721.html'],
     hqHelp: ['华秋 · SMT / PCBA 帮助中心', 'https://www.hqpcb.com/help'],
     pcbway: ['PCBWay · 合作伙伴测试接口', 'https://api-partner.pcbway.com/Help'],
     pcbwayApply: ['PCBWay · API 合作申请', 'https://www.pcbway.com/api_cooperation.html'],
@@ -136,9 +137,9 @@ const bench = {
         parts: ['ui', 'BOM 配单', '网页', '帮助中心展示元器件采购和 BOM 配单。PCB 合作公告提及商城开放服务，具体 BOM 查询和替代件接口待核实。', ['hq', 'hqHelp']],
         order: ['partial', '建单 / 支付 / 删除', 'API', '官方公告列出计价及订单创建、修改、查询、支付和删除。校验、删除边界及付款审批语义需申请后核实。', ['hq']],
         fabrication: ['core', '生产进度与物流', 'API', 'PCB 合作公告列出创建 PCB 订单、查询生产进度和物流跟踪。字段级合同及调用结果待联调。', ['hq']],
-        assembly: ['ui', 'PCBA 网页下单', '网页', '公开帮助提供 PCBA 下单和 SMT 返单流程。PCB API 合作公告未列明 SMT 建单接口。', ['hqHelp', 'hq']],
+        assembly: ['ui', 'PCBA 网页下单', '网页', '公开帮助提供 PCBA 下单和 SMT 返单流程。PCB API 合作公告未列明 SMT 建单接口。', ['hqPcba', 'hq']],
         verify: ['ui', '桌面 DFM', '桌面工具', '官方提供 PCB 可制造性分析软件。公开的检查 API、结构化结果和实物测试接口待核实。', ['hqDfm']],
-        scale: ['unknown', '批次接口待核', '待核实', '公开合作公告覆盖 PCB 订单与进度。批次放行、变更或认证记录的专用接口待核实。', ['hq']]
+        scale: ['ui', 'PCBA 网页返单', '网页', '已审过生产资料的 PCBA 订单可在网页返单。批次放行、变更或认证记录的专用接口待核实。', ['hqPcba', 'hq']]
       }
     },
     {
