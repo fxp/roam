@@ -181,3 +181,11 @@ thead .route-highlight strong { font-size: 11px; }
 @media (max-width: 650px) {
   .masthead nav a[href="#method"] { display: none; }
 }
+.route-controls [data-highlight="mixed"] { background: #efe9ff; color: #523483; }
+.route-highlight.mixed, .route-detail.mixed { --route-ink: #523483; --route-fill: #efe9ff; --route-accent: #7852b1; }
+.cell.route-muted:not(:hover):not(:focus-visible) {
+  background-color: #f8f8fa;
+  color: #687385;
+}
+.cell.route-muted:not(:hover):not(:focus-visible) .dot { background: #a4adbb; }
+.route-highlight .route-transfer { border-top: 1px solid color-mix(in srgb, var(--route-accent) 28%, transparent); margin-top: 2px; padding-top: 2px; }

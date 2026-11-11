@@ -5,7 +5,7 @@
   "title": {
     "zh": "硬件 Agent 接入 Bench"
   },
-  "current_version": 4,
+  "current_version": 5,
   "first_published": "2026-11-11",
   "last_updated": "2026-11-11",
   "freshness_priority": "warm",
@@ -48,6 +48,12 @@
       "date": "2026-11-11",
       "git": "PENDING",
       "summary": "新增华秋路线，用两种高亮标记现有矩阵格，并直接列出各阶段工具与接入方式。"
+    },
+    {
+      "v": 5,
+      "date": "2026-11-11",
+      "git": "PENDING",
+      "summary": "新增 Hi3D 和黑湖混合路线，直接展示交接，选中路线时淡化其他单元格。"
     }
   ]
 }

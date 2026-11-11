@@ -10,11 +10,13 @@ const dialog = document.querySelector('#details');
 const detailBody = document.querySelector('#detail-body');
 const routeContent = document.querySelector('#route-content').content;
 const huaqiuContent = document.querySelector('#huaqiu-route').content;
-const routeSteps = [...routeContent.querySelectorAll('[data-step]'), ...huaqiuContent.querySelectorAll('[data-step]')];
+const mixedContent = document.querySelector('#mixed-route').content;
+const routeSteps = [routeContent, huaqiuContent, mixedContent].flatMap(content => [...content.querySelectorAll('[data-step]')]);
 const routeControls = document.querySelector('.route-controls');
-const routeNames = { jlc: '嘉立创', hq: '华秋', shared: '两条路线共用' };
+const routeNames = { jlc: '嘉立创', hq: '华秋', mixed: '混合', shared: '三条路线共用' };
+const directLink = new URLSearchParams(location.search);
 let view = 'stage';
-let highlight = 'both';
+let highlight = ['jlc', 'hq', 'mixed', 'all'].find(value => value === directLink.get('focus')) ?? 'mixed';
 
 const filters = {
   all: () => true,
@@ -43,8 +45,8 @@ function stageCell(platform, stage) {
     ? '<span aria-hidden="true">—</span>'
     : `<strong><span class="dot" aria-hidden="true"></span>${action}</strong><small>${channel}</small>`;
   const featured = step && highlightVisible(step);
-  const label = featured ? `${routeNames[routeKind(step)]}路线，${step.dataset.tools}，${step.dataset.mode}` : `${levels[level].label}${level === 'na' ? '' : '，' + action}`;
-  return `<td><button type="button" class="cell ${featured ? 'route-highlight ' + routeKind(step) : level}" data-platform="${platform.id}" data-stage="${stage.id}"
+  const label = featured ? `${routeTag(step)}，${step.dataset.tools}，${step.dataset.mode}` : `${levels[level].label}${level === 'na' ? '' : '，' + action}`;
+  return `<td><button type="button" class="cell ${featured ? 'route-highlight ' + displayRoute(step) : level + ' route-muted'}" data-platform="${platform.id}" data-stage="${stage.id}"
     aria-label="${platform.name}，${stage.name}，${label}">${body}</button></td>`;
 }
 
@@ -61,22 +63,37 @@ function routeStep(platform, stage) {
 
 function routeKind(step) {
   if (step.dataset.platform === 'shared') return 'shared';
-  return step.getRootNode() === huaqiuContent ? 'hq' : 'jlc';
+  const root = step.getRootNode();
+  if (root === huaqiuContent) return 'hq';
+  return root === mixedContent ? 'mixed' : 'jlc';
+}
+
+function displayRoute(step) {
+  const kind = routeKind(step);
+  return highlight === 'mixed' && kind === 'jlc' ? 'mixed' : kind;
 }
 
 function highlightVisible(step) {
-  return highlight === 'both' || routeKind(step) === 'shared' || routeKind(step) === highlight;
+  return highlight === 'all' || routeKind(step) === 'shared' || displayRoute(step) === highlight;
+}
+
+function routeTag(step) {
+  const kind = displayRoute(step);
+  return highlight === 'all' && kind === 'jlc' ? '嘉立创 / 混合' : routeNames[kind];
 }
 
 function routeLabel(step) {
-  return `<span class="route-tag">${routeNames[routeKind(step)]}</span>
-    <strong>${step.dataset.tools}</strong><small>${step.dataset.mode}</small>`;
+  const transfer = highlight === 'mixed' && step.dataset.transfer
+    ? `<small class="route-transfer">${step.dataset.transfer}</small>`
+    : '';
+  return `<span class="route-tag">${routeTag(step)}</span>
+    <strong>${step.dataset.tools}</strong><small>${step.dataset.mode}</small>${transfer}`;
 }
 
 function stageHeading(stage, index) {
   const step = routeStep('shared', stage.id);
   return `<th scope="col"><button type="button" data-stage="${stage.id}"><span class="stage-number">${String(index + 1).padStart(2, '0')}</span>${stage.name}</button>
-    ${step ? `<button type="button" class="route-highlight shared" data-route="${stage.id}" aria-label="${stage.name}，两条路线共用，${step.dataset.tools}，${step.dataset.mode}">${routeLabel(step)}</button>` : ''}</th>`;
+    ${step ? `<button type="button" class="route-highlight shared" data-route="${stage.id}" aria-label="${stage.name}，三条路线共用，${step.dataset.tools}，${step.dataset.mode}">${routeLabel(step)}</button>` : ''}</th>`;
 }
 
 function render() {
@@ -87,6 +104,8 @@ function render() {
   stageView.setAttribute('aria-pressed', stageMode);
   accessView.setAttribute('aria-pressed', !stageMode);
   routeControls.hidden = !stageMode;
+  routeControls.querySelectorAll('[data-highlight]').forEach(button =>
+    button.setAttribute('aria-pressed', button.dataset.highlight === highlight));
   legend.innerHTML = stageMode
     ? Object.entries(levels).map(([id, { label, description }]) =>
         `<span class="legend-item ${id}" title="${description}"><span class="dot" aria-hidden="true"></span>${label}</span>`).join('')
@@ -116,6 +135,7 @@ function detailLink(platform, stage) {
   const query = new URLSearchParams();
   if (platform) query.set('platform', platform.id);
   if (stage) query.set('stage', stage.id);
+  query.set('focus', highlight);
   return `<a class="detail-link" href="?${query}#matrix">此项链接</a>`;
 }
 
@@ -157,10 +177,10 @@ function showCell(platform, stage) {
   ];
   showDetail(`${platform.name} / ${stage.name}`, `<h2 id="detail-title">${action}</h2>
     ${detailLink(platform, stage)}
-    ${step ? `<section class="route-detail ${routeKind(step)}">
-      <h3>${routeNames[routeKind(step)]}路线 · ${stage.name}</h3>
+    ${step ? `<section class="route-detail ${displayRoute(step)}">
+      <h3>${routeTag(step)}路线 · ${stage.name}</h3>
       <p><strong>${step.dataset.tools}</strong> · ${step.dataset.mode}</p>
-      ${step.innerHTML}</section>` : ''}
+      ${step.innerHTML}${handoff(step)}</section>` : ''}
     <p><span class="detail-status ${level}"><span class="dot" aria-hidden="true"></span>${levels[level].label}</span></p>
     <p>${summary}</p>
     ${note ? `<p class="detail-note">${note}</p>` : ''}
@@ -201,10 +221,17 @@ function showRoute(id) {
     const original = routeSteps.find(item => item.dataset.step === id);
     return showCell(platforms.find(item => item.id === original.dataset.platform), stage);
   }
-  showDetail('两条路线共用 / ESP32 温湿度记录器', `<h2 id="detail-title">${stage.name}</h2>
-    <a class="detail-link" href="?route=${stage.id}#route">此项链接</a>
+  showDetail('三条路线共用 / ESP32 温湿度记录器', `<h2 id="detail-title">${stage.name}</h2>
+    <a class="detail-link" href="?route=${stage.id}&amp;focus=${highlight}#route">此项链接</a>
     <p><strong>${step.dataset.tools}</strong> · ${step.dataset.mode}</p>
-    ${step.innerHTML}`);
+    ${step.innerHTML}${handoff(step)}`);
+}
+
+function handoff(step) {
+  const mixed = highlight === 'mixed' || highlight === 'all' || routeKind(step) === 'mixed';
+  return mixed && step.dataset.handoff
+    ? `<p class="detail-note"><strong>混合路线交接</strong> · ${step.dataset.handoff}</p>`
+    : '';
 }
 
 function openFromButton(event) {
@@ -234,7 +261,6 @@ routeControls.addEventListener('click', event => {
   if (!button) return;
   highlight = button.dataset.highlight;
   filter.value = 'all';
-  routeControls.querySelectorAll('[data-highlight]').forEach(item => item.setAttribute('aria-pressed', item === button));
   render();
 });
 document.querySelectorAll('a[href="#route"]').forEach(link => link.addEventListener('click', () => {
@@ -250,7 +276,6 @@ dialog.addEventListener('click', event => {
 document.querySelector('#platform-count').textContent = String(platforms.length).padStart(2, '0');
 render();
 renderSourceIndex();
-const directLink = new URLSearchParams(location.search);
 const directPlatform = platforms.find(platform => platform.id === directLink.get('platform'));
 const directStage = stages.find(stage => stage.id === directLink.get('stage'));
 if (directLink.has('route')) showRoute(directLink.get('route'));
