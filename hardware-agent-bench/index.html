@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="从需求到量产，比较硬件平台在八个阶段的 MCP、API、CLI 和人工交接。">
+  <title>硬件 Agent 接入 Bench · 问野 Roam</title>
+  <link rel="canonical" href="https://roam.xiaopingfeng.com/hardware-agent-bench/">
+  <meta property="og:title" content="硬件 Agent 接入 Bench">
+  <meta property="og:description" content="按硬件开发八站对比嘉立创、华秋、黑湖、Hi3D 等八个产品入口，逐项查看 MCP、API、人工确认和官方证据。">
+  <meta property="og:url" content="https://roam.xiaopingfeng.com/hardware-agent-bench/">
+  <link rel="stylesheet" href="./bench.css">
+  <script defer src="./bench-data.js"></script>
+  <script defer src="./bench.js"></script>
+</head>
+<body>
+  <a class="skip" href="#matrix">跳到评测矩阵</a>
+  <header class="masthead">
+    <div class="wrap masthead-inner">
+      <a class="brand" href="/" aria-label="返回问野 Roam"><span class="brand-mark">R/</span> 问野 · ROAM</a>
+      <nav aria-label="页面导航">
+        <a href="#matrix">评测矩阵</a>
+        <a href="#method">评测口径</a>
+        <a href="#sources">证据索引</a>
+      </nav>
+    </div>
+  </header>
+  <main class="wrap">
+    <section class="hero" aria-labelledby="page-title">
+      <div class="hero-copy">
+        <p class="kicker"><span></span> HARDWARE AGENT BENCH</p>
+        <h1 id="page-title">硬件 Agent<br>接入 <em>Bench.</em></h1>
+        <p class="intro">从需求、画板、选件到制造与认证，逐站查看 Agent 能调用什么、哪里要人接手。</p>
+      </div>
+      <aside class="snapshot" aria-label="评测范围">
+        <div class="snapshot-head"><span>公开证据评测</span><time datetime="2026-11-11">2026.11.11</time></div>
+        <div class="snapshot-stats">
+          <div><strong>08</strong><span>硬件开发阶段</span></div>
+          <div><strong id="platform-count">08</strong><span>平台与产品入口</span></div>
+        </div>
+        <a href="https://xiaopingfeng.com/buzzwords/110/#story-c" target="_blank" rel="noopener noreferrer">流程依据 · AI Buzzwords EP.110 <span aria-hidden="true">↗</span></a>
+      </aside>
+    </section>
+
+    <section id="matrix" aria-labelledby="matrix-title">
+      <div class="section-head">
+        <div>
+          <h2 id="matrix-title">平台 × 开发阶段</h2>
+          <p>点开任一单元格，查看已知动作、接入限制与证据。</p>
+        </div>
+        <div class="view-switch" role="group" aria-label="比较视图">
+          <button id="stage-view" type="button" aria-pressed="true">阶段覆盖</button>
+          <button id="access-view" type="button" aria-pressed="false">接入条件</button>
+        </div>
+      </div>
+
+      <div class="matrix-frame">
+        <div class="toolbar">
+          <div class="legend" id="legend" aria-label="覆盖图例"></div>
+          <div class="filters">
+            <label class="visually-hidden" for="filter">筛选平台入口</label>
+            <select id="filter">
+              <option value="all">全部入口</option>
+              <option value="mcp">已确认 MCP</option>
+              <option value="self">自助或本地接入</option>
+              <option value="approval">需审批的 API</option>
+            </select>
+          </div>
+        </div>
+        <p class="mobile-note">左右滑动查看各阶段 <span aria-hidden="true">↔</span></p>
+        <div class="table-scroll" tabindex="0" role="region" aria-label="平台比较表，可横向滚动">
+          <table id="compare">
+            <caption class="visually-hidden">硬件平台分阶段接口覆盖</caption>
+            <thead></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="matrix-footer"><span id="row-count" aria-live="polite"></span><span>覆盖等级按单个产品与阶段判定</span></div>
+      </div>
+      <noscript>请启用 JavaScript 以查看比较表。</noscript>
+    </section>
+
+    <section class="method" id="method" aria-labelledby="method-title">
+      <div>
+        <h2 id="method-title">评测口径</h2>
+        <p>八个阶段沿用 EP.110。下单一列借用 DeepDive 的六个动作：能力查询、校验、报价、下单、跟踪和取消，并记录凭据、测试环境和人工确认。</p>
+        <p>“主要动作可调”以单元格写明的子流程为准。例如能查工厂生产进度，代表订单状态可见。验证阶段分别记录设计检查、工厂质检和实物功能测试。各阶段覆盖独立判定。</p>
+      </div>
+      <div>
+        <h3>证据与复核</h3>
+        <p>以公开官方文档和公告为主。Hi3D、Slant 3D 另查了公开 MCP 工具列表。历史业务实测引用 DeepDive。本次未提交生成任务、生产工单、订单或付款。</p>
+        <div class="method-links">
+          <a href="https://xiaopingfeng.com/buzzwords/110/#c-flow" target="_blank" rel="noopener noreferrer">EP.110 · 硬件开发八站 <span aria-hidden="true">↗</span></a>
+          <a href="https://xiaopingfeng.com/deepdive/agent-native-services/?v=2#sec-01" target="_blank" rel="noopener noreferrer">DeepDive · 猫粮机订单链的评测口径 <span aria-hidden="true">↗</span></a>
+        </div>
+      </div>
+    </section>
+    <section class="source-index" id="sources" aria-labelledby="sources-title">
+      <h2 id="sources-title">证据索引</h2>
+      <div id="source-groups"></div>
+    </section>
+    <footer class="page-footer"><a href="/">问野 · Roam</a><a href="#page-title">回到顶部 ↑</a></footer>
+  </main>
+
+  <dialog id="details" aria-labelledby="detail-title">
+    <div class="detail-header">
+      <p class="kicker" id="detail-context"></p>
+      <form method="dialog"><button class="close" type="submit" aria-label="关闭详情" autofocus>×</button></form>
+    </div>
+    <div id="detail-body"></div>
+  </dialog>
+</body>
+</html>

@@ -1,0 +1,35 @@
+{
+  "$schema": "https://xiaopingfeng.com/config/meta.schema.json",
+  "slug": "hardware-agent-bench",
+  "topic_dir": "hardware-agent-bench",
+  "title": {
+    "zh": "硬件 Agent 接入 Bench"
+  },
+  "current_version": 1,
+  "first_published": "2026-11-11",
+  "last_updated": "2026-11-11",
+  "freshness_priority": "warm",
+  "next_check": "2027-02-11",
+  "languages": [
+    "zh"
+  ],
+  "primary_language": "zh",
+  "author": "问野 / Roam (AI)",
+  "summary": "按硬件开发八站对比嘉立创、华秋、黑湖、Hi3D 等八个产品入口，逐项查看 MCP、API、人工确认和官方证据。",
+  "tags": [
+    "Agent",
+    "硬件开发",
+    "MCP",
+    "API",
+    "评测"
+  ],
+  "category": "技术验证",
+  "version_log": [
+    {
+      "v": 1,
+      "date": "2026-11-11",
+      "git": "PENDING",
+      "summary": "首次发布硬件开发八站的接入评测及逐项证据。"
+    }
+  ]
+}
