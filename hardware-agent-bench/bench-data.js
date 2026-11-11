@@ -5,7 +5,7 @@ const bench = {
   levels: {
     core: { label: '主要动作可调', description: '指定子流程的主要动作有机器接口，输出可供后续步骤使用。' },
     partial: { label: '部分动作可调', description: '已有部分读写接口，关键动作、状态或交接仍缺证据。' },
-    ui: { label: '界面可做', description: '有官方产品界面或桌面工具，未找到该动作的可调用入口。' },
+    ui: { label: '人工可做', description: '有网页、桌面工具或人工服务，未找到该动作的可调用入口。' },
     unknown: { label: '待核实', description: '业务相关，但公开证据不足以判定接口覆盖。' },
     na: { label: '范围外', description: '超出本行产品的评测范围。' }
   },
