@@ -168,3 +168,12 @@ body:has(dialog[open]) { overflow: hidden; }
   table { --provider-width: 118px; }
   .platform-source { margin-left: 15px; }
 }
+.handoff-legend { margin: -3px 0 10px; font-size: 12px; color: var(--muted); }
+.handoff-flags { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; }
+.handoff-flag { font: 700 10px/1.35 var(--sans); border: 1px solid currentColor; padding: 1px 3px; }
+.handoff-flag.direct { color: #135d54; background: #edf9f5; }
+.handoff-flag.mapping { color: #394c70; background: #eff2f7; }
+.handoff-flag.manual { color: #754110; background: #fff3df; }
+.handoff-flag.gap { color: #952b35; background: #fff0f2; }
+.handoff-audit { margin-top: 16px; padding: 8px 12px; border: 1px solid #cbd6e9; background: #f3f6fd; }
+#detail-body .handoff-audit h3 { margin: 6px 0; }

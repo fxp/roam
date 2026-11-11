@@ -1,6 +1,6 @@
 'use strict';
 
-const { levels, groups, stages, sources, platforms } = bench;
+const { levels, groups, stages, sources, platforms, handoffAudit, handoffLabels } = bench;
 const matrix = document.querySelector('#compare');
 const legend = document.querySelector('#legend');
 const filter = document.querySelector('#filter');
@@ -11,26 +11,7 @@ const dialog = document.querySelector('#details');
 const detailBody = document.querySelector('#detail-body');
 const routeControls = document.querySelector('.route-controls');
 const directLink = new URLSearchParams(location.search);
-const viableCells = new Set([
-  'github/intent',
-  'hi3d/concept',
-  'easyeda/schematic',
-  'easyeda/layout',
-  'freecad/mechanical',
-  'esp-idf/firmware',
-  'lcsc/parts',
-  'wokwi/simulation',
-  'easyeda/preflight',
-  'jlc/order',
-  'jlc/fabrication',
-  'jlc/assembly',
-  'esp-idf/bringup',
-  'esp-idf/verify',
-  'blacklake/verify',
-  'blacklake/scale',
-  'sgs/compliance',
-  'github/release'
-]);
+const handoffLegend = document.querySelector('#handoff-legend');
 let view = 'stage';
 let highlight = directLink.get('focus') === 'viable' ? 'viable' : 'none';
 
@@ -55,14 +36,21 @@ function platformHeading(platform) {
 
 function stageCell(platform, stage) {
   const [level, action, channel] = platform.cells[stage.id] ?? ['na', '范围外', ''];
+  const audit = handoffAudit[`${platform.id}/${stage.id}`];
+  const focused = highlight === 'viable';
   const body = level === 'na'
     ? '<span aria-hidden="true">—</span>'
     : `<strong><span class="dot" aria-hidden="true"></span>${action}</strong><small>${channel}</small>`;
-  const focusClass = highlight === 'viable'
-    ? (viableCells.has(`${platform.id}/${stage.id}`) ? ' route-highlight' : ' route-muted')
-    : '';
+  const focusClass = focused ? (audit ? ' route-highlight' : ' route-muted') : '';
+  const auditLabel = focused && audit ? '，' + audit.flags.map(flag => handoffLabels[flag]).join('，') : '';
   return `<td><button type="button" class="cell ${level}${focusClass}" data-platform="${platform.id}" data-stage="${stage.id}"
-    aria-label="${platform.name}，${stage.name}，${levels[level].label}${level === 'na' ? '' : '，' + action}">${body}</button></td>`;
+    aria-label="${platform.name}，${stage.name}，${levels[level].label}${level === 'na' ? '' : '，' + action}${auditLabel}">${body}
+    ${focused && audit ? handoffFlags(audit.flags) : ''}</button></td>`;
+}
+
+function handoffFlags(flags) {
+  return `<span class="handoff-flags">${flags.map(flag =>
+    `<span class="handoff-flag ${flag}">${handoffLabels[flag]}</span>`).join('')}</span>`;
 }
 
 function accessCells(platform) {
@@ -87,6 +75,7 @@ function render() {
   stageView.setAttribute('aria-pressed', stageMode);
   accessView.setAttribute('aria-pressed', !stageMode);
   routeControls.hidden = !stageMode;
+  handoffLegend.hidden = !stageMode || highlight !== 'viable';
   stageGroup.hidden = !stageMode;
   routeControls.querySelectorAll('[data-highlight]').forEach(button =>
     button.setAttribute('aria-pressed', button.dataset.highlight === highlight));
@@ -138,7 +127,8 @@ function renderSourceIndex() {
       ${sourceList(['nasaDesign', 'nasaRealization', 'deepdive', 'deepdiveMethod'])}
     </details>
     ${platforms.map(platform => {
-      const refs = new Set([...platform.refs, ...Object.values(platform.cells).flatMap(cell => cell[4]), ...platform.orderRefs ?? []]);
+      const auditRefs = Object.entries(platform.cells).flatMap(([stage]) => handoffAudit[`${platform.id}/${stage}`]?.refs ?? []);
+      const refs = new Set([...platform.refs, ...Object.values(platform.cells).flatMap(cell => cell[4]), ...platform.orderRefs ?? [], ...auditRefs]);
       return `<details><summary>${platform.name}</summary>${sourceList([...refs])}</details>`;
     }).join('')}`;
 }
@@ -164,6 +154,7 @@ function showPlatform(platform) {
 }
 
 function showCell(platform, stage) {
+  const audit = handoffAudit[`${platform.id}/${stage.id}`];
   const [level, action, channel, summary, refs, note] = platform.cells[stage.id] ?? [
     'na', '范围外', '—', `本行评估 ${platform.scope}。该阶段超出此产品在本评测中的范围。`, platform.refs
   ];
@@ -172,6 +163,13 @@ function showCell(platform, stage) {
     <p><span class="detail-status ${level}"><span class="dot" aria-hidden="true"></span>${levels[level].label}</span></p>
     <p>${summary}</p>
     ${note ? `<p class="detail-note">${note}</p>` : ''}
+    ${audit ? `<section class="handoff-audit" aria-label="可行路线交接复核">
+      <h3>可行路线 · 交接复核</h3>${handoffFlags(audit.flags)}
+      <dl class="detail-list">
+        <dt>本步交付</dt><dd>${audit.output}</dd>
+        <dt>交给下一步</dt><dd>${audit.next}</dd>
+        <dt>接入条件</dt><dd>${audit.check}</dd>
+      </dl><h3>交接依据</h3>${sourceList(audit.refs)}</section>` : ''}
     <dl class="detail-list">
       <dt>阶段任务</dt><dd>${stage.task}</dd>
       <dt>阶段交付物</dt><dd>${stage.handoff}</dd>
@@ -180,7 +178,7 @@ function showCell(platform, stage) {
     </dl>${stage.id === 'order' && platform.order ? `<h3>下单动作核对</h3>
       <dl class="detail-list">${bench.orderChecks.map((check, index) =>
         `<dt>${check}</dt><dd>${platform.order[index]} <span class="action-source">${externalLink('依据', sources[platform.orderRefs[index]][1])}</span></dd>`).join('')}</dl>` : ''}
-    <h3>证据来源</h3>${sourceList(refs)}`);
+    <h3>接口证据来源</h3>${sourceList(refs)}`);
 }
 
 function showStage(stage) {

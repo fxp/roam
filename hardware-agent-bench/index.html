@@ -9,9 +9,9 @@
   <meta property="og:title" content="硬件 Agent 接入 Bench">
   <meta property="og:description" content="把硬件开发拆成 17 个阶段，对比嘉立创、华秋、黑湖、Hi3D、乐鑫、Wokwi 等 18 个产品入口的 MCP、API、人工操作与官方证据。">
   <meta property="og:url" content="https://roam.xiaopingfeng.com/hardware-agent-bench/">
-  <link rel="stylesheet" href="./bench.css?v=8">
-  <script defer src="./bench-data.js?v=8.1"></script>
-  <script defer src="./bench.js?v=8"></script>
+  <link rel="stylesheet" href="./bench.css?v=9">
+  <script defer src="./bench-data.js?v=9"></script>
+  <script defer src="./bench.js?v=9"></script>
 </head>
 <body>
   <a class="skip" href="#matrix">跳到评测矩阵</a>
@@ -45,7 +45,7 @@
       <div class="section-head" id="route">
         <div>
           <h2 id="matrix-title">平台 × 开发阶段</h2>
-          <p>点开任一格查看操作方式和依据。选中「可行路线」可沿 17 个阶段查看相关格子。</p>
+          <p>点开格子查看接口和交接依据。「可行路线」会标出每步是否可直交、需人工确认或存在接口缺口。</p>
         </div>
         <div class="view-switch" role="group" aria-label="比较视图">
           <button id="stage-view" type="button" aria-pressed="true">阶段覆盖</button>
@@ -57,6 +57,7 @@
         <button type="button" data-highlight="viable" aria-pressed="false">可行路线</button>
         <button type="button" data-highlight="none" aria-pressed="true">取消高亮</button>
       </div>
+      <p id="handoff-legend" class="handoff-legend" hidden>「格式可直交」指下一工具接受该格式。人工确认、授权和缺口以各格详情为准。</p>
       <div class="matrix-frame">
         <div class="toolbar">
           <div class="legend" id="legend" aria-label="覆盖图例"></div>
@@ -95,6 +96,7 @@
         <h3>证据与复核</h3>
         <p>以公开官方文档和公告为主。Hi3D、Slant 3D 另查了公开 MCP 工具列表。历史业务实测引用 DeepDive。本次未提交生成任务、生产工单、订单或付款。</p>
         <div class="method-links">
+          <a href="https://roam.xiaopingfeng.com/hardware-agent-bench/supplier-ecosystem.md">供货商与生态 · 17 阶段交接记录 ↗</a>
           <a href="https://www.nasa.gov/reference/5-0-product-realization/" target="_blank" rel="noopener noreferrer">NASA · 实现、集成与验证 ↗</a>
                 <a href="https://xiaopingfeng.com/deepdive/agent-native-services/?v=2#sec-01" target="_blank" rel="noopener noreferrer">DeepDive · 猫粮机订单链的评测口径 <span aria-hidden="true">↗</span></a>
         </div>

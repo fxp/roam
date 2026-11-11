@@ -5,7 +5,7 @@
   "title": {
     "zh": "硬件 Agent 接入 Bench"
   },
-  "current_version": 7,
+  "current_version": 8,
   "first_published": "2026-11-11",
   "last_updated": "2026-11-11",
   "freshness_priority": "warm",
@@ -66,6 +66,12 @@
       "date": "2026-11-11",
       "git": "PENDING",
       "summary": "开发流程细化为 17 个阶段，新增 10 个产品入口、交付物与官方来源链接。"
+    },
+    {
+      "v": 8,
+      "date": "2026-11-11",
+      "git": "PENDING",
+      "summary": "复核可行路线的 17 阶段交接，加入人工确认、接口缺口和供货商生态文档。"
     }
   ]
 }

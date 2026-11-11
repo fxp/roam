@@ -34,8 +34,153 @@ const bench = {
     { id: 'compliance', group: 'production', name: '送检与认证', task: '按目标市场与最终配置确认适用项目，安排样品和检测。', handoff: '送检配置、实验室报告与适用的认证资料。' },
     { id: 'release', group: 'production', name: '量产放行', task: '核对试产、问题关闭和适用报告，批准生产基线并留存变更记录。', handoff: '签字放行记录、生产版本和可追溯的发布包。' }
   ],
+  handoffLabels: {
+    direct: '格式可直交',
+    mapping: '需转换或关联',
+    manual: '人工确认',
+    gap: '接口缺口'
+  },
+  handoffAudit: {
+    'github/intent': {
+      flags: ['mapping', 'manual'],
+      output: '需求 Issue、规格版本、验收项编号及阈值。',
+      next: 'Hi3D 接收外观参考图和尺寸包络，电路与结构设计同时读取冻结规格。',
+      check: 'Issues API 能交付标题、正文和编号。平台需把自由文本整理成结构化规格，并关联验收项。负责人确认约束、预算和放行阈值后再发给设计工具。',
+      refs: ['githubIssues', 'hiApi', 'nasaDesign']
+    },
+    'hi3d/concept': {
+      flags: ['mapping', 'manual'],
+      output: '选定参考图、任务 ID、网格下载链接和预览图。',
+      next: 'FreeCAD 读取网格作为参考，并同时接收 PCB STEP 和尺寸约束。',
+      check: 'MCP 或 REST 可返回网格资产。工程人员要选稿，并按公差、板框和接口位置重建参数化 CAD。记录输入图和下载结果版本。',
+      refs: ['hiMcp', 'hiQuery', 'freecad']
+    },
+    'easyeda/schematic': {
+      flags: ['direct', 'manual'],
+      output: '同一 EDA 工程的原理图、网络、位号与封装关联。',
+      next: '用嘉立创 EDA「更新/转换原理图到 PCB」，将引脚定义交给固件。',
+      check: '同工程可以直接更新 PCB。工程师确认供电、引脚和符号到封装的映射，审查 ECO 差异后再应用。',
+      refs: ['edaUpdate', 'eda']
+    },
+    'easyeda/layout': {
+      flags: ['direct', 'manual'],
+      output: 'PCB 源文件、板框、装配基准和板卡 STEP。',
+      next: 'FreeCAD 导入 STEP；PCB 工程与装配坐标保留给投产前审查。',
+      check: 'STEP 格式可接收。检查板框原点、单位、孔位及连接器高度；未绑定 STEP 的元件可能缺少三维模型，需补尺寸包络。',
+      refs: ['edaStep', 'freecad']
+    },
+    'freecad/mechanical': {
+      flags: ['direct', 'manual'],
+      output: '可编辑 FCStd、每个独立零件的 STEP、关键尺寸与配合公差。',
+      next: 'STEP 交嘉立创 3D 打印，关键尺寸随装配说明和验收表交给装测。',
+      check: '打印端接受 STEP。人确认材料、壁厚、工艺和公差，并按零件分别导出；板框或接口改版时重新核对外壳。',
+      refs: ['freecad', 'jlcPrint']
+    },
+    'esp-idf/firmware': {
+      flags: ['direct', 'mapping'],
+      output: '固定芯片目标和版本的 flasher_args.json、引用的全部镜像及 ELF。',
+      next: '同一套构建产物交 Wokwi 仿真，也保留给后续实板烧录。',
+      check: 'Wokwi 支持 ESP-IDF 原始烧录清单，但要有 wokwi.toml 与目标芯片匹配的 diagram.json。CLI 可生成初始配置，传感器连线和用例仍需项目配置。',
+      refs: ['idfMcp', 'wokwiIdf', 'wokwiCli']
+    },
+    'lcsc/parts': {
+      flags: ['mapping', 'manual', 'gap'],
+      output: '带厂商料号、封装、位号、用量和备选件的配单结果。',
+      next: '映射为嘉立创 SMT 的物料编号和装配 BOM，交给 DFM 与审单。',
+      check: '商城配单能查库存和价格。未找到公开接口证明商城库存、编号与实际可贴料一键同步。人在 SMT 侧核对可贴库存、型号、封装和替代料，保留位号对应表。',
+      refs: ['lcscBom', 'edaParts', 'jlcSmtFlow']
+    },
+    'wokwi/simulation': {
+      flags: ['mapping', 'manual'],
+      output: '仿真配置、用例、固件版本及串口日志。',
+      next: '回归结果并入投产前审查；同一固件版本进入台架。',
+      check: 'CLI 和实验 MCP 可执行仿真。平台需把结果关联到需求编号和固件版本。由人确认传感器模型覆盖范围，电源、信号完整性和实际公差安排实测。',
+      refs: ['wokwiCi', 'wokwiMcp', 'nasaRealization']
+    },
+    'easyeda/preflight': {
+      flags: ['mapping', 'manual', 'gap'],
+      output: 'ERC/DRC/DFM 记录与同版 Gerber、钻孔、BOM、坐标；外壳文件单独打包。',
+      next: 'PCB、SMT、3D 打印分别按各自文件要求提交，保留共同修订号。',
+      check: '自动导出后核对位号、数量、板面、旋转、极性和工艺边。官方有客户端 SMT 检查，但公开下单 API 未核实能返回同等的 SMT 审查结果。材料或料号变化后重新审查。',
+      refs: ['edaDfm', 'jlcSmtDfm', 'jlcBomFormat', 'jlc', 'deepdiveJlc']
+    },
+    'jlc/order': {
+      flags: ['mapping', 'manual', 'gap'],
+      output: '经确认的报价、制板/贴片/外壳订单号和修订号。',
+      next: '按业务线查询进度，在项目档案把同一修订号下的订单归并。',
+      check: 'PCB API 需申请，公开资料列有计价和建单。SMT 创建走网页，文件输入按已授权业务文档处理。付款、审单变更和贴片确认由人承担；国内 PCB 公开证据不足以确认完整校验与撤单闭环。',
+      refs: ['jlc', 'jlcGuide', 'jlcSmtFlow', 'jlcPrintFlow', 'deepdiveJlc']
+    },
+    'jlc/fabrication': {
+      flags: ['mapping', 'manual'],
+      output: '生产和物流状态、供应商订单号、实际到货与批次记录。',
+      next: '按版本把实物与来料清单交给贴片或整机装配，确认缺件和异常。',
+      check: '获批 API 可查相关订单状态；状态回传后仍需现场收料、识别实物批次及核对版次，外壳与板卡分别查单。',
+      refs: ['jlc', 'jlcPrintFlow', 'nasaRealization']
+    },
+    'jlc/assembly': {
+      flags: ['mapping', 'manual', 'gap'],
+      output: '已贴装板卡、已确认的贴片预览、同版外壳和样机编号。',
+      next: '装配人员核对连接器、固定件和传感器通风，再向首次上电交付实物与装配记录。',
+      check: 'SMT API 可查状态，贴片方向和替代料需在页面复核。公开资料未确认有接口把贴片和外壳订单合并为带序列号的整机装配记录，编号和关联由项目方维护。',
+      refs: ['jlc', 'jlcSmtFlow', 'jlcBomFormat', 'nasaRealization']
+    },
+    'esp-idf/bringup': {
+      flags: ['direct', 'manual'],
+      output: '样机编号、已烧录版本、串口启动日志和电源/总线检查记录。',
+      next: '带相同编号及固件版本的实物和日志交给整机验证。',
+      check: 'ESP-IDF CLI 或支持该工具的 MCP 可烧录并监视串口。工程师先核对目标端口、电压、限流和接线，确认首次上电条件。',
+      refs: ['idfMcp', 'idfFlash', 'nasaIntegration']
+    },
+    'esp-idf/verify': {
+      flags: ['mapping', 'manual'],
+      output: '按样机编号和固件版本记录的用例结果、原始日志及实测数据。',
+      next: '把原始证据按工单或样机编号归档，向黑湖提交汇总状态。',
+      check: 'pytest-embedded 可驱动实板并断言串口结果。整机指标仍需相应仪器或夹具，测试人员判定合格/不良。研发样机还没有试产工单时，先归档结果，待工厂建立编号后再关联。',
+      refs: ['idfTest', 'blacklakeReport', 'nasaRealization']
+    },
+    'blacklake/verify': {
+      flags: ['mapping', 'manual', 'gap'],
+      output: '黑湖质量状态、不良原因、工单与批次关联。',
+      next: '原始数据保留在项目档案，按相同编号汇入试产质量记录。',
+      check: '需有租户权限及对应工单/工序。批量报工是异步操作，需查询结果；没有公开证据确认串口日志或测试 CSV 可以原样作为质检报告写入。检验员确认判定及需二次确认的记录。',
+      refs: ['blacklakeMes', 'blacklakeReport', 'idfTest']
+    },
+    'blacklake/scale': {
+      flags: ['mapping', 'manual', 'gap'],
+      output: '冻结的工程版本、试产工单、来料批次、良率与返修记录。',
+      next: '将工单、批次及最终配置对应到送检样品；同时保留量产候选版本。',
+      check: '已授权工厂可用 API 建工单和报工，试产前先建单。嘉立创供应商订单号到黑湖工单的映射由平台或工厂建立，未核实有现成跨厂接口。由工厂确认排产和取样。',
+      refs: ['blacklakeMes', 'blacklakeReport', 'jlc', 'sgsPortfolio']
+    },
+    'sgs/compliance': {
+      flags: ['mapping', 'manual', 'gap'],
+      output: '经确认的送检配置、样品编号、实验室报告和适用的认证材料。',
+      next: '按产品和工程版本将报告原件、编号及签发方交给量产放行。',
+      check: '实验室与项目方确定市场、项目及样品。未核实可直接创建送检任务并取结构化报告的公共 API；平台须支持人工送检、上传原件及报告适用范围确认。',
+      refs: ['sgsPortfolio', 'nasaRealization']
+    },
+    'github/release': {
+      flags: ['mapping', 'manual', 'gap'],
+      output: '签字放行记录、带标签的固件、制造包、测试及检测报告。',
+      next: '冻结版本交给批量生产和后续变更控制，保留对需求、批次和报告的引用。',
+      check: 'GitHub REST 可发布版本及附件。实体批次获批由质量负责人签字。平台把发布标签、文件指纹、工单/批次和审批记录关联。',
+      refs: ['githubRelease', 'blacklakeMes', 'nasaRealization']
+    }
+  },
   orderChecks: ['能力查询', '文件校验', '报价', '下单与付款', '跟踪', '取消'],
   sources: {
+    edaUpdate: ['嘉立创 EDA · 更新/转换原理图到 PCB', 'https://prodocs.easyeda.com/cn/quick-start.html'],
+    edaStep: ['嘉立创 EDA · STEP 导出与器件模型', 'https://prodocs.lceda.cn/cn/faq/pcb/'],
+    edaParts: ['嘉立创 EDA · 元件购买与贴片导出', 'https://prodocs.easyeda.com/cn/schematic/export-order-parts/'],
+    wokwiIdf: ['Wokwi · ESP-IDF 烧录清单、镜像和板型', 'https://docs.wokwi.com/vscode/esp-idf'],
+    wokwiCli: ['Wokwi · CLI 配置与运行', 'https://docs.wokwi.com/wokwi-ci/cli-usage'],
+    jlcSmtDfm: ['嘉立创 · DFM 客户端 SMT 检查', 'https://www.jlc.com/portal/server_guide_41516.html'],
+    jlcBomFormat: ['嘉立创 · BOM 与贴片坐标格式', 'https://www.jlc.com/portal/server_guide_48022.html'],
+    jlcSmtFlow: ['嘉立创 · SMT 下单、核料与审单', 'https://www.jlc.com/portal/server_guide_19858.html'],
+    jlcPrint: ['嘉立创 3D 打印 · STEP 格式与工艺要求', 'https://www.jlc.com/portal/q7i40026.html'],
+    jlcPrintFlow: ['嘉立创 3D 打印 · 报价、审核与进度', 'https://www.jlc.com/portal/q7i28571.html'],
+    nasaIntegration: ['NASA · 产品集成与实物交接', 'https://www.nasa.gov/reference/5-2-product-integration/'],
     nasaDesign: ['NASA · 系统工程与需求分解', 'https://www.nasa.gov/reference/2-0-fundamentals-of-systems-engineering/'],
     nasaRealization: ['NASA · 实现、集成与验证', 'https://www.nasa.gov/reference/5-0-product-realization/'],
     githubMcp: ['GitHub · 官方 MCP 服务与 Issues 工具', 'https://github.com/github/github-mcp-server'],
